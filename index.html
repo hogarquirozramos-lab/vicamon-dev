@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VICAMON</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- BOTÓN DE MUTE -->
+<button id="btn-mute" onclick="toggleMute()" style="position:fixed;top:15px;right:15px;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.18);border-radius:99px;width:40px;height:40px;cursor:pointer;color:#fff;font-size:18px;z-index:9999;backdrop-filter:blur(4px)">🔊</button>
+
+<!-- LOGIN -->
+<div id="s-login" class="screen active">
+  <div class="login-logo" style="padding:0;background:none;-webkit-text-fill-color:initial"><img src="vicamon-logo.png" alt="VICAMON" style="max-width:280px;width:90%"></div>
+  <div class="login-sub">The Vitality Cash Game · Beta</div>
+  <div class="login-box">
+    <div id="step-wallet" style="margin-bottom:16px">
+      <div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Paso 1 — Conectar wallet</div>
+      <button class="btn" id="btn-phantom" style="width:100%;padding:11px;display:flex;align-items:center;justify-content:center;gap:10px" onclick="connectPhantom()">👻 Conectar Phantom</button>
+      <div id="wallet-connected" style="display:none;background:rgba(93,202,165,.1);border:0.5px solid rgba(93,202,165,.3);border-radius:8px;padding:10px 12px;margin-top:8px">
+        <div style="font-size:10px;color:#5DCAA5;margin-bottom:2px">✓ Wallet conectada</div>
+        <div id="wallet-addr" style="font-size:11px;color:rgba(255,255,255,.6);font-family:monospace"></div>
+        <div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:11px;color:rgba(255,255,255,.4)">HP disponibles:</span>
+          <span id="wallet-hp" style="font-size:13px;font-weight:600;color:#5DCAA5">Verificando...</span>
+        </div>
+      </div>
+      <div id="no-phantom" style="display:none;background:rgba(240,153,122,.1);border:0.5px solid rgba(240,153,122,.3);border-radius:8px;padding:10px 12px;margin-top:8px;font-size:12px;color:#F0997B">
+        Phantom no detectado. <a href="https://phantom.app" target="_blank" style="color:#F0997B;text-decoration:underline">Instalalo aqui</a> y recarga la pagina.
+      </div>
+    </div>
+    <div id="step-name" style="opacity:.4;pointer-events:none">
+      <div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Paso 2 — Tu nombre de combate</div>
+      <input id="inp-name" placeholder="Nickname" maxlength="20" autocomplete="off" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:8px;padding:11px 14px;color:#fff;font-size:15px;outline:none;margin-bottom:12px">
+      <button class="btn btn-blue" id="btn-continue" style="width:100%;padding:11px" onclick="goPickBeast()">Continuar →</button>
+    </div>
+    <div id="step-charge" style="display:none;margin-top:14px;background:rgba(74,158,255,.06);border:0.5px solid rgba(74,158,255,.2);border-radius:10px;padding:12px">
+      <div style="font-size:11px;color:#85B7EB;margin-bottom:5px">💡 Deposita USDC para retar jugadores reales</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.45);margin-bottom:8px">0.10 USDC = 100 HP · cualquier monto funciona</div>
+      <div style="background:rgba(0,0,0,.35);border-radius:6px;padding:8px 10px;font-family:monospace;font-size:10px;color:#85B7EB;word-break:break-all;margin-bottom:6px;cursor:pointer;display:flex;justify-content:space-between;align-items:center" onclick="copyWallet()">
+        <span>C7pezdMQV5SnXWuzpt9YHnW1JrAAjvjdybNqoE8uZFTb</span>
+        <span style="font-size:10px;margin-left:8px;white-space:nowrap">📋 copiar</span>
+      </div>
+      <button class="btn btn-sm" style="width:100%;font-size:11px" onclick="checkHPNow()">Ya deposité — verificar HP</button>
+    </div>
+  </div>
+</div>
+
+<!-- PROFILE -->
+<div id="s-profile" class="screen">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+    <h1 style="margin:0">Perfil del Entrenador</h1>
+    <button class="btn btn-sm btn-red" onclick="disconnectWallet()">🚪 Desconectar Wallet</button>
+  </div>
+  <div style="background:rgba(255,255,255,.04);border:0.5px solid rgba(255,255,255,.1);border-radius:12px;padding:16px;margin-bottom:16px">
+    <div style="font-size:22px;font-weight:700;color:#fff;margin-bottom:4px" id="profile-name">Cargando...</div>
+    <div style="background:rgba(0,0,0,.3);padding:8px 10px;border-radius:6px;margin-bottom:12px">
+      <div style="font-size:10px;color:rgba(255,255,255,.3)">Tu Wallet</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.6);font-family:monospace" id="profile-wallet">Conectando...</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:12px">
+      <div style="background:rgba(0,0,0,.3);padding:10px;border-radius:8px;text-align:center">
+        <div style="font-size:11px;color:rgba(255,255,255,.4)">HP Disponibles</div>
+        <div style="font-size:18px;font-weight:700;color:#5DCAA5" id="profile-hp">0 HP</div>
+        <div style="font-size:10px;color:rgba(255,255,255,.3)" id="profile-usdc">0.000 USDC</div>
+      </div>
+      <div style="background:rgba(0,0,0,.3);padding:10px;border-radius:8px;text-align:center">
+        <div style="font-size:11px;color:rgba(255,255,255,.4)">Victorias / Derrotas</div>
+        <div style="font-size:18px;font-weight:700;color:#fff"><span id="profile-wins" style="color:#5DCAA5">0</span> / <span id="profile-losses" style="color:#F0997B">0</span></div>
+      </div>
+      <div style="background:rgba(0,0,0,.3);padding:10px;border-radius:8px;text-align:center">
+        <div style="font-size:11px;color:rgba(255,255,255,.4)">Puesto en Ranking</div>
+        <div style="font-size:18px;font-weight:700;color:#CFA9EC" id="profile-rank">Sin clasificado</div>
+      </div>
+    </div>
+    <div style="background:rgba(130,80,180,.1);border:0.5px solid rgba(130,80,180,.3);border-radius:8px;padding:10px;text-align:center">
+      <div style="font-size:11px;color:rgba(255,255,255,.4)">Rango</div>
+      <div style="font-size:14px;font-weight:600;color:#CFA9EC">🔒 Próximamente</div>
+    </div>
+  </div>
+  <div id="profile-deposit-widget" style="margin-bottom:16px"></div>
+  <button class="btn btn-blue" style="width:100%" onclick="showPickGrid()">🐾 Elegir Vicamon →</button>
+</div>
+
+<!-- PICK BEAST -->
+<div id="s-pick" class="screen">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;flex-wrap:wrap;gap:8px">
+    <h1 style="margin:0">Elige tu Vicamon</h1>
+    <div style="display:flex;align-items:center;gap:10px">
+      <button class="btn btn-sm" onclick="show('s-profile')">⬅ Mi Perfil</button>
+      <div style="background:rgba(255,255,255,.06);border:0.5px solid rgba(255,255,255,.12);border-radius:8px;padding:6px 12px;font-size:12px">
+        <span style="color:rgba(255,255,255,.4)">HP: </span>
+        <span id="pick-hp-val" style="font-weight:600;color:#5DCAA5">—</span>
+        <span style="color:rgba(255,255,255,.3);font-size:10px;margin-left:4px" id="pick-usdc-val"></span>
+      </div>
+      <button class="btn btn-sm" id="btn-cashout" style="display:none;background:rgba(239,159,39,.15);border-color:rgba(239,159,39,.35);color:#EF9F27" onclick="doCashout()">💰 Cashout</button>
+    </div>
+  </div>
+  <p class="sub" style="margin-bottom:10px">Toca un Vicamon para ver sus ataques y estadísticas</p>
+  <div id="pick-deposit-widget" style="margin-bottom:12px"></div>
+  <div class="beast-grid" id="pick-grid"></div>
+  <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
+    <button class="btn btn-blue btn-lg" id="btn-enter" disabled onclick="enterLobby()" style="flex:1">Entrar al lobby →</button>
+  </div>
+</div>
+
+<!-- LOBBY -->
+<div id="s-lobby" class="screen">
+  <div class="lobby-header">
+    <div>
+      <h2 style="margin:0">Sala de espera</h2>
+      <p style="font-size:11px;color:rgba(255,255,255,.3);margin-top:2px"><span class="online-dot"></span><span id="lbl-online">0</span> jugadores en línea</p>
+    </div>
+    <div class="my-badge">
+      <img id="badge-img" src="" alt="">
+      <div>
+        <div style="font-size:10px;color:rgba(255,255,255,.4)">Jugando como</div>
+        <span id="lbl-myname"></span> · <span id="lbl-myhp" style="color:#5DCAA5;font-weight:600;font-size:11px"></span>
+      </div>
+    </div>
+  </div>
+  <div style="margin-bottom:16px">
+    <div style="font-size:11px;color:rgba(255,255,255,.3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">🏆 Hall de la Fama</div>
+    <div id="leaderboard-podium" style="display:flex;justify-content:space-between;gap:8px">
+      <div style="flex:1;color:rgba(255,255,255,.3);text-align:center;font-size:11px;padding:20px 0">Gana batallas reales para aparecer aquí</div>
+    </div>
+  </div>
+  <div style="background:linear-gradient(135deg,rgba(120,40,200,.18),rgba(60,20,120,.18));border:0.5px solid rgba(160,80,255,.3);border-radius:12px;padding:14px 16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px">
+    <div>
+      <div style="font-size:14px;font-weight:600;color:#CFA9EC">⚔ Zodiac Master</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:2px">Reta a la IA para practicar o intenta la Torre de Batalla.</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <button class="btn btn-sm" style="background:rgba(93,202,165,.15);border-color:rgba(93,202,165,.35);color:#5DCAA5;white-space:nowrap" onclick="challengeMaster()">🤝 Entrenar Gratis</button>
+      <button class="btn btn-sm" id="btn-gauntlet" style="background:rgba(246,226,102,.15);border-color:rgba(246,226,102,.35);color:#F6E266;white-space:nowrap;display:none" onclick="challengeGauntlet()">🏰 Torre (100 HP)</button>
+    </div>
+  </div>
+  <div style="font-size:11px;color:rgba(255,255,255,.3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Jugadores en sala</div>
+  <div id="low-hp-warning" style="display:none;margin-bottom:12px">
+    <div style="background:rgba(239,159,39,.1);border:0.5px solid rgba(239,159,39,.3);border-radius:8px;padding:10px 14px;font-size:12px;color:#EF9F27;margin-bottom:8px">
+      ⚠ Con menos de 100 HP no puedes apostar, pero puedes hacer Entrenamientos o retar al Master
+    </div>
+    <div id="lobby-deposit-widget"></div>
+  </div>
+  <div class="lobby-list" id="players-list"></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+    <button class="btn btn-sm" onclick="show('s-profile')">👤 Mi Perfil</button>
+    <button class="btn btn-sm" onclick="goChangeBeast()">🔄 Cambiar Vicamon</button>
+    <button class="btn btn-sm btn-red" onclick="leaveLobby()">🚪 Salir</button>
+  </div>
+  <div class="chat-wrap">
+    <h2 style="margin:0 0 10px 0;font-size:16px">Chat del Lobby</h2>
+    <div class="chat-box" id="chat-box">
+      <div class="chat-empty">Sé el primero en escribir un mensaje...</div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <input id="chat-input" class="chat-input" placeholder="Escribe un mensaje..." maxlength="200" onkeydown="if(event.key==='Enter')sendChatMessage()">
+      <button class="btn btn-blue" onclick="sendChatMessage()">Enviar</button>
+    </div>
+  </div>
+</div>
+
+<!-- BATTLE -->
+<div id="s-battle" class="screen">
+  <div class="arena-wrap">
+    <img class="arena-bg" src="Arena.png" alt="Arena">
+    <div class="battle-ui">
+      <div style="display:flex;justify-content:flex-end;padding:0 4px 8px"><button class="btn btn-sm btn-red" onclick="surrender()">🏳️ Rendirse</button></div>
+      <div class="turn-bar" id="turn-bar"> </div>
+      <div class="fighters">
+        <div class="fighter" id="f-me"></div>
+        <div class="vs-col">
+          <div class="vs-txt">VS</div>
+          <div class="turn-orb" id="turn-orb" style="display:none"></div>
+        </div>
+        <div class="fighter enemy" id="f-opp"></div>
+      </div>
+      <div class="atk-grid" id="atk-grid"></div>
+      <div class="log-box" id="log-box"></div>
+    </div>
+  </div>
+</div>
+
+<!-- RESULT -->
+<div id="s-result" class="screen">
+  <div style="position:relative;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px">
+    <img style="position:fixed;top:0;left:0;width:100%;height:100%;object-fit:cover;opacity:.2;z-index:0" src="Arena.png" alt="">
+    <div class="result-wrap" style="position:relative;z-index:1;width:100%;max-width:400px" id="result-box"></div>
+  </div>
+</div>
+
+<!-- CHALLENGE MODAL -->
+<div class="modal-bg hidden" id="modal-challenged">
+  <div class="modal">
+    <img id="ch-img" src="" alt="">
+    <h3 id="ch-title"></h3>
+    <p id="ch-sub"></p>
+    <div class="modal-btns">
+      <button class="btn btn-red btn-sm" onclick="rejectChallenge()">Rechazar</button>
+      <button class="btn btn-blue btn-sm" onclick="acceptChallenge()">¡Aceptar!</button>
+    </div>
+  </div>
+</div>
+
+<!-- GAUNTLET MODAL -->
+<div class="modal-bg hidden" id="modal-gauntlet">
+  <div class="modal" style="max-width:450px">
+    <h3 id="g-title" style="color:#F6E266"></h3>
+    <p id="g-sub" style="font-size:13px;margin-bottom:15px"></p>
+    <div id="g-beast-picker" style="display:grid;grid-template-columns:repeat(4, 1fr);gap:8px;margin-bottom:20px;max-height:300px;overflow-y:auto"></div>
+    <button class="btn btn-blue" style="width:100%" onclick="continueGauntlet()">Continuar al siguiente Jefe →</button>
+  </div>
+</div>
+
+<script src="beasts.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
