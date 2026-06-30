@@ -205,7 +205,7 @@ module.exports = {
   getHP, addHP, hasHP,
   lockHP, unlockHP, settleMatch, cashout,
   getPlatformHp, getPlatformUsdc, clearPlatformHp,
-  PLATFORM_WALLET: 'Gx9g45pNsENwczo197GTFgJrh6BN3pEZKqiEAfPZ453m', 
+  PLATFORM_WALLET: 'zGjAAUQUxwBYkWkEWLHZ1pHJrrWd8DT8c9rxBvjJ5fk', 
   PLATFORM_THRESHOLD: 1.00, 
   USDC_PER_HP,
   getAllPlayersDebug,
