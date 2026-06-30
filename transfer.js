@@ -9,6 +9,7 @@ const {
 } = require('@solana/spl-token');
 const fs   = require('fs');
 const path = require('path');
+const bs58 = require('bs58'); // NUEVO: Para leer la llave en formato texto
 
 const USDC_MINT  = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'); // mainnet
 const DECIMALS   = 6;
@@ -33,10 +34,17 @@ const connection = new Connection(RPCS[0], 'confirmed');
 
 function loadPlatformWallet() {
   // 1. Si estamos en la nube (Render), usar la variable de entorno secreta
-  if (process.env.PLATFORM_WALLET_SECRET) {
+  const secretEnv = process.env.PLATFORM_WALLET_SECRET;
+  if (secretEnv) {
     try {
-      const secret = JSON.parse(process.env.PLATFORM_WALLET_SECRET);
-      return Keypair.fromSecretKey(Uint8Array.from(secret));
+      // Si es un arreglo (formato antiguo)
+      if (secretEnv.startsWith('[')) {
+        const secret = JSON.parse(secretEnv);
+        return Keypair.fromSecretKey(Uint8Array.from(secret));
+      }
+      // Si es texto (formato nuevo Base58)
+      const secretKey = bs58.decode(secretEnv);
+      return Keypair.fromSecretKey(secretKey);
     } catch(e) {
       console.error("Error leyendo la wallet desde variables de entorno:", e.message);
       throw e;
