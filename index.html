@@ -224,7 +224,8 @@
     <div style="display:flex;flex-direction:column;gap:10px">
       <button class="btn btn-blue" id="cm-1v1-btn" onclick="selectChallengeMode('1v1')">⚔️ 1 vs 1 (Apuesta 100 HP)</button>
       <button class="btn btn-blue" id="cm-3v3-btn" onclick="selectChallengeMode('3v3')">⚔️ 3 vs 3 (Apuesta 300 HP)</button>
-      <button class="btn btn-sm" style="background:rgba(130,80,180,.15);border-color:rgba(130,80,180,.35);color:#CFA9EC" id="cm-train-btn" onclick="selectChallengeMode('train')">🤝 Entrenamiento (Sin HP)</button>
+      <button class="btn btn-sm" style="background:rgba(130,80,180,.15);border-color:rgba(130,80,180,.35);color:#CFA9EC" id="cm-train-btn" onclick="selectChallengeMode('train')">🤝 Entrenar 1v1 (Sin HP)</button>
+      <button class="btn btn-sm" style="background:rgba(130,80,180,.15);border-color:rgba(130,80,180,.35);color:#CFA9EC; display:none" id="cm-train3v3-btn" onclick="selectChallengeMode('train3v3')">🤝 Entrenar 3v3 (Sin HP)</button>
     </div>
     <button class="btn btn-sm btn-red" style="margin-top:15px;width:100%" onclick="document.getElementById('modal-challenge-mode').classList.add('hidden')">Cancelar</button>
   </div>
