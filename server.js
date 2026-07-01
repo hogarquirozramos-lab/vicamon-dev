@@ -9,7 +9,7 @@ const {
   PLATFORM_WALLET, PLATFORM_THRESHOLD, USDC_PER_HP,
   getAllPlayersDebug, updatePlayerName, updatePlayerStats, getTopPlayers,
   getPlayerStats, getPlayerRank, settleGauntlet,
-  isTxProcessed, markTxProcessed // NUEVO
+  isTxProcessed, markTxProcessed, adminSetHP // NUEVO
 } = require('./hp-balance');
 const { sendUSDC } = require('./transfer');
 const BEASTS = require('./beasts.js');
@@ -33,7 +33,96 @@ const MIME = { '.html':'text/html', '.js':'application/javascript', '.css':'text
 
 const server = http.createServer(async (req, res) => {
   const urlPath = req.url.split('?')[0];
+  
   if (urlPath === '/ver-db-secreta') { try { const players = await getAllPlayersDebug(); res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(players, null, 2)); } catch(e) { res.writeHead(500); res.end('Error leyendo DB'); } return; }
+  
+  // --- PANEL DE ADMINISTRACIÓN ---
+  if (urlPath === '/admin') {
+    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.end(`
+      <!DOCTYPE html>
+      <html lang="es"><head><meta charset="UTF-8"><title>Admin - VICAMON</title>
+      <style>
+        body { font-family: system-ui; background: #0a0a0f; color: #fff; padding: 20px; }
+        .header { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; }
+        input, button { background: #1a1a24; border: 1px solid #333; color: #fff; padding: 10px; border-radius: 8px; outline: none; }
+        button { cursor: pointer; background: #4a9eff; border: none; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #14141e; border-radius: 12px; overflow: hidden; }
+        th, td { padding: 12px; border-bottom: 1px solid #2a2a35; text-align: left; font-size: 14px; }
+        th { color: #85B7EB; text-transform: uppercase; font-size: 12px; }
+        td input { width: 80px; padding: 5px; background: #111; border: 1px solid #333; text-align: center; }
+        .btn-save { background: #5DCAA5; padding: 8px 16px; }
+      </style></head><body>
+        <h1>Panel de Administración</h1>
+        <div class="header">
+          <input type="password" id="pass" placeholder="Contraseña de admin">
+          <button onclick="loadData()">Desbloquear y Cargar</button>
+        </div>
+        <table>
+          <thead><tr><th>Wallet</th><th>Nickname</th><th>HP</th><th>HP Bloqueados</th><th>Acción</th></tr></thead>
+          <tbody id="data"><tr><td colspan="5" style="text-align:center;color:#666">Ingresa la contraseña y carga los datos</td></tr></tbody>
+        </table>
+        <script>
+          async function loadData() {
+            const pass = document.getElementById('pass').value;
+            if(!pass) return alert('Ingresa la contraseña');
+            const res = await fetch('/admin-data?pass=' + encodeURIComponent(pass));
+            if(!res.ok) { alert('Contraseña incorrecta'); return; }
+            const data = await res.json();
+            document.getElementById('data').innerHTML = data.map(p => \`
+              <tr>
+                <td>\${p.wallet.slice(0,8)}...\${p.wallet.slice(-4)}</td>
+                <td>\${p.last_name || '-'}</td>
+                <td><input type="number" value="\${p.hp}" id="hp-\${p.wallet}"></td>
+                <td>\${p.locked_hp || 0}</td>
+                <td><button class="btn-save" onclick="saveHP('\${p.wallet}', '\${pass}')">Guardar</button></td>
+              </tr>
+            \`).join('');
+          }
+          async function saveHP(wallet, pass) {
+            const hp = document.getElementById('hp-' + wallet).value;
+            const res = await fetch('/admin-update-hp', {
+              method: 'POST', headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({ pass, wallet, hp: parseInt(hp) })
+            });
+            const data = await res.json();
+            if(data.ok) alert('✓ HP actualizado a ' + hp); else alert('Error al actualizar');
+          }
+        </script>
+      </body></html>
+    `);
+    return;
+  }
+
+  if (urlPath === '/admin-data') {
+    const pass = new URL(req.url, 'http://localhost').searchParams.get('pass') || '';
+    if (pass !== (process.env.ADMIN_PASSWORD || 'vicamon_secret_key_07012010')) {
+      res.writeHead(403); res.end('Forbidden'); return;
+    }
+    try {
+      const players = await getAllPlayersDebug();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(players));
+    } catch(e) { res.writeHead(500); res.end('Error'); }
+    return;
+  }
+
+  if (urlPath === '/admin-update-hp' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { pass, wallet, hp } = JSON.parse(body);
+        if (pass !== (process.env.ADMIN_PASSWORD || 'vicamon_secret_key_07012010')) {
+          res.writeHead(403); res.end(JSON.stringify({ ok: false })); return;
+        }
+        await adminSetHP(wallet, parseInt(hp));
+        res.writeHead(200); res.end(JSON.stringify({ ok: true }));
+      } catch(e) { res.writeHead(400); res.end(JSON.stringify({ ok: false })); }
+    });
+    return;
+  }
+
   if (urlPath === '/hp') { const wallet = new URL(req.url, 'http://localhost').searchParams.get('wallet') || ''; const hp = await getHP(wallet); const stats = await getPlayerStats(wallet); const rank = await getPlayerRank(wallet); res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ hp, wallet, stats: { wins: stats.wins, losses: stats.losses, rank } })); return; }
   
   if (urlPath === '/payment' && req.method === 'POST') {
@@ -44,19 +133,11 @@ const server = http.createServer(async (req, res) => {
     req.on('end', async () => {
       try {
         const { wallet, amount, signature, memo } = JSON.parse(body);
-        
-        // NUEVO: Revisar en la Base de Datos si el pago ya fue procesado
-        if (await isTxProcessed(signature)) { 
-          res.writeHead(200); res.end(JSON.stringify({ ok: false, reason: 'duplicate' })); return; 
-        }
-        
+        if (await isTxProcessed(signature)) { res.writeHead(200); res.end(JSON.stringify({ ok: false, reason: 'duplicate' })); return; }
         const hp = Math.round((amount / 100_000) * 100);
         const newBalance = await addHP(wallet, hp);
         lobby.forEach(p => { if (p.wallet === wallet) send(p.ws, { type: 'hp_updated', hp: newBalance }); });
-        
-        // NUEVO: Marcar el pago como procesado en la Base de Datos
         await markTxProcessed(signature);
-        
         res.writeHead(200); res.end(JSON.stringify({ ok: true, wallet, hp, newBalance }));
         checkPlatformTransfer();
       } catch (e) { res.writeHead(400); res.end(JSON.stringify({ error: e.message })); }
