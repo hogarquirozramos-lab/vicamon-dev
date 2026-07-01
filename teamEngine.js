@@ -246,7 +246,7 @@ async function doTeamCpuTurn(bId) {
   const pl = lobby.get(plId); if (!pl) return;
 
   b.logs.push(...tickEffects(cpuSt));
-  if (await checkTeamDeath(bId, true, true)) return; // true = isP1Attacker (CPU es P1)
+  if (await checkTeamDeath(bId, true, true)) return;
 
   if (cpuSt.stun) { 
     cpuSt.stun = false; 
@@ -264,6 +264,16 @@ async function doTeamCpuTurn(bId) {
 
   b.turnId = plId;
   pushTeamCpuBattle(bId);
+
+  // NUEVO: Si el jugador quedó aturdido o recargando, saltar su turno automáticamente
+  const bb = battles.get(bId); if (!bb) return;
+  const plStNow = bb.team2[bb.active2];
+  if (plStNow.stun || plStNow.recharge > 0) {
+    setTimeout(async () => { 
+      const bbb = battles.get(bId); if (!bbb || bbb.turnId !== plId) return; 
+      await processTeamCpuPlayerTurn(bId, plId, -1); 
+    }, 900);
+  }
 }
 
 async function processTeamCpuPlayerTurn(bId, playerId, atkIndex) {
