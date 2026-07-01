@@ -22,7 +22,6 @@ let pendingChallengeTargetId = null;
 let teamSelectionMode = '1v1'; 
 let selectedTeam = []; 
 let myTeam = [];
-let pendingIsTraining = false;
 
 // ── GESTOR DE AUDIO ──
 const audioFiles = {
