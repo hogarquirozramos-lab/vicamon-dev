@@ -304,5 +304,6 @@ async function processTeamSwitch(bId, playerId, switchToIndex) {
 module.exports = { 
   pushTeamBattle, pushTeamCpuBattle,
   processTeamTurn, processTeamSwitch,
-  processTeamCpuPlayerTurn
+  processTeamCpuPlayerTurn,
+  doTeamCpuTurn
 };
