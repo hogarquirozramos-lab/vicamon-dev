@@ -178,8 +178,4 @@ async function processTeamSwitch(bId, playerId, switchToIndex) {
   pushTeamBattle(bId);
 }
 
-module.exports = { 
-  pushTeamBattle, 
-  processTeamTurn, 
-  processTeamSwitch 
-};
+module.exports = { pushTeamBattle, processTeamTurn, processTeamSwitch, endTeamBattle };
