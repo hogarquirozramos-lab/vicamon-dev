@@ -45,6 +45,12 @@ async function markTxProcessed(signature) {
   await pool.query('INSERT INTO processed_txs (signature) VALUES ($1) ON CONFLICT DO NOTHING', [signature]);
 }
 
+// NUEVA FUNCIÓN PARA EL PANEL DE ADMIN
+async function adminSetHP(wallet, hp) {
+  await pool.query(`INSERT INTO players (wallet, hp) VALUES ($1, $2) ON CONFLICT (wallet) DO UPDATE SET hp = $2`, [wallet, hp]);
+  return await getHP(wallet);
+}
+
 async function updatePlayerName(wallet, name) {
   await pool.query(`INSERT INTO players (wallet, last_name) VALUES ($1, $2) ON CONFLICT (wallet) DO UPDATE SET last_name = $2`, [wallet, name]);
 }
@@ -141,5 +147,6 @@ module.exports = {
   PLATFORM_WALLET: 'Gx9g45pNsENwczo197GTFgJrh6BN3pEZKqiEAfPZ453m', PLATFORM_THRESHOLD: 1.00, USDC_PER_HP,
   getAllPlayersDebug, updatePlayerName, updatePlayerStats, getTopPlayers,
   getPlayerStats, getPlayerRank,
-  isTxProcessed, markTxProcessed // NUEVO
+  isTxProcessed, markTxProcessed,
+  adminSetHP
 };
