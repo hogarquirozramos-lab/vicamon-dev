@@ -93,19 +93,6 @@
   </div>
 </div>
 
-<!-- PICK BEAST (Usado temporalmente para retos 1v1 en pruebas) -->
-<div id="s-pick" class="screen">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;flex-wrap:wrap;gap:8px">
-    <h1 style="margin:0">Elige tu Vicamon</h1>
-    <button class="btn btn-sm" onclick="show('s-profile')">⬅ Volver</button>
-  </div>
-  <p class="sub" style="margin-bottom:10px">Toca un Vicamon para ver sus ataques y estadísticas</p>
-  <div class="beast-grid" id="pick-grid"></div>
-  <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
-    <button class="btn btn-blue btn-lg" id="btn-enter" disabled onclick="enterLobby()" style="flex:1">Entrar al lobby →</button>
-  </div>
-</div>
-
 <!-- LOBBY -->
 <div id="s-lobby" class="screen">
   <div class="lobby-header">
@@ -114,7 +101,7 @@
       <p style="font-size:11px;color:rgba(255,255,255,.3);margin-top:2px"><span class="online-dot"></span><span id="lbl-online">0</span> jugadores en línea</p>
     </div>
     <div class="my-badge">
-      <img id="badge-img" src="" alt="">
+      <img id="badge-img" src="" alt="" style="display:none">
       <div>
         <div style="font-size:10px;color:rgba(255,255,255,.4)">Jugando como</div>
         <span id="lbl-myname"></span> · <span id="lbl-myhp" style="color:#5DCAA5;font-weight:600;font-size:11px"></span>
@@ -133,7 +120,7 @@
       <div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:2px">Reta a la IA para practicar o intenta la Torre de Batalla.</div>
     </div>
     <div style="display:flex;flex-direction:column;gap:6px">
-      <button class="btn btn-sm" style="background:rgba(93,202,165,.15);border-color:rgba(93,202,165,.35);color:#5DCAA5;white-space:nowrap" onclick="challengeMaster()">🤝 Entrenar Gratis</button>
+      <button class="btn btn-sm" style="background:rgba(93,202,165,.15);border-color:rgba(93,202,165,.35);color:#5DCAA5;white-space:nowrap" onclick="challengeMaster()">🤝 Entrenar 1v1</button>
       <button class="btn btn-sm" id="btn-gauntlet" style="background:rgba(246,226,102,.15);border-color:rgba(246,226,102,.35);color:#F6E266;white-space:nowrap;display:none" onclick="challengeGauntlet()">🏰 Torre (100 HP)</button>
     </div>
   </div>
@@ -158,6 +145,23 @@
       <input id="chat-input" class="chat-input" placeholder="Escribe un mensaje..." maxlength="200" onkeydown="if(event.key==='Enter')sendChatMessage()">
       <button class="btn btn-blue" onclick="sendChatMessage()">Enviar</button>
     </div>
+  </div>
+</div>
+
+<!-- TEAM SELECTION (NUEVO) -->
+<div id="s-team-select" class="screen">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+    <h1 style="margin:0">Preparación de Equipo</h1>
+    <button class="btn btn-sm" onclick="cancelTeamSelection()">⬅ Cancelar</button>
+  </div>
+  <div style="background:rgba(74,158,255,.06);border:0.5px solid rgba(74,158,255,.2);border-radius:10px;padding:12px;margin-bottom:16px;text-align:center">
+    <div id="ts-mode-title" style="font-size:18px;color:#85B7EB;font-weight:700">Modo: 1v1</div>
+    <div style="font-size:12px;color:rgba(255,255,255,.4);margin-top:4px">Selecciona tu Vicamon inicial</div>
+  </div>
+  <div class="beast-grid" id="team-pick-grid"></div>
+  <div class="beast-detail" id="team-detail-panel"></div>
+  <div style="margin-top:20px">
+    <button class="btn btn-blue btn-lg" id="btn-confirm-team" disabled onclick="confirmTeam()" style="width:100%">¡Listo para pelear! ⚔️</button>
   </div>
 </div>
 
@@ -209,6 +213,19 @@
     <p id="g-sub" style="font-size:13px;margin-bottom:15px"></p>
     <div id="g-beast-picker" style="display:grid;grid-template-columns:repeat(4, 1fr);gap:8px;margin-bottom:20px;max-height:300px;overflow-y:auto"></div>
     <button class="btn btn-blue" style="width:100%" onclick="continueGauntlet()">Continuar al siguiente Jefe →</button>
+  </div>
+</div>
+
+<!-- CHALLENGE MODE MENU (NUEVO) -->
+<div class="modal-bg hidden" id="modal-challenge-mode">
+  <div class="modal" style="max-width:350px">
+    <h3 id="cm-title" style="margin-bottom:15px">Elige modalidad de reto</h3>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <button class="btn btn-blue" id="cm-1v1-btn" onclick="selectChallengeMode('1v1')">⚔️ 1 vs 1 (Apuesta 100 HP)</button>
+      <button class="btn btn-blue" id="cm-3v3-btn" onclick="selectChallengeMode('3v3')">⚔️ 3 vs 3 (Apuesta 300 HP)</button>
+      <button class="btn btn-sm" style="background:rgba(130,80,180,.15);border-color:rgba(130,80,180,.35);color:#CFA9EC" id="cm-train-btn" onclick="selectChallengeMode('train')">🤝 Entrenamiento (Sin HP)</button>
+    </div>
+    <button class="btn btn-sm btn-red" style="margin-top:15px;width:100%" onclick="document.getElementById('modal-challenge-mode').classList.add('hidden')">Cancelar</button>
   </div>
 </div>
 
