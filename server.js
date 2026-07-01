@@ -202,10 +202,13 @@ wss.on('connection', ws => {
         logs: [{t: `¡Entrenamiento 3v3 vs Master!`, c: 'hi'}], 
         isTeamBattle: true, isTeamCpu: true, cpuTeam: cpuTeam 
       });
-      send(ws, { type: 'battle_start', battleId: bId, role: 'p2', opponent: 'Zodiac Master', opponentBeast: cpuTeam[0], isTeamBattle: true, isCpu: true });
+            send(ws, { type: 'battle_start', battleId: bId, role: 'p2', opponent: 'Zodiac Master', opponentBeast: cpuTeam[0], isTeamBattle: true, isCpu: true });
       await pushLobby(); 
-      const { pushTeamCpuBattle } = require('./teamEngine');
-      setTimeout(() => pushTeamCpuBattle(bId), 200);
+      const { pushTeamCpuBattle, doTeamCpuTurn } = require('./teamEngine');
+      setTimeout(() => { 
+        pushTeamCpuBattle(bId); 
+        setTimeout(() => doTeamCpuTurn(bId), 1000); // ¡Que el Master ataque!
+      }, 200);
     }
 
     // Acciones
