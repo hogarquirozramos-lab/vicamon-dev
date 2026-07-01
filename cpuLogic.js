@@ -130,7 +130,4 @@ async function processCpuPlayerTurn(bId, playerId, atkIndex) {
   scheduleCpuTurn(bId);
 }
 
-module.exports = { 
-  CPU_ID, 
-  processCpuPlayerTurn 
-};
+module.exports = { CPU_ID, processCpuPlayerTurn, scheduleCpuTurn };
