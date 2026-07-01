@@ -108,7 +108,6 @@ async function checkTeamDeath(bId, isP1Attacker, isCpu) {
   const aPlayer = lobby.get(aId);
   const dPlayer = lobby.get(dId);
 
-  // ¿Murió el defensor?
   if (dSt.hp <= 0) {
     const defenderTeam = isP1Attacker ? b.team2 : b.team1;
     const defenderActive = isP1Attacker ? b.active2 : b.active1;
@@ -123,17 +122,13 @@ async function checkTeamDeath(bId, isP1Attacker, isCpu) {
       return true;
     } else {
       b.turnId = -4; 
-      
-      // Si el defensor es el CPU (P1), se cambia solo automáticamente
       const defenderIsCpu = isCpu && !isP1Attacker; 
-      
       if (defenderIsCpu) {
-        b.active1 = livingBench[0]; // CPU elige el primer vivo
+        b.active1 = livingBench[0]; 
         b.logs.push({t: `${CPU_NAME} cambia a ${BEASTS[b.cpuTeam[b.active1]].name}`, c: 'special'});
-        b.turnId = b.p2id; // Le da el turno al jugador humano
+        b.turnId = b.p2id; 
         pushTeamCpuBattle(bId);
       } else {
-        // El defensor es humano, pedirle que cambie
         if(isCpu) pushTeamCpuBattle(bId); else pushTeamBattle(bId);
         if (dPlayer && dPlayer.ws) {
           send(dPlayer.ws, { type: 'team_force_switch', battleId: bId, reason: '¡Tu Vicamon fue derrotado! Elige el siguiente.' });
@@ -143,7 +138,6 @@ async function checkTeamDeath(bId, isP1Attacker, isCpu) {
     }
   }
 
-  // ¿Murió el atacante (por retroceso o daño por turno)?
   if (aSt.hp <= 0) {
     const attackerTeam = isP1Attacker ? b.team1 : b.team2;
     const attackerActive = isP1Attacker ? b.active1 : b.active2;
@@ -158,17 +152,13 @@ async function checkTeamDeath(bId, isP1Attacker, isCpu) {
       return true;
     } else {
       b.turnId = -4;
-      
-      // Si el atacante es el CPU (P1), se cambia solo
       const attackerIsCpu = isCpu && isP1Attacker; 
-      
       if (attackerIsCpu) {
         b.active1 = livingBench[0];
         b.logs.push({t: `${CPU_NAME} cambia a ${BEASTS[b.cpuTeam[b.active1]].name}`, c: 'special'});
-        b.turnId = b.p2id; // Le da el turno al jugador humano
+        b.turnId = b.p2id; 
         pushTeamCpuBattle(bId);
       } else {
-        // El atacante es humano, pedirle que cambie
         if(isCpu) pushTeamCpuBattle(bId); else pushTeamBattle(bId);
         if (aPlayer && aPlayer.ws) {
           send(aPlayer.ws, { type: 'team_force_switch', battleId: bId, reason: '¡Tu Vicamon fue derrotado! Elige el siguiente.' });
@@ -246,7 +236,7 @@ async function doTeamCpuTurn(bId) {
   const pl = lobby.get(plId); if (!pl) return;
 
   b.logs.push(...tickEffects(cpuSt));
-  if (await checkTeamDeath(bId, true, true)) return;
+  if (await checkTeamDeath(bId, true, true)) return; 
 
   if (cpuSt.stun) { 
     cpuSt.stun = false; 
@@ -265,7 +255,6 @@ async function doTeamCpuTurn(bId) {
   b.turnId = plId;
   pushTeamCpuBattle(bId);
 
-  // NUEVO: Si el jugador quedó aturdido o recargando, saltar su turno automáticamente
   const bb = battles.get(bId); if (!bb) return;
   const plStNow = bb.team2[bb.active2];
   if (plStNow.stun || plStNow.recharge > 0) {
@@ -283,7 +272,7 @@ async function processTeamCpuPlayerTurn(bId, playerId, atkIndex) {
   const pl = lobby.get(playerId); if (!pl) return;
 
   b.logs.push(...tickEffects(plSt));
-  if (await checkTeamDeath(bId, false, true)) return; // false = isP1Attacker (Player es P2)
+  if (await checkTeamDeath(bId, false, true)) return;
 
   if (plSt.stun) { 
     plSt.stun = false; 
@@ -328,7 +317,6 @@ async function processTeamSwitch(bId, playerId, switchToIndex) {
   const beastName = BEASTS[player.team[switchToIndex]].name;
   b.logs.push({t: `${player.name} cambia a ${beastName}`, c: 'special'});
   
-  // Pierde el turno
   if(isCpu) {
     b.turnId = CPU_ID;
     pushTeamCpuBattle(bId);
