@@ -76,11 +76,9 @@ async function endTeamBattle(bId, winnerId, loserId, winnerRemainingHp) {
   const hp = Math.max(0, Math.min(300, winnerRemainingHp));
 
   if (isTraining || isCpu) {
-    // Entrenamiento: No se mueve HP, solo XP visual
     if(winner) winner.ws.send(JSON.stringify({ type:'battle_end', won:true, isTeamBattle:true, isTraining:true, winnerHp:hp }));
     if(loser) loser.ws.send(JSON.stringify({ type:'battle_end', won:false, isTeamBattle:true, isTraining:true, winnerHp:hp }));
   } else {
-    // Combate Real 3v3
     const winnerWallet = winner?.wallet || '';
     const loserWallet = loser?.wallet || '';
     const result = await settleTeamMatch(winnerWallet, loserWallet, hp);
@@ -110,6 +108,7 @@ async function checkTeamDeath(bId, isP1Attacker, isCpu) {
   const aPlayer = lobby.get(aId);
   const dPlayer = lobby.get(dId);
 
+  // ¿Murió el defensor?
   if (dSt.hp <= 0) {
     const defenderTeam = isP1Attacker ? b.team2 : b.team1;
     const defenderActive = isP1Attacker ? b.active2 : b.active1;
@@ -124,12 +123,27 @@ async function checkTeamDeath(bId, isP1Attacker, isCpu) {
       return true;
     } else {
       b.turnId = -4; 
-      if(isCpu) pushTeamCpuBattle(bId); else pushTeamBattle(bId);
-      send(dPlayer.ws, { type: 'team_force_switch', battleId: bId, reason: '¡Tu Vicamon fue derrotado! Elige el siguiente.' });
+      
+      // Si el defensor es el CPU (P1), se cambia solo automáticamente
+      const defenderIsCpu = isCpu && !isP1Attacker; 
+      
+      if (defenderIsCpu) {
+        b.active1 = livingBench[0]; // CPU elige el primer vivo
+        b.logs.push({t: `${CPU_NAME} cambia a ${BEASTS[b.cpuTeam[b.active1]].name}`, c: 'special'});
+        b.turnId = b.p2id; // Le da el turno al jugador humano
+        pushTeamCpuBattle(bId);
+      } else {
+        // El defensor es humano, pedirle que cambie
+        if(isCpu) pushTeamCpuBattle(bId); else pushTeamBattle(bId);
+        if (dPlayer && dPlayer.ws) {
+          send(dPlayer.ws, { type: 'team_force_switch', battleId: bId, reason: '¡Tu Vicamon fue derrotado! Elige el siguiente.' });
+        }
+      }
       return true;
     }
   }
 
+  // ¿Murió el atacante (por retroceso o daño por turno)?
   if (aSt.hp <= 0) {
     const attackerTeam = isP1Attacker ? b.team1 : b.team2;
     const attackerActive = isP1Attacker ? b.active1 : b.active2;
@@ -144,8 +158,22 @@ async function checkTeamDeath(bId, isP1Attacker, isCpu) {
       return true;
     } else {
       b.turnId = -4;
-      if(isCpu) pushTeamCpuBattle(bId); else pushTeamBattle(bId);
-      send(aPlayer.ws, { type: 'team_force_switch', battleId: bId, reason: '¡Tu Vicamon fue derrotado! Elige el siguiente.' });
+      
+      // Si el atacante es el CPU (P1), se cambia solo
+      const attackerIsCpu = isCpu && isP1Attacker; 
+      
+      if (attackerIsCpu) {
+        b.active1 = livingBench[0];
+        b.logs.push({t: `${CPU_NAME} cambia a ${BEASTS[b.cpuTeam[b.active1]].name}`, c: 'special'});
+        b.turnId = b.p2id; // Le da el turno al jugador humano
+        pushTeamCpuBattle(bId);
+      } else {
+        // El atacante es humano, pedirle que cambie
+        if(isCpu) pushTeamCpuBattle(bId); else pushTeamBattle(bId);
+        if (aPlayer && aPlayer.ws) {
+          send(aPlayer.ws, { type: 'team_force_switch', battleId: bId, reason: '¡Tu Vicamon fue derrotado! Elige el siguiente.' });
+        }
+      }
       return true;
     }
   }
@@ -287,7 +315,7 @@ async function processTeamSwitch(bId, playerId, switchToIndex) {
   }
   
   if (isP1) b.active1 = switchToIndex; else b.active2 = switchToIndex;
-  const beastName = isCpu ? BEASTS[player.team[switchToIndex]].name : BEASTS[player.team[switchToIndex]].name;
+  const beastName = BEASTS[player.team[switchToIndex]].name;
   b.logs.push({t: `${player.name} cambia a ${beastName}`, c: 'special'});
   
   // Pierde el turno
