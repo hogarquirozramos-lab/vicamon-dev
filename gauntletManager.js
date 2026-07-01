@@ -164,6 +164,4 @@ async function processGauntletPlayerTurn(bId, playerId, atkIndex) {
   scheduleGauntletCpuTurn(bId);
 }
 
-module.exports = { 
-  processGauntletPlayerTurn 
-};
+module.exports = { processGauntletPlayerTurn, endGauntlet, scheduleGauntletCpuTurn };
