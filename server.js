@@ -8,13 +8,14 @@ const {
   getPlatformHp, getPlatformUsdc, clearPlatformHp,
   PLATFORM_WALLET, PLATFORM_THRESHOLD, USDC_PER_HP,
   getAllPlayersDebug, updatePlayerName, updatePlayerStats, getTopPlayers,
-  getPlayerStats, getPlayerRank, settleGauntlet
+  getPlayerStats, getPlayerRank, settleGauntlet,
+  isTxProcessed, markTxProcessed // NUEVO
 } = require('./hp-balance');
 const { sendUSDC } = require('./transfer');
 const BEASTS = require('./beasts.js');
 const BEAST_KEYS = Object.keys(BEASTS);
 
-const { lobby, battles, processedTx, uid, send, broadcast, pushLobby, pushBattle, pushCpuBattle } = require('./state');
+const { lobby, battles, uid, send, broadcast, pushLobby, pushBattle, pushCpuBattle } = require('./state');
 const { getStartState, processTurn, endBattle } = require('./battleEngine');
 const { CPU_ID, processCpuPlayerTurn, scheduleCpuTurn } = require('./cpuLogic');
 const { processGauntletPlayerTurn, endGauntlet, scheduleGauntletCpuTurn } = require('./gauntletManager');
@@ -34,6 +35,7 @@ const server = http.createServer(async (req, res) => {
   const urlPath = req.url.split('?')[0];
   if (urlPath === '/ver-db-secreta') { try { const players = await getAllPlayersDebug(); res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(players, null, 2)); } catch(e) { res.writeHead(500); res.end('Error leyendo DB'); } return; }
   if (urlPath === '/hp') { const wallet = new URL(req.url, 'http://localhost').searchParams.get('wallet') || ''; const hp = await getHP(wallet); const stats = await getPlayerStats(wallet); const rank = await getPlayerRank(wallet); res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ hp, wallet, stats: { wins: stats.wins, losses: stats.losses, rank } })); return; }
+  
   if (urlPath === '/payment' && req.method === 'POST') {
     const secret = req.headers['x-internal-secret'];
     if (secret !== (process.env.INTERNAL_SECRET || 'dev-secret')) { res.writeHead(403); res.end(JSON.stringify({ error: 'Forbidden' })); return; }
@@ -42,17 +44,26 @@ const server = http.createServer(async (req, res) => {
     req.on('end', async () => {
       try {
         const { wallet, amount, signature, memo } = JSON.parse(body);
-        if (processedTx.has(signature)) { res.writeHead(200); res.end(JSON.stringify({ ok: false, reason: 'duplicate' })); return; }
-        processedTx.add(signature);
+        
+        // NUEVO: Revisar en la Base de Datos si el pago ya fue procesado
+        if (await isTxProcessed(signature)) { 
+          res.writeHead(200); res.end(JSON.stringify({ ok: false, reason: 'duplicate' })); return; 
+        }
+        
         const hp = Math.round((amount / 100_000) * 100);
         const newBalance = await addHP(wallet, hp);
         lobby.forEach(p => { if (p.wallet === wallet) send(p.ws, { type: 'hp_updated', hp: newBalance }); });
+        
+        // NUEVO: Marcar el pago como procesado en la Base de Datos
+        await markTxProcessed(signature);
+        
         res.writeHead(200); res.end(JSON.stringify({ ok: true, wallet, hp, newBalance }));
         checkPlatformTransfer();
       } catch (e) { res.writeHead(400); res.end(JSON.stringify({ error: e.message })); }
     });
     return;
   }
+  
   const file = urlPath === '/' ? '/index.html' : urlPath;
   const fp = path.join(__dirname, file);
   fs.readFile(fp, (err, data) => { if (err) { res.writeHead(404); res.end('Not found'); return; } res.writeHead(200, { 'Content-Type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream' }); res.end(data); });
@@ -92,12 +103,8 @@ wss.on('connection', ws => {
       await pushLobby();
     }
 
-    if (msg.type === 'change_beast') {
-      const p = lobby.get(id);
-      if (p && !p.inBattle) { p.beast = msg.beast; await pushLobby(); }
-    }
+    if (msg.type === 'change_beast') { const p = lobby.get(id); if (p && !p.inBattle) { p.beast = msg.beast; await pushLobby(); } }
 
-    // 1v1
     if (msg.type === 'challenge') {
       const challenger = lobby.get(id); const target = lobby.get(msg.targetId);
       if (!challenger || !target || target.inBattle || challenger.inBattle) return;
@@ -134,7 +141,6 @@ wss.on('connection', ws => {
       }
     }
 
-    // 3v3
     if (msg.type === 'challenge_3v3') {
       const challenger = lobby.get(id); const target = lobby.get(msg.targetId);
       if (!challenger || !target || target.inBattle || challenger.inBattle) return;
@@ -153,65 +159,38 @@ wss.on('connection', ws => {
     if (msg.type === 'accept_3v3') {
       const p1 = lobby.get(msg.fromId), p2 = lobby.get(id);
       if (!p1 || !p2 || p1.inBattle || p2.inBattle) return;
-      
       p2.team = msg.team;
-      
       if (!msg.isTraining) {
         if (!await hasHP(p1.wallet, 300) || !await hasHP(p2.wallet, 300)) { send(p1.ws, { type: 'error', msg: 'Fondos insuficientes para 3v3.' }); return; }
         await lockHP(p1.wallet, 300); await lockHP(p2.wallet, 300);
       }
-
       p1.inBattle = true; p2.inBattle = true;
       const bId = `bteam${uid()}`;
-      battles.set(bId, { 
-        p1id: msg.fromId, p2id: id, 
-        team1: p1.team.map(k => getStartState(k)), team2: p2.team.map(k => getStartState(k)), 
-        active1: 0, active2: 0, turnId: msg.fromId, 
-        logs: [{t: `¡Combate 3v3!`, c: 'hi'}], 
-        isTeamBattle: true, isTeamTraining: msg.isTraining 
-      });
-      
+      battles.set(bId, { p1id: msg.fromId, p2id: id, team1: p1.team.map(k => getStartState(k)), team2: p2.team.map(k => getStartState(k)), active1: 0, active2: 0, turnId: msg.fromId, logs: [{t: `¡Combate 3v3!`, c: 'hi'}], isTeamBattle: true, isTeamTraining: msg.isTraining });
       send(p1.ws, { type: 'battle_start', battleId: bId, role: 'p1', opponent: p2.name, opponentBeast: p2.team[0], isTeamBattle: true, isTraining: msg.isTraining });
       send(p2.ws, { type: 'battle_start', battleId: bId, role: 'p2', opponent: p1.name, opponentBeast: p1.team[0], isTeamBattle: true, isTraining: msg.isTraining });
       await pushLobby(); setTimeout(() => pushTeamBattle(bId), 120);
     }
 
-    // CPU 1v1 y 3v3
     if (msg.type === 'challenge_cpu') {
-      const pl = lobby.get(id);
-      if (!pl || pl.inBattle) return;
-      pl.inBattle = true;
+      const pl = lobby.get(id); if (!pl || pl.inBattle) return; pl.inBattle = true;
       const cpuBeast = BEAST_KEYS[Math.floor(Math.random() * BEAST_KEYS.length)];
       const bId = `bcpu${uid()}`;
       battles.set(bId, { p1id: CPU_ID, p2id: id, st1: getStartState(cpuBeast), st2: getStartState(pl.beast), turnId: CPU_ID, logs: [{t: `¡Entrenamiento 1v1 vs Master!`, c: 'hi'}], isCpu: true, cpuIsP1: true, cpuBeast });
       send(ws, { type: 'battle_start', battleId: bId, role: 'p2', opponent: 'Zodiac Master', opponentBeast: cpuBeast, isCpu: true });
       await pushLobby(); setTimeout(() => { pushCpuBattle(bId); scheduleCpuTurn(bId); }, 200);
     }
-
     if (msg.type === 'challenge_3v3_cpu') {
-      const pl = lobby.get(id);
-      if (!pl || pl.inBattle) return;
-      pl.inBattle = true;
-      pl.team = msg.team;
+      const pl = lobby.get(id); if (!pl || pl.inBattle) return; pl.inBattle = true; pl.team = msg.team;
       const cpuTeam = [BEAST_KEYS[Math.floor(Math.random()*12)], BEAST_KEYS[Math.floor(Math.random()*12)], BEAST_KEYS[Math.floor(Math.random()*12)]];
       const bId = `bteamcpu${uid()}`;
-      battles.set(bId, { 
-        p1id: CPU_ID, p2id: id, 
-        team1: cpuTeam.map(k => getStartState(k)), team2: pl.team.map(k => getStartState(k)), 
-        active1: 0, active2: 0, turnId: CPU_ID, 
-        logs: [{t: `¡Entrenamiento 3v3 vs Master!`, c: 'hi'}], 
-        isTeamBattle: true, isTeamCpu: true, cpuTeam: cpuTeam 
-      });
-            send(ws, { type: 'battle_start', battleId: bId, role: 'p2', opponent: 'Zodiac Master', opponentBeast: cpuTeam[0], isTeamBattle: true, isCpu: true });
+      battles.set(bId, { p1id: CPU_ID, p2id: id, team1: cpuTeam.map(k => getStartState(k)), team2: pl.team.map(k => getStartState(k)), active1: 0, active2: 0, turnId: CPU_ID, logs: [{t: `¡Entrenamiento 3v3 vs Master!`, c: 'hi'}], isTeamBattle: true, isTeamCpu: true, cpuTeam: cpuTeam });
+      send(ws, { type: 'battle_start', battleId: bId, role: 'p2', opponent: 'Zodiac Master', opponentBeast: cpuTeam[0], isTeamBattle: true, isCpu: true });
       await pushLobby(); 
       const { pushTeamCpuBattle, doTeamCpuTurn } = require('./teamEngine');
-      setTimeout(() => { 
-        pushTeamCpuBattle(bId); 
-        setTimeout(() => doTeamCpuTurn(bId), 1000); // ¡Que el Master ataque!
-      }, 200);
+      setTimeout(() => { pushTeamCpuBattle(bId); setTimeout(() => doTeamCpuTurn(bId), 1000); }, 200);
     }
 
-    // Acciones
     if (msg.type === 'attack') {
       const b = battles.get(msg.battleId); if (!b) return;
       if (b.isTeamBattle && b.isTeamCpu) await processTeamCpuPlayerTurn(msg.battleId, id, msg.index);
@@ -220,31 +199,20 @@ wss.on('connection', ws => {
       else if (b.isCpu) await processCpuPlayerTurn(msg.battleId, id, msg.index);
       else await processTurn(msg.battleId, id, msg.index);
     }
-    if (msg.type === 'team_switch') {
-      const b = battles.get(msg.battleId); if (!b) return;
-      await processTeamSwitch(msg.battleId, id, msg.index);
-    }
+    if (msg.type === 'team_switch') { const b = battles.get(msg.battleId); if (!b) return; await processTeamSwitch(msg.battleId, id, msg.index); }
     if (msg.type === 'surrender') {
       const b = battles.get(msg.battleId); if (!b) return;
       const { endTeamBattle } = require('./teamEngine');
-      if (b.isTeamBattle) {
-        const otherId = b.p1id === id ? b.p2id : b.p1id;
-        await endTeamBattle(msg.battleId, otherId, id, 0);
-      } else if (b.isGauntlet) await endGauntlet(msg.battleId, id, false);
+      if (b.isTeamBattle) { const otherId = b.p1id === id ? b.p2id : b.p1id; await endTeamBattle(msg.battleId, otherId, id, 0); }
+      else if (b.isGauntlet) await endGauntlet(msg.battleId, id, false);
       else if (b.isCpu) await endBattle(msg.battleId, CPU_ID, id, 0, true);
-      else if (b.p1id === id || b.p2id === id) {
-        const otherId = b.p1id === id ? b.p2id : b.p1id;
-        await endBattle(msg.battleId, otherId, id, 0, true);
-      }
+      else if (b.p1id === id || b.p2id === id) { const otherId = b.p1id === id ? b.p2id : b.p1id; await endBattle(msg.battleId, otherId, id, 0, true); }
     }
 
-    // Otros (Gauntlet, Cashout, Chat, Ping)
     if (msg.type === 'challenge_gauntlet') {
-      const pl = lobby.get(id);
-      if (!pl || pl.inBattle) return;
+      const pl = lobby.get(id); if (!pl || pl.inBattle) return;
       if (!await hasHP(pl.wallet, 100)) { send(ws, { type: 'error', msg: 'Necesitas 100 HP para la Torre.' }); return; }
-      await lockHP(pl.wallet, 100);
-      pl.inBattle = true;
+      await lockHP(pl.wallet, 100); pl.inBattle = true;
       const cpuBeast = BEAST_KEYS[0];
       const bId = `bgauntlet${uid()}`;
       battles.set(bId, { p1id: CPU_ID, p2id: id, st1: getStartState(cpuBeast), st2: getStartState(pl.beast), turnId: CPU_ID, logs: [{t: `¡Torre de Batalla!`, c: 'hi'}], isCpu: true, isGauntlet: true, gauntletIndex: 0, cpuIsP1: true, cpuBeast });
@@ -252,8 +220,7 @@ wss.on('connection', ws => {
       await pushLobby(); setTimeout(() => { pushCpuBattle(bId); scheduleGauntletCpuTurn(bId); }, 200);
     }
     if (msg.type === 'gauntlet_continue') {
-      const b = battles.get(msg.battleId); if (!b || !b.isGauntlet) return;
-      const pl = lobby.get(id);
+      const b = battles.get(msg.battleId); if (!b || !b.isGauntlet) return; const pl = lobby.get(id);
       if (msg.beast) pl.beast = msg.beast;
       b.st2 = getStartState(pl.beast); b.st1 = getStartState(b.cpuBeast); b.turnId = CPU_ID;
       pushCpuBattle(msg.battleId); scheduleGauntletCpuTurn(msg.battleId);
