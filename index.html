@@ -53,7 +53,6 @@
     <h1 style="margin:0">Perfil del Entrenador</h1>
     <button class="btn btn-sm btn-red" onclick="disconnectWallet()">🚪 Desconectar Wallet</button>
   </div>
-  
   <div style="background:rgba(255,255,255,.04);border:0.5px solid rgba(255,255,255,.1);border-radius:12px;padding:16px;margin-bottom:16px">
     <div style="font-size:22px;font-weight:700;color:#fff;margin-bottom:4px" id="profile-name">Cargando...</div>
     <div style="background:rgba(0,0,0,.3);padding:8px 10px;border-radius:6px;margin-bottom:12px">
@@ -80,12 +79,9 @@
       <div style="font-size:14px;font-weight:600;color:#CFA9EC">🔒 Próximamente</div>
     </div>
   </div>
-
   <div id="profile-deposit-widget" style="margin-bottom:16px"></div>
-    <button class="btn btn-sm" id="btn-cashout" style="display:none;width:100%;margin-bottom:10px;background:rgba(239,159,39,.15);border-color:rgba(239,159,39,.35);color:#EF9F27" onclick="doCashout()">💰 Hacer Cashout</button>
+  <button class="btn btn-sm" id="btn-cashout" style="display:none;width:100%;margin-bottom:10px;background:rgba(239,159,39,.15);border-color:rgba(239,159,39,.35);color:#EF9F27" onclick="doCashout()">💰 Hacer Cashout</button>
   <button class="btn btn-blue" style="width:100%;margin-bottom:20px" onclick="enterLobby()">⚔️ Ir al Lobby →</button>
-
-  <!-- BESTIARIO -->
   <div class="chat-wrap" style="border-top:0.5px solid rgba(255,255,255,.1);padding-top:16px">
     <h2 style="margin:0 0 10px 0;font-size:16px">📖 Bestiario Vicamon</h2>
     <p style="font-size:11px;color:rgba(255,255,255,.3);margin-bottom:10px">Estudia los ataques de cada Vicamon para armar tu estrategia.</p>
@@ -103,10 +99,7 @@
     </div>
     <div class="my-badge">
       <img id="badge-img" src="" alt="" style="display:none">
-      <div>
-        <div style="font-size:10px;color:rgba(255,255,255,.4)">Jugando como</div>
-        <span id="lbl-myname"></span> · <span id="lbl-myhp" style="color:#5DCAA5;font-weight:600;font-size:11px"></span>
-      </div>
+      <div><div style="font-size:10px;color:rgba(255,255,255,.4)">Jugando como</div><span id="lbl-myname"></span> · <span id="lbl-myhp" style="color:#5DCAA5;font-weight:600;font-size:11px"></span></div>
     </div>
   </div>
   <div style="margin-bottom:16px">
@@ -127,9 +120,7 @@
   </div>
   <div style="font-size:11px;color:rgba(255,255,255,.3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Jugadores en sala</div>
   <div id="low-hp-warning" style="display:none;margin-bottom:12px">
-    <div style="background:rgba(239,159,39,.1);border:0.5px solid rgba(239,159,39,.3);border-radius:8px;padding:10px 14px;font-size:12px;color:#EF9F27;margin-bottom:8px">
-      ⚠ Con menos de 100 HP no puedes apostar, pero puedes hacer Entrenamientos o retar al Master
-    </div>
+    <div style="background:rgba(239,159,39,.1);border:0.5px solid rgba(239,159,39,.3);border-radius:8px;padding:10px 14px;font-size:12px;color:#EF9F27;margin-bottom:8px">⚠ Con menos de 100 HP no puedes apostar, pero puedes hacer Entrenamientos o retar al Master</div>
     <div id="lobby-deposit-widget"></div>
   </div>
   <div class="lobby-list" id="players-list"></div>
@@ -139,9 +130,7 @@
   </div>
   <div class="chat-wrap">
     <h2 style="margin:0 0 10px 0;font-size:16px">Chat del Lobby</h2>
-    <div class="chat-box" id="chat-box">
-      <div class="chat-empty">Sé el primero en escribir un mensaje...</div>
-    </div>
+    <div class="chat-box" id="chat-box"><div class="chat-empty">Sé el primero en escribir un mensaje...</div></div>
     <div style="display:flex;gap:8px">
       <input id="chat-input" class="chat-input" placeholder="Escribe un mensaje..." maxlength="200" onkeydown="if(event.key==='Enter')sendChatMessage()">
       <button class="btn btn-blue" onclick="sendChatMessage()">Enviar</button>
@@ -149,7 +138,7 @@
   </div>
 </div>
 
-<!-- TEAM SELECTION (NUEVO) -->
+<!-- TEAM SELECTION -->
 <div id="s-team-select" class="screen">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
     <h1 style="margin:0">Preparación de Equipo</h1>
@@ -175,10 +164,7 @@
       <div class="turn-bar" id="turn-bar"> </div>
       <div class="fighters">
         <div class="fighter" id="f-me"></div>
-        <div class="vs-col">
-          <div class="vs-txt">VS</div>
-          <div class="turn-orb" id="turn-orb" style="display:none"></div>
-        </div>
+        <div class="vs-col"><div class="vs-txt">VS</div><div class="turn-orb" id="turn-orb" style="display:none"></div></div>
         <div class="fighter enemy" id="f-opp"></div>
       </div>
       <div class="atk-grid" id="atk-grid"></div>
@@ -217,7 +203,6 @@
   </div>
 </div>
 
-<!-- CHALLENGE MODE MENU (NUEVO) -->
 <div class="modal-bg hidden" id="modal-challenge-mode">
   <div class="modal" style="max-width:350px">
     <h3 id="cm-title" style="margin-bottom:15px">Elige modalidad de reto</h3>
