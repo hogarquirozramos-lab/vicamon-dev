@@ -280,7 +280,7 @@ function buildBestiary(){
   keys.forEach(([k,b])=>{ if(!cats[b.cat]) cats[b.cat] = []; cats[b.cat].push({k,b}); });
   for(const catName in cats){
     html += `<div style="grid-column:1/-1; margin-top:15px; border-bottom:0.5px solid rgba(255,255,255,.2); padding-bottom:5px; color:#CFA9EC; font-weight:600; text-transform:uppercase; letter-spacing:.08em; font-size:13px">✦ ${catName} Series</div>`;
-    cats[catName].forEach(({k,b})=>{
+    cats[catName].forEach(([k,b])=>{
       html+=`<div class="bcard" id="bc-${k}" onclick="showBestiaryDetail('${k}')">
         <img src="${b.img}" alt="${b.name}">
         <div class="bname">${b.name}</div>
@@ -347,9 +347,22 @@ function openChallengeMenu(targetId, name, isTrainAvail) {
   const btn3v3 = document.getElementById('cm-3v3-btn');
   const btnTrain = document.getElementById('cm-train-btn');
   
-  btn1v1.disabled = myCurrentHP < 100;
-  btn3v3.disabled = myCurrentHP < 300;
-  btnTrain.style.display = isTrainAvail ? 'block' : 'none';
+  // Si es contra el Master, es entrenamiento (XP), no cuesta HP
+  const isMaster = (targetId === null);
+  
+  if(isMaster) {
+    btn1v1.textContent = '🤝 Entrenar 1 vs 1 (XP)';
+    btn3v3.textContent = '🤝 Entrenar 3 vs 3 (XP)';
+    btn1v1.disabled = false;
+    btn3v3.disabled = false;
+    btnTrain.style.display = 'none'; // Ya no necesitamos el botón genérico de entrenar
+  } else {
+    btn1v1.textContent = '⚔️ 1 vs 1 (Apuesta 100 HP)';
+    btn3v3.textContent = '⚔️ 3 vs 3 (Apuesta 300 HP)';
+    btn1v1.disabled = myCurrentHP < 100;
+    btn3v3.disabled = myCurrentHP < 300;
+    btnTrain.style.display = isTrainAvail ? 'block' : 'none';
+  }
   
   document.getElementById('modal-challenge-mode').classList.remove('hidden');
 }
@@ -360,9 +373,11 @@ function selectChallengeMode(mode) {
   selectedTeam = [];
   
   const titleEl = document.getElementById('ts-mode-title');
-  if(mode === '1v1') titleEl.textContent = 'Modo: 1 vs 1 (Elige 1)';
-  if(mode === '3v3') titleEl.textContent = 'Modo: 3 vs 3 (Elige 3 en orden)';
-  if(mode === 'train') titleEl.textContent = 'Modo: Entrenamiento (Elige 1)';
+  const isMaster = (pendingChallengeTargetId === null);
+  
+  if(mode === '1v1') titleEl.textContent = isMaster ? 'Entrenamiento: 1 vs 1 (Elige 1)' : 'Combate: 1 vs 1 (Elige 1)';
+  if(mode === '3v3') titleEl.textContent = isMaster ? 'Entrenamiento: 3 vs 3 (Elige 3)' : 'Combate: 3 vs 3 (Elige 3)';
+  if(mode === 'train') titleEl.textContent = 'Entrenamiento: 1 vs 1 (Elige 1)';
   
   buildTeamPickGrid();
   show('s-team-select');
@@ -437,11 +452,12 @@ function cancelTeamSelection() {
 }
 
 function confirmTeam() {
-  const isTraining = teamSelectionMode === 'train';
+  // Es entrenamiento si el modo es 'train' O si estamos retando al Master (targetId === null)
+  const isTraining = teamSelectionMode === 'train' || pendingChallengeTargetId === null;
   const mode3v3 = teamSelectionMode === '3v3';
   
   if(mode3v3) {
-    alert('El modo 3v3 aún no está programado en el servidor. Probaremos con 1v1 por ahora.');
+    alert('El modo 3v3 aún no está programado en el servidor. Se usará el primero que elegiste para 1v1.');
     myBeast = selectedTeam[0];
   } else {
     myBeast = selectedTeam[0];
@@ -453,10 +469,11 @@ function confirmTeam() {
   
   // Aquí enviaremos el reto al servidor
   if(pendingChallengeTargetId !== null) {
+    // Reto a otro jugador
     if(isTraining) ws.send(JSON.stringify({type:'challenge_training', targetId: pendingChallengeTargetId}));
     else ws.send(JSON.stringify({type:'challenge', targetId: pendingChallengeTargetId}));
   } else {
-    // Si era contra el Master
+    // Reto al Master
     if(isTraining) ws.send(JSON.stringify({type:'challenge_cpu'}));
   }
   
