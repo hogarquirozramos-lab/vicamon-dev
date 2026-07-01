@@ -133,38 +133,30 @@ async function settleMatch(winnerWallet, loserWallet, winnerHp) {
   }
 }
 
-// NUEVO: Econonomía para la Torre de Batalla (Gauntlet)
-async function settleGauntlet(wallet, won) {
+// NUEVO: Econonomía para 3v3 (300 HP)
+async function settleTeamMatch(winnerWallet, loserWallet, winnerRemainingHp) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    // Liberar los 100 HP bloqueados del jugador
-    await client.query('UPDATE players SET locked_hp = GREATEST(0, locked_hp - 100) WHERE wallet = $1', [wallet]);
+    const hp = Math.max(0, Math.min(300, winnerRemainingHp));
     
-    if (won) {
-      // Si gana: recupera sus 100 HP + 100 HP de premio
-      await client.query('UPDATE players SET hp = hp + 200 WHERE wallet = $1', [wallet]);
-      // La plataforma pierde 100 HP
-      await client.query('UPDATE platform SET hp = GREATEST(0, hp - 100) WHERE id = 1');
-    } else {
-      // Si pierde: la plataforma se queda con los 100 HP
-      await client.query('UPDATE platform SET hp = hp + 100 WHERE id = 1');
-    }
+    // El ganador recupera sus 300 HP bloqueados + el HP que le quedó a sus Vicamons
+    await client.query('UPDATE players SET locked_hp = GREATEST(0, locked_hp - 300), hp = hp + 300 + $1 WHERE wallet = $2', [hp, winnerWallet]);
+    // El perdedor pierde sus 300 HP bloqueados
+    await client.query('UPDATE players SET locked_hp = GREATEST(0, locked_hp - 300) WHERE wallet = $1', [loserWallet]);
+    // La plataforma se queda con el HP que el ganador perdió (300 - hp)
+    await client.query('UPDATE platform SET hp = hp + (300 - $1) WHERE id = 1', [hp]);
     
     await client.query('COMMIT');
-    return await getHP(wallet);
+    
+    const winnerNewHp = await getHP(winnerWallet);
+    return { winnerNewHp };
   } catch(e) {
     await client.query('ROLLBACK');
     throw e;
   } finally {
     client.release();
   }
-}
-
-// NUEVO: Estadísticas para Gauntlet (solo afecta al jugador)
-async function updateGauntletStats(wallet, won) {
-  if (won) await pool.query('UPDATE players SET wins = wins + 1 WHERE wallet = $1', [wallet]);
-  else await pool.query('UPDATE players SET losses = losses + 1 WHERE wallet = $1', [wallet]);
 }
 
 async function cashout(wallet) {
@@ -203,13 +195,12 @@ async function clearPlatformHp(hp) {
 
 module.exports = {
   getHP, addHP, hasHP,
-  lockHP, unlockHP, settleMatch, cashout,
+  lockHP, unlockHP, settleMatch, settleTeamMatch, cashout,
   getPlatformHp, getPlatformUsdc, clearPlatformHp,
-  PLATFORM_WALLET: 'zGjAAUQUxwBYkWkEWLHZ1pHJrrWd8DT8c9rxBvjJ5fk', 
+  PLATFORM_WALLET: 'Gx9g45pNsENwczo197GTFgJrh6BN3pEZKqiEAfPZ453m', 
   PLATFORM_THRESHOLD: 1.00, 
   USDC_PER_HP,
   getAllPlayersDebug,
   updatePlayerName, updatePlayerStats, getTopPlayers,
-  getPlayerStats, getPlayerRank,
-  settleGauntlet, updateGauntletStats // NUEVO
+  getPlayerStats, getPlayerRank
 };
