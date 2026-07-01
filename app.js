@@ -280,7 +280,7 @@ function buildBestiary(){
   keys.forEach(([k,b])=>{ if(!cats[b.cat]) cats[b.cat] = []; cats[b.cat].push({k,b}); });
   for(const catName in cats){
     html += `<div style="grid-column:1/-1; margin-top:15px; border-bottom:0.5px solid rgba(255,255,255,.2); padding-bottom:5px; color:#CFA9EC; font-weight:600; text-transform:uppercase; letter-spacing:.08em; font-size:13px">✦ ${catName} Series</div>`;
-    cats[catName].forEach(([k,b])=>{
+    cats[catName].forEach(({k,b})=>{ // CORREGIDO AQUÍ: ({k,b}) en lugar de ([k,b])
       html+=`<div class="bcard" id="bc-${k}" onclick="showBestiaryDetail('${k}')">
         <img src="${b.img}" alt="${b.name}">
         <div class="bname">${b.name}</div>
