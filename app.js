@@ -9,12 +9,14 @@ let reconnectTimer=null, myWallet='', myCurrentHP=0, isKicked=false;
 let myStats = { wins: 0, losses: 0, rank: null };
 let gauntletBattleId = null, gauntletSelectedBeast = null;
 
-const audioFiles = {
-    lobby: new Audio('Audio/lobby.mp3'), batalla: new Audio('Audio/batalla.mp3'),
-    ataque: new Audio('Audio/ataque.mp3'), curacion: new Audio('Audio/curacion.mp3'), boton: new Audio('Audio/boton.mp3')
-};
-audioFiles.lobby.loop = true; audioFiles.lobby.volume = 0.3;
-audioFiles.batalla.loop = true; audioFiles.batalla.volume = 0.3;
+// NUEVAS VARIABLES PARA 3v3
+let pendingChallengeTargetId = null;
+let pendingChallengeName = null;
+let teamSelectionMode = '1v1'; // '1v1', '3v3', 'train'
+let selectedTeam = []; // Arreglo para guardar los vicamons elegidos
+
+const audioFiles = { lobby: new Audio('Audio/lobby.mp3'), batalla: new Audio('Audio/batalla.mp3'), ataque: new Audio('Audio/ataque.mp3'), curacion: new Audio('Audio/curacion.mp3'), boton: new Audio('Audio/boton.mp3') };
+audioFiles.lobby.loop = true; audioFiles.lobby.volume = 0.3; audioFiles.batalla.loop = true; audioFiles.batalla.volume = 0.3;
 let currentMusic = null, isMuted = false, challengeBeepInterval = null;
 
 function playMusic(track) { if (currentMusic === audioFiles[track]) return; if (currentMusic) currentMusic.pause(); currentMusic = audioFiles[track]; if (!isMuted) currentMusic.play().catch(e=>{}); }
@@ -32,52 +34,22 @@ function copyWallet() { navigator.clipboard.writeText('DIRECCION_WALLET_A').then
 function depositWidgetHTML() { return `<div style="background:rgba(74,158,255,.06);border:0.5px solid rgba(74,158,255,.2);border-radius:10px;padding:10px 12px"><div style="font-size:11px;color:#85B7EB;margin-bottom:4px">💡 Deposita USDC para retar jugadores</div><div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:7px">0.10 USDC = 100 HP · cualquier monto funciona</div><div style="display:flex;gap:6px;align-items:center"><div style="flex:1;background:rgba(0,0,0,.35);border-radius:6px;padding:6px 8px;font-family:monospace;font-size:9px;color:#85B7EB;word-break:break-all;cursor:pointer" onclick="copyWallet()">DIRECCION_WALLET_A <span style="color:rgba(255,255,255,.3)">📋</span></div><button class="btn btn-sm" style="font-size:10px;white-space:nowrap;padding:5px 10px" onclick="checkHPNow()">Verificar HP</button></div></div>`; }
 function getPhantom() { return window.phantom?.solana || window.solana || null; }
 async function connectPhantom() {
-  await new Promise(r => setTimeout(r, 100));
-  const phantom = getPhantom();
+  await new Promise(r => setTimeout(r, 100)); const phantom = getPhantom();
   if (!phantom || !phantom.isPhantom) {
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    const currentUrl = window.location.href;
-    if (isMobile) {
-      const deepLink = `https://phantom.app/ul/browse/${currentUrl}`;
-      const noPhantomDiv = document.getElementById('no-phantom');
-      noPhantomDiv.style.display = 'block';
-      noPhantomDiv.innerHTML = `<div style="color:#F0997B; font-size:13px; line-height:1.5; text-align:left"><strong>📱 Para jugar desde tu móvil:</strong><br><br>1. Abre la app de <strong>Phantom</strong> en tu teléfono.<br>2. Ve a la pestaña <strong>"Descubrir" (🔍)</strong> en la barra inferior.<br>3. Pega este enlace en la barra de búsqueda para entrar al juego:<div style="background:rgba(0,0,0,.3); padding:8px; margin-top:8px; border-radius:6px; word-break:break-all; font-family:monospace; font-size:10px; color:#85B7EB; cursor:pointer; display:flex; justify-content:space-between; align-items:center" onclick="copyText('${currentUrl}')"><span>${currentUrl}</span><span style="margin-left:8px; white-space:nowrap">📋</span></div><br><button class="btn btn-blue btn-sm" style="width:100%; padding:10px" onclick="window.location.href='${deepLink}'">Intentar abrir automáticamente</button></div>`;
-      document.getElementById('btn-phantom').style.display = 'none'; return;
-    }
-    document.getElementById('no-phantom').style.display='block';
-    document.getElementById('no-phantom').innerHTML = 'Phantom no detectado. <a href="https://phantom.app" target="_blank" style="color:#F0997B;text-decoration:underline">Instalalo aqui</a> y recarga la pagina.';
-    document.getElementById('btn-phantom').style.display='none'; return;
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent); const currentUrl = window.location.href;
+    if (isMobile) { const deepLink = `https://phantom.app/ul/browse/${currentUrl}`; const noPhantomDiv = document.getElementById('no-phantom'); noPhantomDiv.style.display = 'block'; noPhantomDiv.innerHTML = `<div style="color:#F0997B; font-size:13px; line-height:1.5; text-align:left"><strong>📱 Para jugar desde tu móvil:</strong><br><br>1. Abre la app de <strong>Phantom</strong> en tu teléfono.<br>2. Ve a la pestaña <strong>"Descubrir" (🔍)</strong> en la barra inferior.<br>3. Pega este enlace en la barra de búsqueda para entrar al juego:<div style="background:rgba(0,0,0,.3); padding:8px; margin-top:8px; border-radius:6px; word-break:break-all; font-family:monospace; font-size:10px; color:#85B7EB; cursor:pointer; display:flex; justify-content:space-between; align-items:center" onclick="copyText('${currentUrl}')"><span>${currentUrl}</span><span style="margin-left:8px; white-space:nowrap">📋</span></div><br><button class="btn btn-blue btn-sm" style="width:100%; padding:10px" onclick="window.location.href='${deepLink}'">Intentar abrir automáticamente</button></div>`; document.getElementById('btn-phantom').style.display = 'none'; return; }
+    document.getElementById('no-phantom').style.display='block'; document.getElementById('no-phantom').innerHTML = 'Phantom no detectado. <a href="https://phantom.app" target="_blank" style="color:#F0997B;text-decoration:underline">Instalalo aqui</a> y recarga la pagina.'; document.getElementById('btn-phantom').style.display='none'; return;
   }
-  try {
-    const resp = await phantom.connect();
-    myWallet = resp.publicKey.toString();
-    document.getElementById('btn-phantom').style.display='none';
-    document.getElementById('wallet-connected').style.display='block';
-    document.getElementById('wallet-addr').textContent = myWallet.slice(0,8)+'...'+myWallet.slice(-6);
-    document.getElementById('wallet-hp').textContent = 'Verificando...';
-    const sn = document.getElementById('step-name'); if(sn){ sn.style.opacity='1'; sn.style.pointerEvents='auto'; }
-    await checkHPNow(true);
-  } catch(e) { console.error('Phantom error:', e); alert('No se pudo conectar Phantom.'); }
+  try { const resp = await phantom.connect(); myWallet = resp.publicKey.toString(); document.getElementById('btn-phantom').style.display='none'; document.getElementById('wallet-connected').style.display='block'; document.getElementById('wallet-addr').textContent = myWallet.slice(0,8)+'...'+myWallet.slice(-6); document.getElementById('wallet-hp').textContent = 'Verificando...'; const sn = document.getElementById('step-name'); if(sn){ sn.style.opacity='1'; sn.style.pointerEvents='auto'; } await checkHPNow(true); } catch(e) { console.error('Phantom error:', e); alert('No se pudo conectar Phantom.'); }
 }
 function copyText(text) { navigator.clipboard.writeText(text).then(() => alert('¡Enlace copiado!')).catch(() => alert('Copia este enlace manualmente: ' + text)); }
 window.addEventListener('load', async () => { await new Promise(r => setTimeout(r, 500)); const ph2 = getPhantom(); if (ph2?.isPhantom && ph2.isConnected) { try { const r2 = await ph2.connect({ onlyIfTrusted: true }); myWallet = r2.publicKey.toString(); document.getElementById('btn-phantom').style.display='none'; document.getElementById('wallet-connected').style.display='block'; document.getElementById('wallet-addr').textContent = myWallet.slice(0,8)+'...'+myWallet.slice(-6); document.getElementById('wallet-hp').textContent = 'Verificando...'; await checkHPNow(true); } catch(e) {} } });
 
-async function checkHPNow(fromConnect=false) {
-  if (!myWallet) return;
-  try {
-    const res = await fetch('/hp?wallet='+myWallet); const data = await res.json(); const hp = data.hp || 0;
-    const loginHp = document.getElementById('wallet-hp');
-    if(loginHp){ loginHp.textContent=hp+' HP'; loginHp.style.color=hp>=100?'#5DCAA5':'#EF9F27'; }
-    updateHPDisplay(hp);
-    if (data.stats) updateProfileUI(data.stats);
-    if (hp >= 100) { document.getElementById('step-charge').style.display='none'; document.getElementById('step-name').style.opacity='1'; document.getElementById('step-name').style.pointerEvents='auto'; }
-    else { document.getElementById('step-charge').style.display='block'; document.getElementById('step-name').style.opacity='1'; document.getElementById('step-name').style.pointerEvents='auto'; }
-  } catch(e) { document.getElementById('wallet-hp').textContent = 'Error al verificar'; }
-}
+async function checkHPNow(fromConnect=false) { if (!myWallet) return; try { const res = await fetch('/hp?wallet='+myWallet); const data = await res.json(); const hp = data.hp || 0; const loginHp = document.getElementById('wallet-hp'); if(loginHp){ loginHp.textContent=hp+' HP'; loginHp.style.color=hp>=100?'#5DCAA5':'#EF9F27'; } updateHPDisplay(hp); if (data.stats) updateProfileUI(data.stats); if (hp >= 100) { document.getElementById('step-charge').style.display='none'; document.getElementById('step-name').style.opacity='1'; document.getElementById('step-name').style.pointerEvents='auto'; } else { document.getElementById('step-charge').style.display='block'; document.getElementById('step-name').style.opacity='1'; document.getElementById('step-name').style.pointerEvents='auto'; } } catch(e) { document.getElementById('wallet-hp').textContent = 'Error al verificar'; } }
 
 function updateProfileUI(stats) { if (stats) myStats = stats; const nameEl = document.getElementById('profile-name'); if (nameEl) { nameEl.textContent = myName || 'Jugador'; document.getElementById('profile-wallet').textContent = myWallet ? myWallet.slice(0,8)+'...'+myWallet.slice(-6) : 'Desconectado'; document.getElementById('profile-wins').textContent = myStats.wins || 0; document.getElementById('profile-losses').textContent = myStats.losses || 0; document.getElementById('profile-rank').textContent = myStats.rank ? '#' + myStats.rank : 'Sin clasificado'; } }
 
-function show(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); if(id === 's-login' || id === 's-pick' || id === 's-lobby' || id === 's-profile') playMusic('lobby'); if(id === 's-battle' || id === 's-result') playMusic('batalla'); }
+function show(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); if(id === 's-login' || id === 's-lobby' || id === 's-profile' || id === 's-team-select') playMusic('lobby'); if(id === 's-battle' || id === 's-result') playMusic('batalla'); }
 
 function hpColor(pct){return pct>50?'#5DCAA5':pct>25?'#EF9F27':'#F0997B';}
 function stTags(st,right=false){ let t=''; if(st.poisonTurns>0) t+=`<span class="stag" style="background:rgba(83,150,40,.3);color:#9ECC5A">☠×${st.poisonTurns}</span>`; if(st.burnTurns>0) t+=`<span class="stag" style="background:rgba(216,90,48,.3);color:#F0997B">🔥×${st.burnTurns}</span>`; if(st.shield>0) t+=`<span class="stag" style="background:rgba(55,138,221,.3);color:#85B7EB">🛡×${st.shield}</span>`; if(st.reflect50>0) t+=`<span class="stag" style="background:rgba(55,138,221,.2);color:#85B7EB">↩50%</span>`; if(st.stun) t+=`<span class="stag" style="background:rgba(212,83,126,.3);color:#ED93B1">💫stun</span>`; if(st.recharge>0) t+=`<span class="stag" style="background:rgba(136,135,128,.3);color:#B4B2A9">⚡×${st.recharge}</span>`; if(st.blind>0) t+=`<span class="stag" style="background:rgba(186,117,23,.3);color:#EF9F27">👁×${st.blind}</span>`; if(st.weakAtk>0) t+=`<span class="stag" style="background:rgba(15,110,86,.3);color:#5DCAA5">⬇atk×${st.weakAtk}</span>`; if(st.weaken>0) t+=`<span class="stag" style="background:rgba(15,110,86,.3);color:#5DCAA5">⬇dmg×${st.weaken}</span>`; if(st.analyzed>0) t+=`<span class="stag" style="background:rgba(130,80,180,.3);color:#CFA9EC">🔍×${st.analyzed}</span>`; return t; }
@@ -90,26 +62,138 @@ function dmgClassPick(a){ if(a.d===0) return 'dmg-zero'; const e=a.fx==='double'
 function buildBestiary(){ const keys=Object.entries(BEASTS); let html=''; const cats = {}; keys.forEach(([k,b])=>{ if(!cats[b.cat]) cats[b.cat] = []; cats[b.cat].push({k,b}); }); for(const catName in cats){ html += `<div style="grid-column:1/-1; margin-top:15px; border-bottom:0.5px solid rgba(255,255,255,.2); padding-bottom:5px; color:#CFA9EC; font-weight:600; text-transform:uppercase; letter-spacing:.08em; font-size:13px">✦ ${catName} Series</div>`; cats[catName].forEach(({k,b})=>{ html+=`<div class="bcard" id="bc-${k}" onclick="showBestiaryDetail('${k}')"><img src="${b.img}" alt="${b.name}"><div class="bname">${b.name}</div><div class="bsub">${b.sub}</div><span class="bstyle" style="${STCSS[b.style]}">${b.style}</span><div class="elbar" style="background:${EL[b.el]}"></div></div>`; }); } html+=`<div class="beast-detail" id="bestiary-detail-panel"></div>`; document.getElementById('bestiary-grid').innerHTML=html; }
 function showBestiaryDetail(k){ const b=BEASTS[k]; const panel=document.getElementById('bestiary-detail-panel'); const statData={atk:{aries:70,tauro:55,geminis:65,cancer:45,leo:70,virgo:60,libra:62,escorpio:65,sagitario:68,capricornio:50,acuario:72,piscis:58},def:{aries:30,tauro:90,geminis:50,cancer:95,leo:65,virgo:70,libra:62,escorpio:55,sagitario:55,capricornio:92,acuario:45,piscis:68},spd:{aries:90,tauro:30,geminis:80,cancer:40,leo:70,virgo:65,libra:62,escorpio:70,sagitario:75,capricornio:35,acuario:85,piscis:60}}; const atksHtml=b.attacks.map(a=>{ const tags=[]; if(a.pierce) tags.push('<span class="atk-tag tag-pierce">Ignora escudo</span>'); if(a.fx==='double') tags.push('<span class="atk-tag tag-nobreak">Doble golpe</span>'); if(a.fx==='triple') tags.push('<span class="atk-tag tag-nobreak">Triple golpe</span>'); if(a.risk||a.self>0) tags.push(`<span class="atk-tag tag-risk">Riesgo${a.self>0?' -'+a.self+' HP':''}</span>`); if(a.buff) tags.push('<span class="atk-tag tag-buff">Buff</span>'); if(a.dot) tags.push('<span class="atk-tag tag-dot">Daño/turno</span>'); if(a.debuff) tags.push('<span class="atk-tag tag-debuff">Debuff</span>'); const ppText = a.pp === 99 || a.pp === undefined ? 'PP: ∞' : `PP: ${a.pp}`; return `<div class="bd-atk"><div class="bd-atk-top"><span class="bd-atk-name">${a.n}</span><span class="bd-atk-dmg ${dmgClassPick(a)}">${dmgLabelPick(a)}</span></div>${tags.length?`<div class="bd-atk-tags">${tags.join('')}</div>`:''}<div class="bd-atk-desc">${a.desc}</div><div style="display:flex;justify-content:space-between;align-items:center"><div class="bd-atk-acc">${a.acc}% precisión</div><div class="bd-atk-pp">${ppText}</div></div></div>`; }).join(''); panel.innerHTML=`<div class="bd-left"><img src="${b.img}" alt="${b.name}"><div class="bd-name">${b.name}</div><div class="bd-sub">${b.sub}</div><div class="bd-stats"><div class="bd-stat"><div class="bd-stat-val">${statData.atk[k]||'—'}</div><div class="bd-stat-lbl">ATK</div></div><div class="bd-stat"><div class="bd-stat-val">${statData.def[k]||'—'}</div><div class="bd-stat-lbl">DEF</div></div><div class="bd-stat"><div class="bd-stat-val">${statData.spd[k]||'—'}</div><div class="bd-stat-lbl">VEL</div></div></div></div><div class="bd-attacks">${atksHtml}</div>`; panel.classList.add('open'); panel.scrollIntoView({behavior:'smooth',block:'nearest'}); }
 
-// --- FLUJO DE LOGIN A PERFIL ---
-function goProfile(){
-  if(!myWallet){alert('Primero conecta tu wallet Phantom');return;}
-  myName=document.getElementById('inp-name').value.trim();
-  if(!myName){alert('Escribe tu nombre de combate');return;}
-  updateProfileUI();
-  buildBestiary(); // Cargar el bestiario
-  show('s-profile');
-  updateHPDisplay(myCurrentHP);
-  checkHPNow(false);
+function goProfile(){ if(!myWallet){alert('Primero conecta tu wallet Phantom');return;} myName=document.getElementById('inp-name').value.trim(); if(!myName){alert('Escribe tu nombre de combate');return;} updateProfileUI(); buildBestiary(); show('s-profile'); updateHPDisplay(myCurrentHP); checkHPNow(false); }
+
+// --- NUEVO: FLUJO DE RETOS Y SELECCIÓN DE EQUIPO ---
+function openChallengeMenu(targetId, name, isTrainAvail) {
+  pendingChallengeTargetId = targetId;
+  pendingChallengeName = name;
+  document.getElementById('cm-title').textContent = `Retar a ${name}`;
+  
+  const btn1v1 = document.getElementById('cm-1v1-btn');
+  const btn3v3 = document.getElementById('cm-3v3-btn');
+  const btnTrain = document.getElementById('cm-train-btn');
+  
+  btn1v1.disabled = myCurrentHP < 100;
+  btn3v3.disabled = myCurrentHP < 300;
+  btnTrain.style.display = isTrainAvail ? 'block' : 'none';
+  
+  document.getElementById('modal-challenge-mode').classList.remove('hidden');
 }
 
-// --- TEMPORAL: Selección de 1 Vicamon para retos (mientras programamos el 3v3) ---
-function showPickGrid() { buildPickGrid(); if(myBeast) { document.getElementById('bc-'+myBeast)?.classList.add('sel'); document.getElementById('btn-enter').disabled = false; } else { document.getElementById('btn-enter').disabled = true; } show('s-pick'); }
-function buildPickGrid(){ const keys=Object.entries(BEASTS); let html=''; const cats = {}; keys.forEach(([k,b])=>{ if(!cats[b.cat]) cats[b.cat] = []; cats[b.cat].push({k,b}); }); for(const catName in cats){ html += `<div style="grid-column:1/-1; margin-top:15px; border-bottom:0.5px solid rgba(255,255,255,.2); padding-bottom:5px; color:#CFA9EC; font-weight:600; text-transform:uppercase; letter-spacing:.08em; font-size:13px">✦ ${catName} Series</div>`; cats[catName].forEach(({k,b})=>{ html+=`<div class="bcard" id="bc-${k}" onclick="selectBeast('${k}')"><img src="${b.img}" alt="${b.name}"><div class="bname">${b.name}</div><div class="bsub">${b.sub}</div><span class="bstyle" style="${STCSS[b.style]}">${b.style}</span><div class="elbar" style="background:${EL[b.el]}"></div></div>`; }); } html+=`<div class="beast-detail" id="beast-detail-panel"></div>`; document.getElementById('pick-grid').innerHTML=html; }
-function showBeastDetail(k){ const b=BEASTS[k]; const panel=document.getElementById('beast-detail-panel'); const statData={atk:{aries:70,tauro:55,geminis:65,cancer:45,leo:70,virgo:60,libra:62,escorpio:65,sagitario:68,capricornio:50,acuario:72,piscis:58},def:{aries:30,tauro:90,geminis:50,cancer:95,leo:65,virgo:70,libra:62,escorpio:55,sagitario:55,capricornio:92,acuario:45,piscis:68},spd:{aries:90,tauro:30,geminis:80,cancer:40,leo:70,virgo:65,libra:62,escorpio:70,sagitario:75,capricornio:35,acuario:85,piscis:60}}; const atksHtml=b.attacks.map(a=>{ const tags=[]; if(a.pierce) tags.push('<span class="atk-tag tag-pierce">Ignora escudo</span>'); if(a.fx==='double') tags.push('<span class="atk-tag tag-nobreak">Doble golpe</span>'); if(a.fx==='triple') tags.push('<span class="atk-tag tag-nobreak">Triple golpe</span>'); if(a.risk||a.self>0) tags.push(`<span class="atk-tag tag-risk">Riesgo${a.self>0?' -'+a.self+' HP':''}</span>`); if(a.buff) tags.push('<span class="atk-tag tag-buff">Buff</span>'); if(a.dot) tags.push('<span class="atk-tag tag-dot">Daño/turno</span>'); if(a.debuff) tags.push('<span class="atk-tag tag-debuff">Debuff</span>'); const ppText = a.pp === 99 || a.pp === undefined ? 'PP: ∞' : `PP: ${a.pp}`; return `<div class="bd-atk"><div class="bd-atk-top"><span class="bd-atk-name">${a.n}</span><span class="bd-atk-dmg ${dmgClassPick(a)}">${dmgLabelPick(a)}</span></div>${tags.length?`<div class="bd-atk-tags">${tags.join('')}</div>`:''}<div class="bd-atk-desc">${a.desc}</div><div style="display:flex;justify-content:space-between;align-items:center"><div class="bd-atk-acc">${a.acc}% precisión</div><div class="bd-atk-pp">${ppText}</div></div></div>`; }).join(''); panel.innerHTML=`<div class="bd-left"><img src="${b.img}" alt="${b.name}"><div class="bd-name">${b.name}</div><div class="bd-sub">${b.sub}</div><div class="bd-stats"><div class="bd-stat"><div class="bd-stat-val">${statData.atk[k]||'—'}</div><div class="bd-stat-lbl">ATK</div></div><div class="bd-stat"><div class="bd-stat-val">${statData.def[k]||'—'}</div><div class="bd-stat-lbl">DEF</div></div><div class="bd-stat"><div class="bd-stat-val">${statData.spd[k]||'—'}</div><div class="bd-stat-lbl">VEL</div></div></div></div><div class="bd-attacks">${atksHtml}</div>`; panel.classList.add('open'); panel.scrollIntoView({behavior:'smooth',block:'nearest'}); }
-function selectBeast(k){ myBeast=k; document.querySelectorAll('#pick-grid .bcard').forEach(c=>c.classList.remove('sel')); document.getElementById('bc-'+k)?.classList.add('sel'); document.getElementById('btn-enter').disabled=false; if(ws&&ws.readyState===1) ws.send(JSON.stringify({type:'change_beast',beast:k})); showBeastDetail(k); }
+function selectChallengeMode(mode) {
+  document.getElementById('modal-challenge-mode').classList.add('hidden');
+  teamSelectionMode = mode;
+  selectedTeam = [];
+  
+  const titleEl = document.getElementById('ts-mode-title');
+  if(mode === '1v1') titleEl.textContent = 'Modo: 1 vs 1 (Elige 1)';
+  if(mode === '3v3') titleEl.textContent = 'Modo: 3 vs 3 (Elige 3 en orden)';
+  if(mode === 'train') titleEl.textContent = 'Modo: Entrenamiento (Elige 1)';
+  
+  buildTeamPickGrid();
+  show('s-team-select');
+}
 
-function enterLobby(){ if(!myBeast) { showPickGrid(); return alert("Por favor, elige un Vicamon antes de entrar al lobby."); } if(ws && ws.readyState === 1) { show('s-lobby'); ws.send(JSON.stringify({type:'ping'})); } else { connectWS(); } }
-function connectWS(){ clearTimeout(reconnectTimer); isKicked=false; const proto=location.protocol==='https:'?'wss':'ws'; const localWs = new WebSocket(`${proto}://${location.host}`); localWs.onopen=()=>{ clearTimeout(reconnectTimer); localWs.send(JSON.stringify({type:'join',name:myName,beast:myBeast,wallet:myWallet})); }; localWs.onmessage=e=>{try{handleMsg(JSON.parse(e.data));}catch(err){console.error(err);}}; localWs.onerror=()=>{}; localWs.onclose=()=>{ if(ws !== localWs) return; const inBattle=document.getElementById('s-battle').classList.contains('active'); if(!inBattle && !isKicked) reconnectTimer=setTimeout(()=>{ if(myName&&myBeast) connectWS(); },2000); }; ws = localWs; }
+function buildTeamPickGrid() {
+  const keys=Object.entries(BEASTS);
+  let html='';
+  keys.forEach(([k,b])=>{
+    html+=`<div class="bcard" id="tpc-${k}" onclick="toggleTeamBeast('${k}')">
+      <img src="${b.img}" alt="${b.name}">
+      <div class="bname">${b.name}</div>
+      <div class="bsub">${b.sub}</div>
+      <span class="bstyle" style="${STCSS[b.style]}">${b.style}</span>
+      <div class="elbar" style="background:${EL[b.el]}"></div>
+    </div>`;
+  });
+  html+=`<div class="beast-detail" id="team-detail-panel"></div>`;
+  document.getElementById('team-pick-grid').innerHTML=html;
+  updateTeamSelectionUI();
+}
+
+function toggleTeamBeast(k) {
+  const maxPicks = teamSelectionMode === '3v3' ? 3 : 1;
+  const idx = selectedTeam.indexOf(k);
+  
+  if(idx > -1) {
+    selectedTeam.splice(idx, 1); // Si ya estaba, lo quito
+  } else {
+    if(selectedTeam.length >= maxPicks) {
+      alert(`Ya elegiste ${maxPicks} Vicamons.`);
+      return;
+    }
+    selectedTeam.push(k);
+  }
+  updateTeamSelectionUI();
+}
+
+function updateTeamSelectionUI() {
+  const maxPicks = teamSelectionMode === '3v3' ? 3 : 1;
+  document.querySelectorAll('#team-pick-grid .bcard').forEach(c => c.classList.remove('sel'));
+  
+  selectedTeam.forEach((k, i) => {
+    const card = document.getElementById('tpc-'+k);
+    if(card) {
+      card.classList.add('sel');
+      // Agregar número de orden
+      let badge = card.querySelector('.team-badge');
+      if(!badge) {
+        badge = document.createElement('div');
+        badge.className = 'team-badge';
+        badge.style.cssText = 'position:absolute;top:2px;right:2px;background:#4a9eff;color:#fff;width:16px;height:16px;border-radius:50%;font-size:10px;display:flex;align-items:center;justify-content:center;font-weight:bold';
+        card.appendChild(badge);
+      }
+      badge.textContent = i + 1;
+    }
+  });
+  
+  // Limpiar badges de los no seleccionados
+  document.querySelectorAll('#team-pick-grid .bcard').forEach(c => {
+    if(!c.classList.contains('sel')) {
+      const badge = c.querySelector('.team-badge');
+      if(badge) badge.remove();
+    }
+  });
+  
+  document.getElementById('btn-confirm-team').disabled = selectedTeam.length !== maxPicks;
+}
+
+function cancelTeamSelection() {
+  show('s-lobby');
+}
+
+function confirmTeam() {
+  const isTraining = teamSelectionMode === 'train';
+  const mode3v3 = teamSelectionMode === '3v3';
+  
+  if(mode3v3) {
+    alert('El modo 3v3 aún no está programado en el servidor. Probaremos con 1v1 por ahora.');
+    myBeast = selectedTeam[0];
+  } else {
+    myBeast = selectedTeam[0];
+  }
+  
+  if(ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({type:'change_beast', beast: myBeast}));
+  }
+  
+  // Aquí enviaremos el reto al servidor
+  if(pendingChallengeTargetId !== null) {
+    if(isTraining) ws.send(JSON.stringify({type:'challenge_training', targetId: pendingChallengeTargetId}));
+    else ws.send(JSON.stringify({type:'challenge', targetId: pendingChallengeTargetId}));
+  } else {
+    // Si era contra el Master
+    if(isTraining) ws.send(JSON.stringify({type:'challenge_cpu'}));
+  }
+  
+  pendingChallengeTargetId = null;
+  show('s-lobby'); // Volvemos al lobby mientras esperamos que el rival acepte
+}
+// --- FIN FLUJO DE RETOS ---
+
+function enterLobby(){ if(ws && ws.readyState === 1) { show('s-lobby'); ws.send(JSON.stringify({type:'ping'})); } else { if(!myBeast) myBeast = 'aries'; // Temporal para no romper el servidor connectWS(); } }
+function connectWS(){ clearTimeout(reconnectTimer); isKicked=false; const proto=location.protocol==='https:'?'wss':'ws'; const localWs = new WebSocket(`${proto}://${location.host}`); localWs.onopen=()=>{ clearTimeout(reconnectTimer); localWs.send(JSON.stringify({type:'join',name:myName,beast:myBeast||'aries',wallet:myWallet})); }; localWs.onmessage=e=>{try{handleMsg(JSON.parse(e.data));}catch(err){console.error(err);}}; localWs.onerror=()=>{}; localWs.onclose=()=>{ if(ws !== localWs) return; const inBattle=document.getElementById('s-battle').classList.contains('active'); if(!inBattle && !isKicked) reconnectTimer=setTimeout(()=>{ if(myName&&myBeast) connectWS(); },2000); }; ws = localWs; }
 
 function challengeGauntlet() { if(!ws || ws.readyState !== 1) return alert('Espera, estás conectando al servidor.'); if(!confirm('¿Iniciar la Torre de Batalla? Apostarás 100 HP. Si derrotas a los 12 Vicamons, ganarás 100 HP extra. Si caes, perderás tus 100 HP.')) return; ws.send(JSON.stringify({type:'challenge_gauntlet'})); }
 function continueGauntlet() { document.getElementById('modal-gauntlet').classList.add('hidden'); const beastToUse = gauntletSelectedBeast || myBeast; ws.send(JSON.stringify({type:'gauntlet_continue', battleId: gauntletBattleId, beast: beastToUse})); myBeast = beastToUse; }
@@ -139,12 +223,14 @@ function animHit(side, dmg){ const spr=document.getElementById('spr-'+side); if(
 function animAttack(side){ const spr=document.getElementById('spr-'+side); if(!spr) return; spr.classList.remove('anim-attack'); void spr.offsetWidth; spr.classList.add('anim-attack'); setTimeout(()=>spr.classList.remove('anim-attack'),400); }
 function updateLobbyBadge(){ document.getElementById('lbl-myname').textContent=myName; const hpEl = document.getElementById('lbl-myhp'); if(hpEl) hpEl.textContent = myCurrentHP + ' HP'; const b=BEASTS[myBeast]; if(b) document.getElementById('badge-img').src=b.img; }
 let _lastLobbyPlayers=[]; function renderLobbyFromCache(){ renderLobby(_lastLobbyPlayers); }
-function renderLobby(others){ _lastLobbyPlayers=others; const list=document.getElementById('players-list'); const myHp=myCurrentHP; const hpWarnEl=document.getElementById('lobby-hp-warn'); if(hpWarnEl) hpWarnEl.style.display=myHp<100?'block':'none'; if(!others.length){list.innerHTML='<p class="empty-lobby">No hay otros jugadores en el lobby...<br>Comparte la URL con tus amigos</p>';return;} list.innerHTML=others.map(p=>{ const b=BEASTS[p.beast]||{name:p.beast,img:''}; const rivalHp=p.hp||0; const canChallenge=myHp>=100&&rivalHp>=100; const hpColor=rivalHp>=100?'#5DCAA5':'#F0997B'; return `<div class="p-row"><div class="p-info"><img class="p-img" src="${b.img}" alt="${b.name}"><div><div class="p-name">${p.name}</div><div class="p-beast">${b.name} · <span style="color:${hpColor};font-size:10px">${rivalHp} HP</span></div></div></div><div style="display:flex;gap:6px"><button class="btn btn-sm" style="background:rgba(130,80,180,.15);border-color:rgba(130,80,180,.35);color:#CFA9EC" onclick="sendChallengeTraining(${p.id},'${p.name}')">🤝 Entrenar</button><button class="btn btn-blue btn-sm" ${canChallenge?'':'disabled'} onclick="sendChallenge(${p.id},'${p.name}')" title="${!canChallenge?'Se necesitan 100 HP mínimo para retar':''}">⚔ Retar</button></div></div>`; }).join(''); }
+function renderLobby(others){ _lastLobbyPlayers=others; const list=document.getElementById('players-list'); const myHp=myCurrentHP; const hpWarnEl=document.getElementById('lobby-hp-warn'); if(hpWarnEl) hpWarnEl.style.display=myHp<100?'block':'none'; if(!others.length){list.innerHTML='<p class="empty-lobby">No hay otros jugadores en el lobby...<br>Comparte la URL con tus amigos</p>';return;} list.innerHTML=others.map(p=>{ const b=BEASTS[p.beast]||{name:p.beast,img:''}; const rivalHp=p.hp||0; const can1v1=myHp>=100&&rivalHp>=100; const can3v3=myHp>=300&&rivalHp>=300; const hpColor=rivalHp>=100?'#5DCAA5':'#F0997B'; return `<div class="p-row"><div class="p-info"><img class="p-img" src="${b.img}" alt="${b.name}"><div><div class="p-name">${p.name}</div><div class="p-beast">${b.name} · <span style="color:${hpColor};font-size:10px">${rivalHp} HP</span></div></div></div><div style="display:flex;gap:6px"><button class="btn btn-sm" style="background:rgba(130,80,180,.15);border-color:rgba(130,80,180,.35);color:#CFA9EC" onclick="openChallengeMenu(${p.id},'${p.name}', true)">⚔️ Retar</button></div></div>`; }).join(''); }
 async function doCashout(){ const btn=document.getElementById('btn-cashout'); if(btn){btn.disabled=true;btn.textContent='Procesando...';} if(!ws || ws.readyState !== 1){ if(btn){btn.disabled=false;btn.textContent='💰 Cashout';} alert('Debes entrar al lobby primero para conectar con el servidor.'); return; } ws.send(JSON.stringify({type:'cashout'})); }
 function updateHPDisplay(hp){ myCurrentHP = hp || 0; const el=document.getElementById('pick-hp-val'); if(el){ el.textContent=hp+' HP'; el.style.color=hp>=100?'#5DCAA5':'#EF9F27'; } const elUsdc=document.getElementById('pick-usdc-val'); if(elUsdc) elUsdc.textContent='= '+(hp*0.001).toFixed(3)+' USDC'; const loginHp=document.getElementById('wallet-hp'); if(loginHp){ loginHp.textContent=hp+' HP'; loginHp.style.color=hp>=100?'#5DCAA5':'#EF9F27'; } const profHp=document.getElementById('profile-hp'); if(profHp){ profHp.textContent=hp+' HP'; profHp.style.color=hp>=100?'#5DCAA5':'#EF9F27'; } const profUsdc=document.getElementById('profile-usdc'); if(profUsdc) profUsdc.textContent='= '+(hp*0.001).toFixed(3)+' USDC'; const btn=document.getElementById('btn-cashout'); if(btn){ btn.style.display=hp>0?'inline-block':'none'; btn.disabled=false; btn.textContent='💰 Cashout'; } const warn=document.getElementById('low-hp-warning'); if(warn) warn.style.display=hp<100?'block':'none'; const charge=document.getElementById('step-charge'); if(charge) charge.style.display = hp<100 ? 'block' : 'none'; const depHtml = hp<100 ? depositWidgetHTML() : ''; const pickDep = document.getElementById('pick-deposit-widget'); if(pickDep) pickDep.innerHTML = depHtml; const lobbyDep = document.getElementById('lobby-deposit-widget'); if(lobbyDep) lobbyDep.innerHTML = depHtml; const profDep = document.getElementById('profile-deposit-widget'); if(profDep) profDep.innerHTML = depHtml; if(document.getElementById('s-lobby')?.classList.contains('active')){ const cur = document.getElementById('players-list'); if(cur) renderLobbyFromCache(); updateLobbyBadge(); } }
-function sendChallenge(targetId,name){ if(!ws || ws.readyState !== 1) return; if(confirm(`¿Retar a ${name} a combate por HP?`)) ws.send(JSON.stringify({type:'challenge',targetId})); }
-function sendChallengeTraining(targetId,name){ if(!ws || ws.readyState !== 1) return; if(confirm(`¿Retar a ${name} a un ENTRENAMIENTO? (Sin apostar HP)`)) ws.send(JSON.stringify({type:'challenge_training',targetId})); }
-function challengeMaster(){ if(!ws || ws.readyState !== 1) return; ws.send(JSON.stringify({type:'challenge_cpu'})); }
+
+// MODIFICADO: Abre el menú de modos
+function sendChallenge(targetId,name){ openChallengeMenu(targetId, name, false); }
+function sendChallengeTraining(targetId,name){ openChallengeMenu(targetId, name, true); }
+function challengeMaster(){ if(!ws || ws.readyState !== 1) return; openChallengeMenu(null, 'Zodiac Master', true); }
 function acceptChallenge(){ document.getElementById('modal-challenged').classList.add('hidden'); stopChallengeBeep(); if(pendingFrom!==null) ws.send(JSON.stringify({type:'accept',fromId:pendingFrom, isTraining: pendingIsTraining})); pendingIsTraining=false; pendingFrom=null; }
 function rejectChallenge(){ document.getElementById('modal-challenged').classList.add('hidden'); stopChallengeBeep(); pendingFrom=null; pendingIsTraining=false; }
 function escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
