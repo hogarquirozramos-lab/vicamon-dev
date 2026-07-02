@@ -169,8 +169,6 @@ wss.on('connection', ws => {
 
   ws.on('message', async raw => {
     let msg; try { msg = JSON.parse(raw); } catch { return; }
-    
-    // ESCUDO ANTI-CRASH
     try {
       if (msg.type === 'join') {
         const wallet = msg.wallet || '';
@@ -300,6 +298,7 @@ wss.on('connection', ws => {
 
       if (msg.type === 'challenge_gauntlet') {
         const pl = lobby.get(id); if (!pl || pl.inBattle) return;
+        if (msg.beast) pl.beast = msg.beast; // ARREGLO: Usa el beast elegido en la interfaz
         if (!await hasHP(pl.wallet, 100)) { send(ws, { type: 'error', msg: 'Necesitas 100 HP para la Torre.' }); return; }
         await lockHP(pl.wallet, 100); pl.inBattle = true;
         const cpuBeast = BEAST_KEYS[0];
