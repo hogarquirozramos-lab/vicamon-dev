@@ -10,24 +10,11 @@ function pushTeamBattle(bId) {
   const b = battles.get(bId); if (!b) return;
   const p1 = lobby.get(b.p1id), p2 = lobby.get(b.p2id);
   if (!p1 || !p2) return;
-
   const formatSide = (player, teamStates, activeIdx) => {
-    return {
-      name: player.name,
-      activeBeast: player.team[activeIdx],
-      activeState: teamStates[activeIdx],
-      bench: player.team.map((beastKey, i) => ({
-        beast: beastKey,
-        state: teamStates[i],
-        isDead: teamStates[i].hp <= 0,
-        isActive: i === activeIdx
-      }))
-    };
+    return { name: player.name, activeBeast: player.team[activeIdx], activeState: teamStates[activeIdx], bench: player.team.map((beastKey, i) => ({ beast: beastKey, state: teamStates[i], isDead: teamStates[i].hp <= 0, isActive: i === activeIdx })) };
   };
-
   const p1Side = formatSide(p1, b.team1, b.active1);
   const p2Side = formatSide(p2, b.team2, b.active2);
-
   const base = { type: 'battle_state', battleId: bId, p1: p1Side, p2: p2Side, logs: b.logs.slice(-14), isTeamBattle: true };
   send(p1.ws, { ...base, yourTurn: b.turnId === b.p1id });
   send(p2.ws, { ...base, yourTurn: b.turnId === b.p2id });
@@ -36,35 +23,10 @@ function pushTeamBattle(bId) {
 function pushTeamCpuBattle(bId) {
   const b = battles.get(bId); if (!b) return;
   const pl = lobby.get(b.p2id); if (!pl) return;
-  
-  const cpuTeam = b.team1;
-  const plTeam = b.team2;
-  const activeCpu = b.active1;
-  const activePl = b.active2;
-
-  const cpuSide = {
-    name: CPU_NAME,
-    activeBeast: b.cpuTeam[activeCpu],
-    activeState: cpuTeam[activeCpu],
-    bench: b.cpuTeam.map((beastKey, i) => ({
-      beast: beastKey, state: cpuTeam[i], isDead: cpuTeam[i].hp <= 0, isActive: i === activeCpu
-    }))
-  };
-  const plSide = {
-    name: pl.name,
-    activeBeast: pl.team[activePl],
-    activeState: plTeam[activePl],
-    bench: pl.team.map((beastKey, i) => ({
-      beast: beastKey, state: plTeam[i], isDead: plTeam[i].hp <= 0, isActive: i === activePl
-    }))
-  };
-
-  send(pl.ws, {
-    type: 'battle_state', battleId: bId,
-    p1: cpuSide, p2: plSide,
-    logs: b.logs.slice(-14), isTeamBattle: true,
-    yourTurn: b.turnId !== CPU_ID
-  });
+  const cpuTeam = b.team1; const plTeam = b.team2; const activeCpu = b.active1; const activePl = b.active2;
+  const cpuSide = { name: CPU_NAME, activeBeast: b.cpuTeam[activeCpu], activeState: cpuTeam[activeCpu], bench: b.cpuTeam.map((beastKey, i) => ({ beast: beastKey, state: cpuTeam[i], isDead: cpuTeam[i].hp <= 0, isActive: i === activeCpu })) };
+  const plSide = { name: pl.name, activeBeast: pl.team[activePl], activeState: plTeam[activePl], bench: pl.team.map((beastKey, i) => ({ beast: beastKey, state: plTeam[i], isDead: plTeam[i].hp <= 0, isActive: i === activePl })) };
+  send(pl.ws, { type: 'battle_state', battleId: bId, p1: cpuSide, p2: plSide, logs: b.logs.slice(-14), isTeamBattle: true, yourTurn: b.turnId !== CPU_ID });
 }
 
 async function endTeamBattle(bId, winnerId, loserId, winnerRemainingHp) {
@@ -74,7 +36,6 @@ async function endTeamBattle(bId, winnerId, loserId, winnerRemainingHp) {
   const winner = lobby.get(winnerId);
   const loser = lobby.get(loserId);
   const hp = Math.max(0, Math.min(300, winnerRemainingHp));
-
   if (isTraining || isCpu) {
     if(winner) winner.ws.send(JSON.stringify({ type:'battle_end', won:true, isTeamBattle:true, isTraining:true, winnerHp:hp }));
     if(loser) loser.ws.send(JSON.stringify({ type:'battle_end', won:false, isTeamBattle:true, isTraining:true, winnerHp:hp }));
@@ -92,7 +53,6 @@ async function endTeamBattle(bId, winnerId, loserId, winnerRemainingHp) {
     const top = await getTopPlayers(3);
     broadcast({ type: 'leaderboard_update', top });
   }
-
   if (winner) winner.inBattle = false;
   if (loser) loser.inBattle = false;
   battles.delete(bId);
@@ -112,9 +72,7 @@ async function checkTeamDeath(bId, isP1Attacker, isCpu) {
     const defenderTeam = isP1Attacker ? b.team2 : b.team1;
     const defenderActive = isP1Attacker ? b.active2 : b.active1;
     const livingBench = [];
-    defenderTeam.forEach((st, i) => {
-      if (i !== defenderActive && st.hp > 0) livingBench.push(i);
-    });
+    defenderTeam.forEach((st, i) => { if (i !== defenderActive && st.hp > 0) livingBench.push(i); });
 
     if (livingBench.length === 0) {
       const winnerRemainingHp = (isP1Attacker ? b.team1 : b.team2).reduce((sum, st) => sum + Math.max(0, st.hp), 0);
@@ -142,9 +100,7 @@ async function checkTeamDeath(bId, isP1Attacker, isCpu) {
     const attackerTeam = isP1Attacker ? b.team1 : b.team2;
     const attackerActive = isP1Attacker ? b.active1 : b.active2;
     const livingBench = [];
-    attackerTeam.forEach((st, i) => {
-      if (i !== attackerActive && st.hp > 0) livingBench.push(i);
-    });
+    attackerTeam.forEach((st, i) => { if (i !== attackerActive && st.hp > 0) livingBench.push(i); });
 
     if (livingBench.length === 0) {
       const winnerRemainingHp = (isP1Attacker ? b.team2 : b.team1).reduce((sum, st) => sum + Math.max(0, st.hp), 0);
@@ -195,7 +151,6 @@ function cpuPickAttack(cpuSt, oppSt, beastKey) {
 async function processTeamTurn(bId, attackerId, atkIndex) {
   const b = battles.get(bId); if (!b) return true;
   if (b.turnId !== attackerId) return false;
-  
   const isP1 = b.p1id === attackerId;
   const aSt = isP1 ? b.team1[b.active1] : b.team2[b.active2];
   const dSt = isP1 ? b.team2[b.active2] : b.team1[b.active1];
@@ -206,11 +161,9 @@ async function processTeamTurn(bId, attackerId, atkIndex) {
   b.logs.push(...tickEffects(aSt));
   if (await checkTeamDeath(bId, isP1, false)) return true;
 
-  if (aSt.stun) {
-    aSt.stun = false; b.logs.push({t: `${aPlayer.name} aturdido — pierde turno`, c: 'special'});
-  } else if (aSt.recharge > 0) {
-    aSt.recharge--; b.logs.push({t: `${aPlayer.name} recargando...`, c: 'special'});
-  } else if (atkIndex >= 0) {
+  if (aSt.stun) { aSt.stun = false; b.logs.push({t: `${aPlayer.name} aturdido — pierde turno`, c: 'special'}); } 
+  else if (aSt.recharge > 0) { aSt.recharge--; b.logs.push({t: `${aPlayer.name} recargando...`, c: 'special'}); } 
+  else if (atkIndex >= 0) {
     const atkKey = isP1 ? aPlayer.team[b.active1] : aPlayer.team[b.active2];
     const atk = BEASTS[atkKey]?.attacks[atkIndex];
     if (!atk) return false;
@@ -222,7 +175,6 @@ async function processTeamTurn(bId, attackerId, atkIndex) {
     b.logs.push(...applyAtk(aSt, dSt, atk, BEASTS[atkKey].name));
     if (await checkTeamDeath(bId, isP1, false)) return true;
   }
-  
   b.turnId = isP1 ? b.p2id : b.p1id;
   pushTeamBattle(bId);
   return false;
@@ -238,13 +190,9 @@ async function doTeamCpuTurn(bId) {
   b.logs.push(...tickEffects(cpuSt));
   if (await checkTeamDeath(bId, true, true)) return; 
 
-  if (cpuSt.stun) { 
-    cpuSt.stun = false; 
-    b.logs.push({t: `${CPU_NAME} aturdido — pierde turno`, c: 'special'}); 
-  } else if (cpuSt.recharge > 0) { 
-    cpuSt.recharge--; 
-    b.logs.push({t: `${CPU_NAME} recargando...`, c: 'special'}); 
-  } else {
+  if (cpuSt.stun) { cpuSt.stun = false; b.logs.push({t: `${CPU_NAME} aturdido — pierde turno`, c: 'special'}); } 
+  else if (cpuSt.recharge > 0) { cpuSt.recharge--; b.logs.push({t: `${CPU_NAME} recargando...`, c: 'special'}); } 
+  else {
     const idx = cpuPickAttack(cpuSt, plSt, b.cpuTeam[b.active1]);
     const atk = BEASTS[b.cpuTeam[b.active1]].attacks[idx];
     if (cpuSt.pp[idx] < 99) cpuSt.pp[idx]--;
@@ -274,13 +222,9 @@ async function processTeamCpuPlayerTurn(bId, playerId, atkIndex) {
   b.logs.push(...tickEffects(plSt));
   if (await checkTeamDeath(bId, false, true)) return;
 
-  if (plSt.stun) { 
-    plSt.stun = false; 
-    b.logs.push({t: `${pl.name} aturdido — pierde turno`, c: 'special'}); 
-  } else if (plSt.recharge > 0) { 
-    plSt.recharge--; 
-    b.logs.push({t: `${pl.name} recargando...`, c: 'special'}); 
-  } else if (atkIndex >= 0) {
+  if (plSt.stun) { plSt.stun = false; b.logs.push({t: `${pl.name} aturdido — pierde turno`, c: 'special'}); } 
+  else if (plSt.recharge > 0) { plSt.recharge--; b.logs.push({t: `${pl.name} recargando...`, c: 'special'}); } 
+  else if (atkIndex >= 0) {
     const atkKey = pl.team[b.active2];
     const atk = BEASTS[atkKey]?.attacks[atkIndex]; if (!atk) return;
     if (plSt.pp[atkIndex] <= 0) {
@@ -293,7 +237,6 @@ async function processTeamCpuPlayerTurn(bId, playerId, atkIndex) {
     b.logs.push(...applyAtk(plSt, cpuSt, atk, BEASTS[atkKey].name));
     if (await checkTeamDeath(bId, false, true)) return;
   }
-  
   b.turnId = CPU_ID; 
   pushTeamCpuBattle(bId);
   setTimeout(() => doTeamCpuTurn(bId), 1000);
@@ -301,12 +244,20 @@ async function processTeamCpuPlayerTurn(bId, playerId, atkIndex) {
 
 async function processTeamSwitch(bId, playerId, switchToIndex) {
   const b = battles.get(bId); if (!b) return;
+  
+  // FIX DEL CONGELAMIENTO: Solo se puede cambiar si es tu turno (turnId === playerId) 
+  // o si estás forzado a cambiar (turnId === -4)
+  if (b.turnId !== -4 && b.turnId !== playerId) {
+    const player = lobby.get(playerId);
+    if (player) send(player.ws, { type: 'error', msg: 'No es tu turno para cambiar.' });
+    return;
+  }
+
   const isP1 = b.p1id === playerId;
   const isCpu = b.isTeamCpu;
   const player = lobby.get(playerId);
   
   const team = isP1 ? b.team1 : b.team2;
-  
   if (switchToIndex < 0 || switchToIndex >= team.length) return;
   if (team[switchToIndex].hp <= 0) {
     send(player.ws, { type: 'error', msg: 'Ese Vicamon está debilitado.' });
