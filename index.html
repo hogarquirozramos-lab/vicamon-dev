@@ -54,7 +54,14 @@
     <button class="btn btn-sm btn-red" onclick="disconnectWallet()">🚪 Desconectar Wallet</button>
   </div>
   <div style="background:rgba(255,255,255,.04);border:0.5px solid rgba(255,255,255,.1);border-radius:12px;padding:16px;margin-bottom:16px">
-    <div style="font-size:22px;font-weight:700;color:#fff;margin-bottom:4px" id="profile-name">Cargando...</div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
+      <div style="font-size:22px;font-weight:700;color:#fff" id="profile-name">Cargando...</div>
+      <button class="btn btn-sm" style="margin-left:auto;padding:5px 10px" onclick="toggleEditName()">✏️ Cambiar</button>
+    </div>
+    <div id="edit-name-box" style="display:none;margin-bottom:12px">
+      <input id="inp-edit-name" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:8px;padding:8px;color:#fff;font-size:14px;outline:none;margin-bottom:8px">
+      <button class="btn btn-blue btn-sm" style="width:100%" onclick="saveNickname()">Guardar Nickname</button>
+    </div>
     <div style="background:rgba(0,0,0,.3);padding:8px 10px;border-radius:6px;margin-bottom:12px">
       <div style="font-size:10px;color:rgba(255,255,255,.3)">Tu Wallet</div>
       <div style="font-size:11px;color:rgba(255,255,255,.6);font-family:monospace" id="profile-wallet">Conectando...</div>
