@@ -1,288 +1,50 @@
-const BEASTS = require('./beasts.js');
-const { lobby, battles, send, broadcast, pushLobby } = require('./state');
-const { applyAtk, tickEffects, getStartState } = require('./battleEngine');
-const { settleTeamMatch, updatePlayerStats, getPlayerStats, getPlayerRank, getTopPlayers } = require('./hp-balance');
+const { Pool } = require('pg');
 
-const CPU_ID = -1;
-const CPU_NAME = 'Zodiac Master';
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
+});
 
-function pushTeamBattle(bId) {
-  const b = battles.get(bId); if (!b) return;
-  const p1 = lobby.get(b.p1id), p2 = lobby.get(b.p2id);
-  if (!p1 || !p2) return;
-  const formatSide = (player, teamStates, activeIdx) => {
-    return { name: player.name, activeBeast: player.team[activeIdx], activeState: teamStates[activeIdx], bench: player.team.map((beastKey, i) => ({ beast: beastKey, state: teamStates[i], isDead: teamStates[i].hp <= 0, isActive: i === activeIdx })) };
-  };
-  const p1Side = formatSide(p1, b.team1, b.active1);
-  const p2Side = formatSide(p2, b.team2, b.active2);
-  const base = { type: 'battle_state', battleId: bId, p1: p1Side, p2: p2Side, logs: b.logs.slice(-14), isTeamBattle: true };
-  send(p1.ws, { ...base, yourTurn: b.turnId === b.p1id });
-  send(p2.ws, { ...base, yourTurn: b.turnId === b.p2id });
-}
+pool.query(`CREATE TABLE IF NOT EXISTS players (wallet VARCHAR(50) PRIMARY KEY, hp INTEGER DEFAULT 0, locked_hp INTEGER DEFAULT 0);`).catch(e => console.error("Error creando tabla players:", e));
+pool.query(`CREATE TABLE IF NOT EXISTS platform (id INTEGER PRIMARY KEY DEFAULT 1, hp INTEGER DEFAULT 0);`).catch(e => console.error("Error creando tabla platform:", e));
+pool.query(`CREATE TABLE IF NOT EXISTS processed_txs (signature VARCHAR(100) PRIMARY KEY);`).catch(e=>{});
+pool.query(`INSERT INTO platform (id, hp) VALUES (1, 0) ON CONFLICT DO NOTHING;`).catch(e=>{});
+pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS wins INTEGER DEFAULT 0;`).catch(e=>{});
+pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS losses INTEGER DEFAULT 0;`).catch(e=>{});
+pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS last_name VARCHAR(20);`).catch(e=>{});
 
-function pushTeamCpuBattle(bId) {
-  const b = battles.get(bId); if (!b) return;
-  const pl = lobby.get(b.p2id); if (!pl) return;
-  const cpuTeam = b.team1; const plTeam = b.team2; const activeCpu = b.active1; const activePl = b.active2;
-  const cpuSide = { name: CPU_NAME, activeBeast: b.cpuTeam[activeCpu], activeState: cpuTeam[activeCpu], bench: b.cpuTeam.map((beastKey, i) => ({ beast: beastKey, state: cpuTeam[i], isDead: cpuTeam[i].hp <= 0, isActive: i === activeCpu })) };
-  const plSide = { name: pl.name, activeBeast: pl.team[activePl], activeState: plTeam[activePl], bench: pl.team.map((beastKey, i) => ({ beast: beastKey, state: plTeam[i], isDead: plTeam[i].hp <= 0, isActive: i === activePl })) };
-  send(pl.ws, { type: 'battle_state', battleId: bId, p1: cpuSide, p2: plSide, logs: b.logs.slice(-14), isTeamBattle: true, yourTurn: b.turnId !== CPU_ID });
-}
+const USDC_PER_HP = 0.001;
 
-async function endTeamBattle(bId, winnerId, loserId, winnerRemainingHp) {
-  const b = battles.get(bId);
-  const isTraining = b?.isTeamTraining || false;
-  const isCpu = b?.isTeamCpu || false;
-  const winner = lobby.get(winnerId);
-  const loser = lobby.get(loserId);
-  const hp = Math.max(0, Math.min(300, winnerRemainingHp));
-  if (isTraining || isCpu) {
-    // CÁLCULO DE XP VISUAL
-    let winnerXp = 0, loserXp = 0;
-    if (winner) {
-      const winnerTeamStates = (b.p1id === winnerId) ? b.team1 : b.team2;
-      const winnerActive = (b.p1id === winnerId) ? b.active1 : b.active2;
-      const unusedBeasts = winnerTeamStates.filter((st, i) => i !== winnerActive && st.hp > 0).length;
-      winnerXp = 300 + (unusedBeasts * 100) + hp;
-    }
-    if(winner) winner.ws.send(JSON.stringify({ type:'battle_end', won:true, isTeamBattle:true, isTraining:true, winnerXp, loserXp }));
-    if(loser) loser.ws.send(JSON.stringify({ type:'battle_end', won:false, isTeamBattle:true, isTraining:true, winnerXp, loserXp }));
-  } else {
-    const winnerWallet = winner?.wallet || '';
-    const loserWallet = loser?.wallet || '';
-    const result = await settleTeamMatch(winnerWallet, loserWallet, hp);
-    await updatePlayerStats(winnerWallet, loserWallet);
-    const wStats = await getPlayerStats(winnerWallet);
-    const lStats = await getPlayerStats(loserWallet);
-    const wRank = await getPlayerRank(winnerWallet);
-    const lRank = await getPlayerRank(loserWallet);
-    if(winner) winner.ws.send(JSON.stringify({ type:'battle_end', won:true, isTeamBattle:true, winnerHp:hp, newHp: result.winnerNewHp, stats: { wins: wStats.wins, losses: wStats.losses, rank: wRank } }));
-    if(loser) loser.ws.send(JSON.stringify({ type:'battle_end', won:false, isTeamBattle:true, winnerHp:hp, newHp: 0, stats: { wins: lStats.wins, losses: lStats.losses, rank: lRank } }));
-    const top = await getTopPlayers(3);
-    broadcast({ type: 'leaderboard_update', top });
-  }
-  if (winner) winner.inBattle = false;
-  if (loser) loser.inBattle = false;
-  battles.delete(bId);
-  await pushLobby();
-}
+async function getAllPlayersDebug() { const res = await pool.query('SELECT wallet, hp, locked_hp, wins, losses, last_name FROM players'); return res.rows; }
+async function isTxProcessed(signature) { const res = await pool.query('SELECT 1 FROM processed_txs WHERE signature = $1', [signature]); return res.rows.length > 0; }
+async function markTxProcessed(signature) { await pool.query('INSERT INTO processed_txs (signature) VALUES ($1) ON CONFLICT DO NOTHING', [signature]); }
+async function adminSetHP(wallet, hp) { await pool.query(`INSERT INTO players (wallet, hp) VALUES ($1, $2) ON CONFLICT (wallet) DO UPDATE SET hp = $2`, [wallet, hp]); return await getHP(wallet); }
+async function adminResetPlatform() { await pool.query('UPDATE platform SET hp = 0 WHERE id = 1'); }
+async function adminUnlockAllHP() { await pool.query('UPDATE players SET hp = hp + locked_hp, locked_hp = 0'); }
+async function updatePlayerName(wallet, name) { await pool.query(`INSERT INTO players (wallet, last_name) VALUES ($1, $2) ON CONFLICT (wallet) DO UPDATE SET last_name = $2`, [wallet, name]); }
+async function updatePlayerStats(winnerWallet, loserWallet) { await pool.query('UPDATE players SET wins = wins + 1 WHERE wallet = $1', [winnerWallet]); await pool.query('UPDATE players SET losses = losses + 1 WHERE wallet = $1', [loserWallet]); }
+async function getTopPlayers(limit = 3) { const res = await pool.query('SELECT last_name, wins, losses FROM players WHERE wins > 0 ORDER BY wins DESC, losses ASC LIMIT $1', [limit]); return res.rows; }
+async function getPlayerStats(wallet) { const res = await pool.query('SELECT wins, losses FROM players WHERE wallet = $1', [wallet]); if (res.rows.length > 0) return res.rows[0]; return { wins: 0, losses: 0 }; }
+async function getPlayerRank(wallet) { const pRes = await pool.query('SELECT wins, losses FROM players WHERE wallet = $1', [wallet]); if (pRes.rows.length === 0 || pRes.rows[0].wins === 0) return null; const { wins, losses } = pRes.rows[0]; const rRes = await pool.query('SELECT COUNT(*) + 1 as rank FROM players WHERE wins > $1 OR (wins = $1 AND losses < $2)', [wins, losses]); return parseInt(rRes.rows[0].rank, 10); }
+async function getHP(wallet) { const res = await pool.query('SELECT hp FROM players WHERE wallet = $1', [wallet]); return res.rows.length > 0 ? res.rows[0].hp : 0; }
+async function addHP(wallet, hp) { await pool.query(`INSERT INTO players (wallet, hp, locked_hp) VALUES ($1, $2, 0) ON CONFLICT (wallet) DO UPDATE SET hp = players.hp + $2`, [wallet, hp]); return await getHP(wallet); }
+async function hasHP(wallet, amount = 100) { return (await getHP(wallet)) >= amount; }
+async function lockHP(wallet, amount = 100) { const client = await pool.connect(); try { await client.query('BEGIN'); const res = await client.query('SELECT hp FROM players WHERE wallet = $1 FOR UPDATE', [wallet]); const currentHp = res.rows.length > 0 ? res.rows[0].hp : 0; if (currentHp < amount) { await client.query('ROLLBACK'); return false; } await client.query('UPDATE players SET hp = hp - $1, locked_hp = locked_hp + $1 WHERE wallet = $2', [amount, wallet]); await client.query('COMMIT'); return true; } catch(e) { await client.query('ROLLBACK'); return false; } finally { client.release(); } }
+async function unlockHP(wallet, amount = 100) { await pool.query('UPDATE players SET hp = hp + $1, locked_hp = GREATEST(0, locked_hp - $1) WHERE wallet = $2', [amount, wallet]); }
+async function settleMatch(winnerWallet, loserWallet, winnerHp) { const client = await pool.connect(); try { await client.query('BEGIN'); const hp = Math.max(0, Math.min(100, winnerHp)); await client.query('UPDATE players SET locked_hp = GREATEST(0, locked_hp - 100), hp = hp + 100 + $1 WHERE wallet = $2', [hp, winnerWallet]); await client.query('UPDATE players SET locked_hp = GREATEST(0, locked_hp - 100) WHERE wallet = $1', [loserWallet]); await client.query('UPDATE platform SET hp = hp + (100 - $1) WHERE id = 1', [hp]); await client.query('COMMIT'); const winnerNewHp = await getHP(winnerWallet); const platformHp = await getPlatformHp(); return { winnerNewHp, platformHp, platformUsdc: parseFloat((platformHp * USDC_PER_HP).toFixed(3)) }; } catch(e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); } }
+async function settleTeamMatch(winnerWallet, loserWallet, winnerRemainingHp) { const client = await pool.connect(); try { await client.query('BEGIN'); const hp = Math.max(0, Math.min(300, winnerRemainingHp)); await client.query('UPDATE players SET locked_hp = GREATEST(0, locked_hp - 300), hp = hp + 300 + $1 WHERE wallet = $2', [hp, winnerWallet]); await client.query('UPDATE players SET locked_hp = GREATEST(0, locked_hp - 300) WHERE wallet = $1', [loserWallet]); await client.query('UPDATE platform SET hp = hp + (300 - $1) WHERE id = 1', [hp]); await client.query('COMMIT'); const winnerNewHp = await getHP(winnerWallet); return { winnerNewHp }; } catch(e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); } }
+async function settleGauntlet(wallet, won) { const client = await pool.connect(); try { await client.query('BEGIN'); await client.query('UPDATE players SET locked_hp = GREATEST(0, locked_hp - 100) WHERE wallet = $1', [wallet]); if (won) { await client.query('UPDATE players SET hp = hp + 200 WHERE wallet = $1', [wallet]); await client.query('UPDATE platform SET hp = GREATEST(0, hp - 100) WHERE id = 1'); } else { await client.query('UPDATE platform SET hp = hp + 100 WHERE id = 1'); } await client.query('COMMIT'); return await getHP(wallet); } catch(e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); } }
+async function cashout(wallet) { const client = await pool.connect(); try { await client.query('BEGIN'); const res = await client.query('SELECT hp FROM players WHERE wallet = $1 FOR UPDATE', [wallet]); const hp = res.rows.length > 0 ? res.rows[0].hp : 0; if (hp <= 0) { await client.query('ROLLBACK'); return { ok: false, reason: 'no_hp', hp: 0, usdc: 0 }; } await client.query('UPDATE players SET hp = 0 WHERE wallet = $1', [wallet]); await client.query('COMMIT'); return { ok: true, hp, usdc: parseFloat((hp * USDC_PER_HP).toFixed(6)) }; } catch(e) { await client.query('ROLLBACK'); return { ok: false, reason: 'db_error', hp: 0, usdc: 0 }; } finally { client.release(); } }
+async function getPlatformHp() { const res = await pool.query('SELECT hp FROM platform WHERE id = 1'); return res.rows.length > 0 ? res.rows[0].hp : 0; }
+async function getPlatformUsdc() { return parseFloat(((await getPlatformHp()) * USDC_PER_HP).toFixed(6)); }
+async function clearPlatformHp(hp) { await pool.query('UPDATE platform SET hp = GREATEST(0, hp - $1) WHERE id = 1', [hp]); }
 
-async function checkTeamDeath(bId, isP1Attacker, isCpu) {
-  const b = battles.get(bId); if (!b) return false;
-  const aSt = isP1Attacker ? b.team1[b.active1] : b.team2[b.active2];
-  const dSt = isP1Attacker ? b.team2[b.active2] : b.team1[b.active1];
-  const aId = isP1Attacker ? b.p1id : b.p2id;
-  const dId = isP1Attacker ? b.p2id : b.p1id;
-  const aPlayer = lobby.get(aId);
-  const dPlayer = lobby.get(dId);
-
-  if (dSt.hp <= 0) {
-    const defenderTeam = isP1Attacker ? b.team2 : b.team1;
-    const defenderActive = isP1Attacker ? b.active2 : b.active1;
-    const livingBench = [];
-    defenderTeam.forEach((st, i) => { if (i !== defenderActive && st.hp > 0) livingBench.push(i); });
-
-    if (livingBench.length === 0) {
-      const winnerRemainingHp = (isP1Attacker ? b.team1 : b.team2).reduce((sum, st) => sum + Math.max(0, st.hp), 0);
-      await endTeamBattle(bId, aId, dId, winnerRemainingHp);
-      return true;
-    } else {
-      b.turnId = -4; 
-      const defenderIsCpu = isCpu && !isP1Attacker; 
-      if (defenderIsCpu) {
-        b.active1 = livingBench[0]; 
-        b.logs.push({t: `${CPU_NAME} cambia a ${BEASTS[b.cpuTeam[b.active1]].name}`, c: 'special'});
-        b.turnId = b.p2id; 
-        pushTeamCpuBattle(bId);
-      } else {
-        if(isCpu) pushTeamCpuBattle(bId); else pushTeamBattle(bId);
-        if (dPlayer && dPlayer.ws) {
-          send(dPlayer.ws, { type: 'team_force_switch', battleId: bId, reason: '¡Tu Vicamon fue derrotado! Elige el siguiente.' });
-        }
-      }
-      return true;
-    }
-  }
-
-  if (aSt.hp <= 0) {
-    const attackerTeam = isP1Attacker ? b.team1 : b.team2;
-    const attackerActive = isP1Attacker ? b.active1 : b.active2;
-    const livingBench = [];
-    attackerTeam.forEach((st, i) => { if (i !== attackerActive && st.hp > 0) livingBench.push(i); });
-
-    if (livingBench.length === 0) {
-      const winnerRemainingHp = (isP1Attacker ? b.team2 : b.team1).reduce((sum, st) => sum + Math.max(0, st.hp), 0);
-      await endTeamBattle(bId, dId, aId, winnerRemainingHp);
-      return true;
-    } else {
-      b.turnId = -4;
-      const attackerIsCpu = isCpu && isP1Attacker; 
-      if (attackerIsCpu) {
-        b.active1 = livingBench[0];
-        b.logs.push({t: `${CPU_NAME} cambia a ${BEASTS[b.cpuTeam[b.active1]].name}`, c: 'special'});
-        b.turnId = b.p2id; 
-        pushTeamCpuBattle(bId);
-      } else {
-        if(isCpu) pushTeamCpuBattle(bId); else pushTeamBattle(bId);
-        if (aPlayer && aPlayer.ws) {
-          send(aPlayer.ws, { type: 'team_force_switch', battleId: bId, reason: '¡Tu Vicamon fue derrotado! Elige el siguiente.' });
-        }
-      }
-      return true;
-    }
-  }
-  return false;
-}
-
-function cpuPickAttack(cpuSt, oppSt, beastKey) {
-  const atks = BEASTS[beastKey]?.attacks || [];
-  const validIndices = []; const weights = [];
-  atks.forEach((a, i) => {
-    if (cpuSt.pp[i] > 0 || cpuSt.pp[i] === undefined || cpuSt.pp[i] === 99) {
-      validIndices.push(i); let s = 2;
-      if (a.d > 30 && oppSt.hp < 40) s = 5;
-      if ((a.fx === 'poison5' || a.fx === 'poison3l') && oppSt.poisonTurns === 0 && oppSt.hp > 40) s = 4;
-      if ((a.fx === 'heal20' || a.fx === 'heal30' || a.fx === 'fortress') && cpuSt.hp < 35) s = 5;
-      if ((a.fx === 'shield2' || a.fx === 'shield1r') && cpuSt.hp < 45 && cpuSt.shield === 0) s = 4;
-      if (a.fx === 'poisonDouble' && oppSt.poisonTurns > 0) s = 6;
-      if (a.fx === 'recharge' && cpuSt.recharge === 0 && oppSt.hp > 60) s = 1;
-      weights.push(s);
-    }
-  });
-  if (validIndices.length === 0) return 0;
-  const tot = weights.reduce((a, b) => a + b, 0);
-  let r = Math.random() * tot, idx = validIndices[0];
-  for (let i = 0; i < validIndices.length; i++) { r -= weights[i]; if (r <= 0) { idx = validIndices[i]; break; } }
-  return idx;
-}
-
-async function processTeamTurn(bId, attackerId, atkIndex) {
-  const b = battles.get(bId); if (!b) return true;
-  if (b.turnId !== attackerId) return false;
-  const isP1 = b.p1id === attackerId;
-  const aSt = isP1 ? b.team1[b.active1] : b.team2[b.active2];
-  const dSt = isP1 ? b.team2[b.active2] : b.team1[b.active1];
-  const aPlayer = lobby.get(attackerId);
-  const dPlayer = lobby.get(isP1 ? b.p2id : b.p1id);
-  if (!aPlayer || !dPlayer) return true;
-
-  b.logs.push(...tickEffects(aSt));
-  if (await checkTeamDeath(bId, isP1, false)) return true;
-
-  if (aSt.stun) { aSt.stun = false; b.logs.push({t: `${aPlayer.name} aturdido — pierde turno`, c: 'special'}); } 
-  else if (aSt.recharge > 0) { aSt.recharge--; b.logs.push({t: `${aPlayer.name} recargando...`, c: 'special'}); } 
-  else if (atkIndex >= 0) {
-    const atkKey = isP1 ? aPlayer.team[b.active1] : aPlayer.team[b.active2];
-    const atk = BEASTS[atkKey]?.attacks[atkIndex];
-    if (!atk) return false;
-    if (aSt.pp[atkIndex] <= 0) {
-      b.logs.push({t: `${aPlayer.name} intentó usar ${atk.n} pero no tiene PP. ¡Turno perdido!`, c: 'bad'});
-      b.turnId = isP1 ? b.p2id : b.p1id; pushTeamBattle(bId); return false;
-    }
-    if (aSt.pp[atkIndex] < 99) aSt.pp[atkIndex]--;
-    b.logs.push(...applyAtk(aSt, dSt, atk, BEASTS[atkKey].name));
-    if (await checkTeamDeath(bId, isP1, false)) return true;
-  }
-  b.turnId = isP1 ? b.p2id : b.p1id;
-  pushTeamBattle(bId);
-  return false;
-}
-
-async function doTeamCpuTurn(bId) {
-  const b = battles.get(bId); if (!b) return;
-  const cpuSt = b.team1[b.active1];
-  const plSt  = b.team2[b.active2];
-  const plId  = b.p2id;
-  const pl = lobby.get(plId); if (!pl) return;
-
-  b.logs.push(...tickEffects(cpuSt));
-  if (await checkTeamDeath(bId, true, true)) return; 
-
-  if (cpuSt.stun) { cpuSt.stun = false; b.logs.push({t: `${CPU_NAME} aturdido — pierde turno`, c: 'special'}); } 
-  else if (cpuSt.recharge > 0) { cpuSt.recharge--; b.logs.push({t: `${CPU_NAME} recargando...`, c: 'special'}); } 
-  else {
-    const idx = cpuPickAttack(cpuSt, plSt, b.cpuTeam[b.active1]);
-    const atk = BEASTS[b.cpuTeam[b.active1]].attacks[idx];
-    if (cpuSt.pp[idx] < 99) cpuSt.pp[idx]--;
-    b.logs.push(...applyAtk(cpuSt, plSt, atk, BEASTS[b.cpuTeam[b.active1]].name));
-    if (await checkTeamDeath(bId, true, true)) return;
-  }
-
-  b.turnId = plId;
-  pushTeamCpuBattle(bId);
-
-  const bb = battles.get(bId); if (!bb) return;
-  const plStNow = bb.team2[bb.active2];
-  if (plStNow.stun || plStNow.recharge > 0) {
-    setTimeout(async () => { 
-      const bbb = battles.get(bId); if (!bbb || bbb.turnId !== plId) return; 
-      await processTeamCpuPlayerTurn(bId, plId, -1); 
-    }, 900);
-  }
-}
-
-async function processTeamCpuPlayerTurn(bId, playerId, atkIndex) {
-  const b = battles.get(bId); if (!b || b.turnId !== playerId) return;
-  const plSt = b.team2[b.active2];
-  const cpuSt = b.team1[b.active1];
-  const pl = lobby.get(playerId); if (!pl) return;
-
-  b.logs.push(...tickEffects(plSt));
-  if (await checkTeamDeath(bId, false, true)) return;
-
-  if (plSt.stun) { plSt.stun = false; b.logs.push({t: `${pl.name} aturdido — pierde turno`, c: 'special'}); } 
-  else if (plSt.recharge > 0) { plSt.recharge--; b.logs.push({t: `${pl.name} recargando...`, c: 'special'}); } 
-  else if (atkIndex >= 0) {
-    const atkKey = pl.team[b.active2];
-    const atk = BEASTS[atkKey]?.attacks[atkIndex]; if (!atk) return;
-    if (plSt.pp[atkIndex] <= 0) {
-      b.logs.push({t: `${pl.name} intentó usar ${atk.n} pero no tiene PP. ¡Turno perdido!`, c: 'bad'});
-      b.turnId = CPU_ID; pushTeamCpuBattle(bId); 
-      setTimeout(() => doTeamCpuTurn(bId), 1000);
-      return;
-    }
-    if (plSt.pp[atkIndex] < 99) plSt.pp[atkIndex]--;
-    b.logs.push(...applyAtk(plSt, cpuSt, atk, BEASTS[atkKey].name));
-    if (await checkTeamDeath(bId, false, true)) return;
-  }
-  b.turnId = CPU_ID; 
-  pushTeamCpuBattle(bId);
-  setTimeout(() => doTeamCpuTurn(bId), 1000);
-}
-
-async function processTeamSwitch(bId, playerId, switchToIndex) {
-  const b = battles.get(bId); if (!b) return;
-  if (b.turnId !== -4 && b.turnId !== playerId) {
-    const player = lobby.get(playerId);
-    if (player) send(player.ws, { type: 'error', msg: 'No es tu turno para cambiar.' });
-    return;
-  }
-  const isP1 = b.p1id === playerId;
-  const isCpu = b.isTeamCpu;
-  const player = lobby.get(playerId);
-  const team = isP1 ? b.team1 : b.team2;
-  if (switchToIndex < 0 || switchToIndex >= team.length) return;
-  if (team[switchToIndex].hp <= 0) {
-    send(player.ws, { type: 'error', msg: 'Ese Vicamon está debilitado.' });
-    return;
-  }
-  if (isP1) b.active1 = switchToIndex; else b.active2 = switchToIndex;
-  const beastName = BEASTS[player.team[switchToIndex]].name;
-  b.logs.push({t: `${player.name} cambia a ${beastName}`, c: 'special'});
-  if(isCpu) {
-    b.turnId = CPU_ID;
-    pushTeamCpuBattle(bId);
-    setTimeout(() => doTeamCpuTurn(bId), 1000);
-  } else {
-    b.turnId = isP1 ? b.p2id : b.p1id;
-    pushTeamBattle(bId);
-  }
-}
-
-module.exports = { 
-  pushTeamBattle, pushTeamCpuBattle,
-  processTeamTurn, processTeamSwitch,
-  processTeamCpuPlayerTurn,
-  doTeamCpuTurn,
-  endTeamBattle
+module.exports = {
+  getHP, addHP, hasHP, lockHP, unlockHP, settleMatch, settleTeamMatch, settleGauntlet, cashout,
+  getPlatformHp, getPlatformUsdc, clearPlatformHp,
+  PLATFORM_WALLET: 'Gx9g45pNsENwczo197GTFgJrh6BN3pZ453m', PLATFORM_THRESHOLD: 1.00, USDC_PER_HP,
+  getAllPlayersDebug, updatePlayerName, updatePlayerStats, getTopPlayers,
+  getPlayerStats, getPlayerRank,
+  isTxProcessed, markTxProcessed,
+  adminSetHP, adminResetPlatform, adminUnlockAllHP
 };
