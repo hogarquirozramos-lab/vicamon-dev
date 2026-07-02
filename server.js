@@ -9,7 +9,7 @@ const {
   PLATFORM_WALLET, PLATFORM_THRESHOLD, USDC_PER_HP,
   getAllPlayersDebug, updatePlayerName, updatePlayerStats, getTopPlayers,
   getPlayerStats, getPlayerRank, settleGauntlet,
-  isTxProcessed, markTxProcessed, adminSetHP // NUEVO
+  isTxProcessed, markTxProcessed, adminSetHP
 } = require('./hp-balance');
 const { sendUSDC } = require('./transfer');
 const BEASTS = require('./beasts.js');
@@ -36,31 +36,37 @@ const server = http.createServer(async (req, res) => {
   
   if (urlPath === '/ver-db-secreta') { try { const players = await getAllPlayersDebug(); res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(players, null, 2)); } catch(e) { res.writeHead(500); res.end('Error leyendo DB'); } return; }
   
-  // --- PANEL DE ADMINISTRACIÓN ---
   if (urlPath === '/admin') {
     res.writeHead(200, { 'Content-Type': 'text/html' });
     res.end(`
       <!DOCTYPE html>
       <html lang="es"><head><meta charset="UTF-8"><title>Admin - VICAMON</title>
       <style>
-        body { font-family: system-ui; background: #0a0a0f; color: #fff; padding: 20px; }
+        body { font-family: system-ui; background: #0a0a0f; color: #fff; padding: 20px; max-width: 1000px; margin: 0 auto; }
         .header { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; }
         input, button { background: #1a1a24; border: 1px solid #333; color: #fff; padding: 10px; border-radius: 8px; outline: none; }
         button { cursor: pointer; background: #4a9eff; border: none; font-weight: bold; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #14141e; border-radius: 12px; overflow: hidden; }
+        .plat-info { background: #14141e; padding: 15px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .plat-info span { font-size: 14px; color: #85B7EB; }
+        .plat-info b { font-size: 18px; color: #5DCAA5; }
+        table { width: 100%; border-collapse: collapse; background: #14141e; border-radius: 12px; overflow: hidden; }
         th, td { padding: 12px; border-bottom: 1px solid #2a2a35; text-align: left; font-size: 14px; }
         th { color: #85B7EB; text-transform: uppercase; font-size: 12px; }
-        td input { width: 80px; padding: 5px; background: #111; border: 1px solid #333; text-align: center; }
-        .btn-save { background: #5DCAA5; padding: 8px 16px; }
+        td input { width: 80px; padding: 5px; background: #111; border: 1px solid #333; text-align: center; color: #fff; border-radius: 4px; }
+        .btn-save { background: #5DCAA5; padding: 8px 16px; color: #000; }
       </style></head><body>
         <h1>Panel de Administración</h1>
         <div class="header">
           <input type="password" id="pass" placeholder="Contraseña de admin">
           <button onclick="loadData()">Desbloquear y Cargar</button>
         </div>
-        <table>
+        <div class="plat-info" id="plat-info" style="display:none">
+          <span>HP Ganados por la Plataforma (Comisiones):</span>
+          <b id="plat-hp">-</b>
+        </div>
+        <table id="tbl" style="display:none">
           <thead><tr><th>Wallet</th><th>Nickname</th><th>HP</th><th>HP Bloqueados</th><th>Acción</th></tr></thead>
-          <tbody id="data"><tr><td colspan="5" style="text-align:center;color:#666">Ingresa la contraseña y carga los datos</td></tr></tbody>
+          <tbody id="data"></tbody>
         </table>
         <script>
           async function loadData() {
@@ -69,7 +75,10 @@ const server = http.createServer(async (req, res) => {
             const res = await fetch('/admin-data?pass=' + encodeURIComponent(pass));
             if(!res.ok) { alert('Contraseña incorrecta'); return; }
             const data = await res.json();
-            document.getElementById('data').innerHTML = data.map(p => \`
+            document.getElementById('plat-info').style.display = 'flex';
+            document.getElementById('tbl').style.display = 'table';
+            document.getElementById('plat-hp').textContent = data.platformHp + ' HP (' + (data.platformHp * 0.001) + ' USDC)';
+            document.getElementById('data').innerHTML = data.players.map(p => \`
               <tr>
                 <td>\${p.wallet.slice(0,8)}...\${p.wallet.slice(-4)}</td>
                 <td>\${p.last_name || '-'}</td>
@@ -96,13 +105,12 @@ const server = http.createServer(async (req, res) => {
 
   if (urlPath === '/admin-data') {
     const pass = new URL(req.url, 'http://localhost').searchParams.get('pass') || '';
-    if (pass !== (process.env.ADMIN_PASSWORD || 'vicamon_secret_key_07012010')) {
-      res.writeHead(403); res.end('Forbidden'); return;
-    }
+    if (pass !== (process.env.ADMIN_PASSWORD || 'vicamon_secret_key_07012010')) { res.writeHead(403); res.end('Forbidden'); return; }
     try {
       const players = await getAllPlayersDebug();
+      const platformHp = await getPlatformHp(); // OBTENER HP DE PLATAFORMA
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(players));
+      res.end(JSON.stringify({ players, platformHp })); // ENVIAR AMBOS
     } catch(e) { res.writeHead(500); res.end('Error'); }
     return;
   }
@@ -113,9 +121,7 @@ const server = http.createServer(async (req, res) => {
     req.on('end', async () => {
       try {
         const { pass, wallet, hp } = JSON.parse(body);
-        if (pass !== (process.env.ADMIN_PASSWORD || 'vicamon_secret_key_07012010')) {
-          res.writeHead(403); res.end(JSON.stringify({ ok: false })); return;
-        }
+        if (pass !== (process.env.ADMIN_PASSWORD || 'vicamon_secret_key_07012010')) { res.writeHead(403); res.end(JSON.stringify({ ok: false })); return; }
         await adminSetHP(wallet, parseInt(hp));
         res.writeHead(200); res.end(JSON.stringify({ ok: true }));
       } catch(e) { res.writeHead(400); res.end(JSON.stringify({ ok: false })); }
