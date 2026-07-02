@@ -22,6 +22,7 @@ let teamSelectionMode = '1v1';
 let selectedTeam = []; 
 let myTeam = [];
 let isGauntletChallenge = false;
+let lastMsgTime = Date.now(); // NUEVO: Para el heartbeat móvil
 
 const audioFiles = {
     lobby: new Audio('Audio/lobby.mp3'),
@@ -96,6 +97,18 @@ window.addEventListener('load', async () => {
     } catch(e) {} 
   } 
 });
+
+// HEARTBEAT MÓVIL: Revisa cada 10s si la conexión sigue viva
+setInterval(() => {
+  if (ws && ws.readyState === 1) {
+    if (Date.now() - lastMsgTime > 25000) { // Si no recibimos nada en 25s, forzar reconexión
+      console.log("WS timeout, forzando reconexión...");
+      try { ws.close(); } catch(e) {}
+      return;
+    }
+    ws.send(JSON.stringify({type:'ping'}));
+  }
+}, 10000);
 
 async function checkHPNow(fromConnect=false) {
   if (!myWallet) return;
@@ -202,7 +215,7 @@ function confirmTeam() {
 }
 
 function enterLobby(){ if(ws && ws.readyState === 1) { show('s-lobby'); ws.send(JSON.stringify({type:'ping'})); } else { if(!myBeast) myBeast = 'aries'; connectWS(); } }
-function connectWS(){ clearTimeout(reconnectTimer); isKicked=false; const proto=location.protocol==='https:'?'wss':'ws'; const localWs = new WebSocket(`${proto}://${location.host}`); localWs.onopen=()=>{ clearTimeout(reconnectTimer); localWs.send(JSON.stringify({type:'join',name:myName,beast:myBeast||'aries',wallet:myWallet})); }; localWs.onmessage=e=>{try{handleMsg(JSON.parse(e.data));}catch(err){console.error(err);}}; localWs.onerror=()=>{}; localWs.onclose=()=>{ if(ws !== localWs) return; const inBattle=document.getElementById('s-battle').classList.contains('active'); if(!inBattle && !isKicked) reconnectTimer=setTimeout(()=>{ if(myName&&myBeast) connectWS(); },2000); }; ws = localWs; }
+function connectWS(){ clearTimeout(reconnectTimer); isKicked=false; const proto=location.protocol==='https:'?'wss':'ws'; const localWs = new WebSocket(`${proto}://${location.host}`); localWs.onopen=()=>{ clearTimeout(reconnectTimer); lastMsgTime = Date.now(); localWs.send(JSON.stringify({type:'join',name:myName,beast:myBeast||'aries',wallet:myWallet})); }; localWs.onmessage=e=>{ lastMsgTime = Date.now(); try{handleMsg(JSON.parse(e.data));}catch(err){console.error(err);} }; localWs.onerror=()=>{}; localWs.onclose=()=>{ if(ws !== localWs) return; const inBattle=document.getElementById('s-battle').classList.contains('active'); if(!inBattle && !isKicked) reconnectTimer=setTimeout(()=>{ if(myName&&myBeast) connectWS(); },2000); }; ws = localWs; }
 
 function challengeGauntlet() {
   if(!ws || ws.readyState !== 1) return alert('Conectando...');
@@ -295,9 +308,9 @@ function handleMsg(m){
         resultBody=`<div style="background:rgba(130,80,180,.08);border:0.5px solid rgba(130,80,180,.2);border-radius:10px;padding:14px;margin:14px 0;text-align:center"><div style="font-size:20px">&#127891;</div><div style="font-size:13px;color:#CFA9EC;font-weight:600">Entrenamiento 3v3</div><div style="font-size:14px;color:#5DCAA5;margin-top:8px">+${myXp} XP</div></div>`;
     } else if(isGauntletResult){
         if(won){
-            resultBody=`<div style="background:rgba(246, 226, 102, 0.1);border-radius:10px;padding:14px;margin:14px 0;text-align:center"><div style="color:#F6E265">¡Torre Completada!</div><div style="color:#5DCAA5;margin-top:8px">+200 HP</div></div>`;
+            resultBody=`<div style="background:rgba(246, 226, 102, 0.1);border-radius:10px;padding:14px;margin:14px 0;text-align:center"><div style="color:#F6E265">¡Torre Completada!</div><div style="color:#5DCAA5;margin-top:8px">+100 HP devueltos<br>+100 HP ganados</div></div>`;
         } else {
-            resultBody=`<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:14px;margin:14px 0;text-align:center"><div style="color:#F0997B">Torre Fallida</div><div style="color:#F0997B;margin-top:8px">-100 HP</div></div>`;
+            resultBody=`<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:14px;margin:14px 0;text-align:center"><div style="color:#F0997B">Torre Fallida</div><div style="color:#F0997B;margin-top:8px">-100 HP perdidos</div></div>`;
         }
     } else if(isTrainingResult){
         const myXp = won ? (m.winnerXp || 0) : (m.loserXp || 0);
