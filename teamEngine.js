@@ -2,6 +2,7 @@ const BEASTS = require('./beasts.js');
 const { lobby, battles, send, broadcast, pushLobby } = require('./state');
 const { applyAtk, tickEffects, getStartState } = require('./battleEngine');
 const { settleTeamMatch, updatePlayerStats, getPlayerStats, getPlayerRank, getTopPlayers } = require('./hp-balance');
+const { cpuPickAttack } = require('./cpuAI'); // NUEVO: Importar IA unificada
 
 const CPU_ID = -1;
 const CPU_NAME = 'Zodiac Master';
@@ -36,9 +37,21 @@ async function endTeamBattle(bId, winnerId, loserId, winnerRemainingHp) {
   const winner = lobby.get(winnerId);
   const loser = lobby.get(loserId);
   const hp = Math.max(0, Math.min(300, winnerRemainingHp));
+  
   if (isTraining || isCpu) {
-    if(winner) winner.ws.send(JSON.stringify({ type:'battle_end', won:true, isTeamBattle:true, isTraining:true, winnerHp:hp }));
-    if(loser) loser.ws.send(JSON.stringify({ type:'battle_end', won:false, isTeamBattle:true, isTraining:true, winnerHp:hp }));
+    // ARREGLADO: Cálculo de XP para entrenamientos 3v3
+    let winnerXp = 0, loserXp = 0;
+    if (winner) {
+      const winnerTeamStates = (b.p1id === winnerId) ? b.team1 : b.team2;
+      const winnerActive = (b.p1id === winnerId) ? b.active1 : b.active2;
+      const unusedBeasts = winnerTeamStates.filter((st, i) => i !== winnerActive && st.hp > 0).length;
+      winnerXp = 300 + (unusedBeasts * 100) + hp;
+    }
+    if(loser) {
+      loserXp = 50; // Consolation XP
+    }
+    if(winner) winner.ws.send(JSON.stringify({ type:'battle_end', won:true, isTeamBattle:true, isTraining:true, winnerXp, loserXp }));
+    if(loser) loser.ws.send(JSON.stringify({ type:'battle_end', won:false, isTeamBattle:true, isTraining:true, winnerXp, loserXp }));
   } else {
     const winnerWallet = winner?.wallet || '';
     const loserWallet = loser?.wallet || '';
@@ -126,28 +139,6 @@ async function checkTeamDeath(bId, isP1Attacker, isCpu) {
   return false;
 }
 
-function cpuPickAttack(cpuSt, oppSt, beastKey) {
-  const atks = BEASTS[beastKey]?.attacks || [];
-  const validIndices = []; const weights = [];
-  atks.forEach((a, i) => {
-    if (cpuSt.pp[i] > 0 || cpuSt.pp[i] === undefined || cpuSt.pp[i] === 99) {
-      validIndices.push(i); let s = 2;
-      if (a.d > 30 && oppSt.hp < 40) s = 5;
-      if ((a.fx === 'poison5' || a.fx === 'poison3l') && oppSt.poisonTurns === 0 && oppSt.hp > 40) s = 4;
-      if ((a.fx === 'heal20' || a.fx === 'heal30' || a.fx === 'fortress') && cpuSt.hp < 35) s = 5;
-      if ((a.fx === 'shield2' || a.fx === 'shield1r') && cpuSt.hp < 45 && cpuSt.shield === 0) s = 4;
-      if (a.fx === 'poisonDouble' && oppSt.poisonTurns > 0) s = 6;
-      if (a.fx === 'recharge' && cpuSt.recharge === 0 && oppSt.hp > 60) s = 1;
-      weights.push(s);
-    }
-  });
-  if (validIndices.length === 0) return 0;
-  const tot = weights.reduce((a, b) => a + b, 0);
-  let r = Math.random() * tot, idx = validIndices[0];
-  for (let i = 0; i < validIndices.length; i++) { r -= weights[i]; if (r <= 0) { idx = validIndices[i]; break; } }
-  return idx;
-}
-
 async function processTeamTurn(bId, attackerId, atkIndex) {
   const b = battles.get(bId); if (!b) return true;
   if (b.turnId !== attackerId) return false;
@@ -193,7 +184,7 @@ async function doTeamCpuTurn(bId) {
   if (cpuSt.stun) { cpuSt.stun = false; b.logs.push({t: `${CPU_NAME} aturdido — pierde turno`, c: 'special'}); } 
   else if (cpuSt.recharge > 0) { cpuSt.recharge--; b.logs.push({t: `${CPU_NAME} recargando...`, c: 'special'}); } 
   else {
-    const idx = cpuPickAttack(cpuSt, plSt, b.cpuTeam[b.active1]);
+    const idx = cpuPickAttack(cpuSt, plSt, b.cpuTeam[b.active1]); // USA IA UNIFICADA
     const atk = BEASTS[b.cpuTeam[b.active1]].attacks[idx];
     if (cpuSt.pp[idx] < 99) cpuSt.pp[idx]--;
     b.logs.push(...applyAtk(cpuSt, plSt, atk, BEASTS[b.cpuTeam[b.active1]].name));
@@ -276,5 +267,5 @@ module.exports = {
   processTeamTurn, processTeamSwitch,
   processTeamCpuPlayerTurn,
   doTeamCpuTurn,
-  endTeamBattle // EXPORTADO CORRECTAMENTE
+  endTeamBattle
 };
