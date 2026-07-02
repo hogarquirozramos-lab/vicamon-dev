@@ -21,7 +21,7 @@ let pendingChallengeTargetId = null;
 let teamSelectionMode = '1v1'; 
 let selectedTeam = []; 
 let myTeam = [];
-let isGauntletChallenge = false; // NUEVO: Para saber si estamos iniciando la Torre
+let isGauntletChallenge = false;
 
 const audioFiles = {
     lobby: new Audio('Audio/lobby.mp3'),
@@ -47,6 +47,7 @@ async function disconnectWallet() { try { const phantom = getPhantom(); if (phan
 function copyWallet() { navigator.clipboard.writeText('DIRECCION_WALLET_A').then(() => { const btn = event.currentTarget || event.target; const orig = btn.textContent; btn.textContent = '✓ Copiado!'; setTimeout(() => { btn.textContent = orig; }, 1500); }).catch(() => alert('Dirección: DIRECCION_WALLET_A')); }
 function depositWidgetHTML() { return `<div style="background:rgba(74,158,255,.06);border:0.5px solid rgba(74,158,255,.2);border-radius:10px;padding:10px 12px"><div style="font-size:11px;color:#85B7EB;margin-bottom:4px">💡 Deposita USDC para retar jugadores</div><div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:7px">0.10 USDC = 100 HP · cualquier monto funciona</div><div style="display:flex;gap:6px;align-items:center"><div style="flex:1;background:rgba(0,0,0,.35);border-radius:6px;padding:6px 8px;font-family:monospace;font-size:9px;color:#85B7EB;word-break:break-all;cursor:pointer" onclick="copyWallet()">DIRECCION_WALLET_A <span style="color:rgba(255,255,255,.3)">📋</span></div><button class="btn btn-sm" style="font-size:10px;white-space:nowrap;padding:5px 10px" onclick="checkHPNow()">Verificar HP</button></div></div>`; }
 function getPhantom() { return window.phantom?.solana || window.solana || null; }
+
 async function connectPhantom() {
   await new Promise(r => setTimeout(r, 100));
   const phantom = getPhantom();
@@ -67,10 +68,38 @@ async function connectPhantom() {
     document.getElementById('wallet-hp').textContent = 'Verificando...';
     const sn = document.getElementById('step-name'); if(sn){ sn.style.opacity='1'; sn.style.pointerEvents='auto'; }
     await checkHPNow(true);
+    
+    // AUTO-LOGIN: Si recuerda el nickname, entra directo
+    const savedName = localStorage.getItem('vicamon_nick');
+    if (savedName) {
+      document.getElementById('inp-name').value = savedName;
+      goProfile();
+    }
   } catch(e) { console.error('Phantom error:', e); alert('No se pudo conectar Phantom.'); }
 }
 function copyText(text) { navigator.clipboard.writeText(text).then(() => alert('¡Enlace copiado!')).catch(() => alert('Copia este enlace manualmente: ' + text)); }
-window.addEventListener('load', async () => { await new Promise(r => setTimeout(r, 500)); const ph2 = getPhantom(); if (ph2?.isPhantom && ph2.isConnected) { try { const r2 = await ph2.connect({ onlyIfTrusted: true }); myWallet = r2.publicKey.toString(); document.getElementById('btn-phantom').style.display='none'; document.getElementById('wallet-connected').style.display='block'; document.getElementById('wallet-addr').textContent = myWallet.slice(0,8)+'...'+myWallet.slice(-6); document.getElementById('wallet-hp').textContent = 'Verificando...'; await checkHPNow(true); } catch(e) {} } });
+window.addEventListener('load', async () => { 
+  await new Promise(r => setTimeout(r, 500)); 
+  const ph2 = getPhantom(); 
+  if (ph2?.isPhantom && ph2.isConnected) {
+    try {
+      const r2 = await ph2.connect({ onlyIfTrusted: true }); 
+      myWallet = r2.publicKey.toString(); 
+      document.getElementById('btn-phantom').style.display='none'; 
+      document.getElementById('wallet-connected').style.display='block'; 
+      document.getElementById('wallet-addr').textContent = myWallet.slice(0,8)+'...'+myWallet.slice(-6); 
+      document.getElementById('wallet-hp').textContent = 'Verificando...'; 
+      await checkHPNow(true); 
+      
+      // AUTO-LOGIN: Si recuerda el nickname, entra directo
+      const savedName = localStorage.getItem('vicamon_nick');
+      if (savedName) {
+        document.getElementById('inp-name').value = savedName;
+        goProfile();
+      }
+    } catch(e) {} 
+  } 
+});
 
 async function checkHPNow(fromConnect=false) {
   if (!myWallet) return;
@@ -99,16 +128,45 @@ function dmgClassPick(a){ if(a.d===0) return 'dmg-zero'; const e=a.fx==='double'
 function buildBestiary(){ const keys=Object.entries(BEASTS); let html=''; const cats = {}; keys.forEach(([k,b])=>{ if(!cats[b.cat]) cats[b.cat] = []; cats[b.cat].push({k,b}); }); for(const catName in cats){ html += `<div style="grid-column:1/-1; margin-top:15px; border-bottom:0.5px solid rgba(255,255,255,.2); padding-bottom:5px; color:#CFA9EC; font-weight:600; text-transform:uppercase; letter-spacing:.08em; font-size:13px">✦ ${catName} Series</div>`; cats[catName].forEach(({k,b})=>{ html+=`<div class="bcard" id="bc-${k}" onclick="showBestiaryDetail('${k}')"><img src="${b.img}" alt="${b.name}"><div class="bname">${b.name}</div><div class="bsub">${b.sub}</div><span class="bstyle" style="${STCSS[b.style]}">${b.style}</span><div class="elbar" style="background:${EL[b.el]}"></div></div>`; }); } html+=`<div class="beast-detail" id="bestiary-detail-panel"></div>`; document.getElementById('bestiary-grid').innerHTML=html; }
 function showBestiaryDetail(k){ const b=BEASTS[k]; const panel=document.getElementById('bestiary-detail-panel'); const statData={atk:{aries:70,tauro:55,geminis:65,cancer:45,leo:70,virgo:60,libra:62,escorpio:65,sagitario:68,capricornio:50,acuario:72,piscis:58},def:{aries:30,tauro:90,geminis:50,cancer:95,leo:65,virgo:70,libra:62,escorpio:55,sagitario:55,capricornio:92,acuario:45,piscis:68},spd:{aries:90,tauro:30,geminis:80,cancer:40,leo:70,virgo:65,libra:62,escorpio:70,sagitario:75,capricornio:35,acuario:85,piscis:60}}; const atksHtml=b.attacks.map(a=>{ const tags=[]; if(a.pierce) tags.push('<span class="atk-tag tag-pierce">Ignora escudo</span>'); if(a.fx==='double') tags.push('<span class="atk-tag tag-nobreak">Doble golpe</span>'); if(a.fx==='triple') tags.push('<span class="atk-tag tag-nobreak">Triple golpe</span>'); if(a.risk||a.self>0) tags.push(`<span class="atk-tag tag-risk">Riesgo${a.self>0?' -'+a.self+' HP':''}</span>`); if(a.buff) tags.push('<span class="atk-tag tag-buff">Buff</span>'); if(a.dot) tags.push('<span class="atk-tag tag-dot">Daño/turno</span>'); if(a.debuff) tags.push('<span class="atk-tag tag-debuff">Debuff</span>'); const ppText = a.pp === 99 || a.pp === undefined ? 'PP: ∞' : `PP: ${a.pp}`; return `<div class="bd-atk"><div class="bd-atk-top"><span class="bd-atk-name">${a.n}</span><span class="bd-atk-dmg ${dmgClassPick(a)}">${dmgLabelPick(a)}</span></div>${tags.length?`<div class="bd-atk-tags">${tags.join('')}</div>`:''}<div class="bd-atk-desc">${a.desc}</div><div style="display:flex;justify-content:space-between;align-items:center"><div class="bd-atk-acc">${a.acc}% precisión</div><div class="bd-atk-pp">${ppText}</div></div></div>`; }).join(''); panel.innerHTML=`<div class="bd-left"><img src="${b.img}" alt="${b.name}"><div class="bd-name">${b.name}</div><div class="bd-sub">${b.sub}</div><div class="bd-stats"><div class="bd-stat"><div class="bd-stat-val">${statData.atk[k]||'—'}</div><div class="bd-stat-lbl">ATK</div></div><div class="bd-stat"><div class="bd-stat-val">${statData.def[k]||'—'}</div><div class="bd-stat-lbl">DEF</div></div><div class="bd-stat"><div class="bd-stat-val">${statData.spd[k]||'—'}</div><div class="bd-stat-lbl">VEL</div></div></div></div><div class="bd-attacks">${atksHtml}</div>`; panel.classList.add('open'); panel.scrollIntoView({behavior:'smooth',block:'nearest'}); }
 
-function goProfile(){ if(!myWallet){alert('Primero conecta tu wallet Phantom');return;} myName=document.getElementById('inp-name').value.trim(); if(!myName){alert('Escribe tu nombre de combate');return;} updateProfileUI(); buildBestiary(); show('s-profile'); updateHPDisplay(myCurrentHP); checkHPNow(false); }
+function goProfile(){ 
+  if(!myWallet){alert('Primero conecta tu wallet Phantom');return;} 
+  myName=document.getElementById('inp-name').value.trim(); 
+  if(!myName){alert('Escribe tu nombre de combate');return;} 
+  localStorage.setItem('vicamon_nick', myName); // Guarda el nick
+  updateProfileUI(); 
+  buildBestiary(); 
+  show('s-profile'); 
+  updateHPDisplay(myCurrentHP); 
+  checkHPNow(false); 
+}
+
+function toggleEditName() {
+  const box = document.getElementById('edit-name-box');
+  const input = document.getElementById('inp-edit-name');
+  if (box.style.display === 'none' || box.style.display === '') {
+    input.value = myName;
+    box.style.display = 'block';
+  } else {
+    box.style.display = 'none';
+  }
+}
+function saveNickname() {
+  const newName = document.getElementById('inp-edit-name').value.trim();
+  if (!newName) return alert('Ingresa un nombre válido');
+  myName = newName;
+  localStorage.setItem('vicamon_nick', myName);
+  document.getElementById('profile-name').textContent = myName;
+  document.getElementById('edit-name-box').style.display = 'none';
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify({type:'update_nickname', name: myName}));
+  updateLobbyBadge();
+}
 
 function openChallengeMenu(targetId, name, isTrain) {
   pendingChallengeTargetId = targetId;
   pendingIsTraining = isTrain;
   isGauntletChallenge = false;
-  
   const title = isTrain ? `Entrenar con ${name}` : `Retar a ${name}`;
   let buttonsHtml = '';
-  
   if (isTrain) {
     buttonsHtml += `<button class="btn btn-blue" style="width:100%;margin-bottom:10px" onclick="selectChallengeMode('train')">🤝 Entrenar 1 vs 1 (XP)</button>`;
     buttonsHtml += `<button class="btn btn-blue" style="width:100%" onclick="selectChallengeMode('train3v3')">🤝 Entrenar 3 vs 3 (XP)</button>`;
@@ -116,7 +174,6 @@ function openChallengeMenu(targetId, name, isTrain) {
     buttonsHtml += `<button class="btn btn-blue" style="width:100%;margin-bottom:10px" ${myCurrentHP < 100 ? 'disabled' : ''} onclick="selectChallengeMode('1v1')">⚔️ 1 vs 1 (Apuesta 100 HP)</button>`;
     buttonsHtml += `<button class="btn btn-blue" style="width:100%" ${myCurrentHP < 300 ? 'disabled' : ''} onclick="selectChallengeMode('3v3')">⚔️ 3 vs 3 (Apuesta 300 HP)</button>`;
   }
-  
   const modal = document.getElementById('modal-challenge-mode');
   modal.innerHTML = `
     <div class="modal" style="max-width:350px">
@@ -133,13 +190,10 @@ function selectChallengeMode(mode) {
   teamSelectionMode = (mode === '3v3' || mode === 'train3v3') ? '3v3' : '1v1';
   pendingIsTraining = (mode === 'train' || mode === 'train3v3'); 
   selectedTeam = [];
-  
   const titleEl = document.getElementById('ts-mode-title');
   const isMaster = (pendingChallengeTargetId === null);
-  
   if(teamSelectionMode === '1v1') titleEl.textContent = (isMaster || pendingIsTraining) ? 'Entrenamiento: 1 vs 1 (Elige 1)' : 'Combate: 1 vs 1 (Elige 1)';
   if(teamSelectionMode === '3v3') titleEl.textContent = (isMaster || pendingIsTraining) ? 'Entrenamiento: 3 vs 3 (Elige 3)' : 'Combate: 3 vs 3 (Elige 3)';
-  
   buildTeamPickGrid();
   show('s-team-select');
 }
@@ -183,7 +237,6 @@ function confirmTeam() {
 function enterLobby(){ if(ws && ws.readyState === 1) { show('s-lobby'); ws.send(JSON.stringify({type:'ping'})); } else { if(!myBeast) myBeast = 'aries'; connectWS(); } }
 function connectWS(){ clearTimeout(reconnectTimer); isKicked=false; const proto=location.protocol==='https:'?'wss':'ws'; const localWs = new WebSocket(`${proto}://${location.host}`); localWs.onopen=()=>{ clearTimeout(reconnectTimer); localWs.send(JSON.stringify({type:'join',name:myName,beast:myBeast||'aries',wallet:myWallet})); }; localWs.onmessage=e=>{try{handleMsg(JSON.parse(e.data));}catch(err){console.error(err);}}; localWs.onerror=()=>{}; localWs.onclose=()=>{ if(ws !== localWs) return; const inBattle=document.getElementById('s-battle').classList.contains('active'); if(!inBattle && !isKicked) reconnectTimer=setTimeout(()=>{ if(myName&&myBeast) connectWS(); },2000); }; ws = localWs; }
 
-// ARREGLO: La torre primero te manda a la pantalla de selección
 function challengeGauntlet() {
   if(!ws || ws.readyState !== 1) return alert('Conectando...');
   if(!confirm('¿Iniciar la Torre de Batalla? (Apostarás 100 HP)')) return;
@@ -217,6 +270,7 @@ function executeSwitch(index) { closeSwitchMenu(); ws.send(JSON.stringify({type:
 
 function handleMsg(m){
   if(m.type==='joined'){ myId=m.id; if(m.hp !== undefined) updateHPDisplay(m.hp); updateLobbyBadge(); updateProfileUI(m.stats); if(!isKicked) show('s-lobby'); checkHPNow(false); }
+  if(m.type==='nickname_updated'){ myName = m.name; updateLobbyBadge(); }
   if(m.type==='kicked'){ isKicked=true; alert(m.msg); show('s-login'); if(ws) ws.close(); }
   if(m.type==='lobby'){ const others=m.players.filter(p=>p.id!==myId); document.getElementById('lbl-online').textContent=m.players.length; renderLobby(others); }
   if(m.type==='leaderboard_update'){ renderLeaderboard(m.top); }
