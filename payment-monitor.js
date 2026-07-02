@@ -1,11 +1,11 @@
 const { Connection, PublicKey } = require('@solana/web3.js');
 const { getAssociatedTokenAddress } = require('@solana/spl-token');
 
-const PLATFORM_WALLET = 'C7pezdMQV5SnXWuzpt9YHnW1JrAAjvjdybNqoE8uZFTb'; // RECUERDA PONER AQUÍ LA WALLET A DE TU ESPEJO
+const PLATFORM_WALLET = 'C7pezdMQV5SnXWuzpt9YHnW1JrAAjvjdybNqoE8uZFTb'; // WALLET A
 const USDC_MINT       = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 const USDC_DECIMALS   = 6;
 const MIN_AMOUNT      = 100_000;
-const CHECK_INTERVAL  = 15_000;
+const CHECK_INTERVAL  = 30000; // 30 segundos para no hacer enojar a Solana
 const GAME_SERVER_URL = 'http://localhost:' + (process.env.PORT || 3000) + '/payment';
 
 const RPC_ENDPOINTS = [
@@ -21,6 +21,7 @@ function rotateRpc() { rpcIndex = (rpcIndex + 1) % RPC_ENDPOINTS.length; console
 const connection = getConnection();
 
 let processedSigs = new Set();
+let isChecking = false;
 
 async function getPlatformTokenAccount() {
   const mint = new PublicKey(USDC_MINT);
@@ -29,20 +30,19 @@ async function getPlatformTokenAccount() {
 }
 
 async function checkPayments() {
+  if (isChecking) return;
+  isChecking = true;
   try {
     const conn = getConnection();
     const tokenAccount = await getPlatformTokenAccount();
-    // Obtenemos las últimas 10 transacciones
     const signatures = await conn.getSignaturesForAddress(tokenAccount, { limit: 10 });
 
     if (!signatures.length) return;
 
-    // Las ordenamos de la más vieja a la más nueva
     const toProcess = signatures.reverse();
 
     for (const sigInfo of toProcess) {
       if (sigInfo.err) continue;
-      // Si ya la tenemos en memoria, la saltamos
       if (processedSigs.has(sigInfo.signature)) continue;
 
       const tx = await conn.getParsedTransaction(sigInfo.signature, { maxSupportedTransactionVersion: 0 });
@@ -72,7 +72,6 @@ async function checkPayments() {
 
         console.log(`[PAGO ✓] 0.10 USDC de ${sender.slice(0,8)}... | memo: "${memo}" | tx: ${sigInfo.signature.slice(0,20)}...`);
 
-        // La marcamos como procesada ANTES de enviarla para evitar dobles envíos
         processedSigs.add(sigInfo.signature);
 
         try {
@@ -92,6 +91,8 @@ async function checkPayments() {
     const msg = e.message || '';
     if (msg.includes('429') || msg.includes('403') || msg.includes('long-term storage') || msg.includes('Failed to fetch')) { rotateRpc(); } 
     else if (!msg.includes('429')) { console.error(`[ERROR] Monitor:`, msg.slice(0, 100)); }
+  } finally {
+    isChecking = false;
   }
 }
 
@@ -108,8 +109,6 @@ async function start() {
   try {
     const tokenAccount = await getPlatformTokenAccount();
     console.log(`  Token Account: ${tokenAccount.toBase58()}`);
-    // AL ARRANCAR: Obtenemos las últimas 10 transacciones y las marcamos todas como procesadas.
-    // Así ignoramos el historial viejo y solo procesamos los pagos NUEVOS que lleguen a partir de ahora.
     const sigs = await getConnection().getSignaturesForAddress(tokenAccount, { limit: 10 });
     if (sigs.length) {
       sigs.forEach(s => processedSigs.add(s.signature));
