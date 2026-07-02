@@ -9,7 +9,7 @@ const {
   PLATFORM_WALLET, PLATFORM_THRESHOLD, USDC_PER_HP,
   getAllPlayersDebug, updatePlayerName, updatePlayerStats, getTopPlayers,
   getPlayerStats, getPlayerRank, settleGauntlet,
-  isTxProcessed, markTxProcessed, adminSetHP
+  isTxProcessed, markTxProcessed, adminSetHP, adminResetPlatform, adminUnlockAllHP
 } = require('./hp-balance');
 const { sendUSDC } = require('./transfer');
 const BEASTS = require('./beasts.js');
@@ -54,6 +54,7 @@ const server = http.createServer(async (req, res) => {
         th { color: #85B7EB; text-transform: uppercase; font-size: 12px; }
         td input { width: 80px; padding: 5px; background: #111; border: 1px solid #333; text-align: center; color: #fff; border-radius: 4px; }
         .btn-save { background: #5DCAA5; padding: 8px 16px; color: #000; }
+        .admin-actions { margin-top: 20px; display: flex; gap: 10px; }
       </style></head><body>
         <h1>Panel de Administración</h1>
         <div class="header">
@@ -68,15 +69,22 @@ const server = http.createServer(async (req, res) => {
           <thead><tr><th>Wallet</th><th>Nickname</th><th>HP</th><th>HP Bloqueados</th><th>Acción</th></tr></thead>
           <tbody id="data"></tbody>
         </table>
+        <div class="admin-actions">
+          <button onclick="resetPlatformHP()" style="display:none" id="btn-reset-plat">Resetear HP Plataforma</button>
+          <button onclick="unlockAllHP()" style="display:none" id="btn-unlock-hp">Desbloquear HP de todos</button>
+        </div>
         <script>
+          let globalPass = '';
           async function loadData() {
-            const pass = document.getElementById('pass').value;
-            if(!pass) return alert('Ingresa la contraseña');
-            const res = await fetch('/admin-data?pass=' + encodeURIComponent(pass));
+            globalPass = document.getElementById('pass').value;
+            if(!globalPass) return alert('Ingresa la contraseña');
+            const res = await fetch('/admin-data?pass=' + encodeURIComponent(globalPass));
             if(!res.ok) { alert('Contraseña incorrecta'); return; }
             const data = await res.json();
             document.getElementById('plat-info').style.display = 'flex';
             document.getElementById('tbl').style.display = 'table';
+            document.getElementById('btn-reset-plat').style.display = 'block';
+            document.getElementById('btn-unlock-hp').style.display = 'block';
             document.getElementById('plat-hp').textContent = data.platformHp + ' HP (' + (data.platformHp * 0.001) + ' USDC)';
             document.getElementById('data').innerHTML = data.players.map(p => \`
               <tr>
@@ -84,18 +92,28 @@ const server = http.createServer(async (req, res) => {
                 <td>\${p.last_name || '-'}</td>
                 <td><input type="number" value="\${p.hp}" id="hp-\${p.wallet}"></td>
                 <td>\${p.locked_hp || 0}</td>
-                <td><button class="btn-save" onclick="saveHP('\${p.wallet}', '\${pass}')">Guardar</button></td>
+                <td><button class="btn-save" onclick="saveHP('\${p.wallet}')">Guardar</button></td>
               </tr>
             \`).join('');
           }
-          async function saveHP(wallet, pass) {
+          async function saveHP(wallet) {
             const hp = document.getElementById('hp-' + wallet).value;
             const res = await fetch('/admin-update-hp', {
               method: 'POST', headers: {'Content-Type':'application/json'},
-              body: JSON.stringify({ pass, wallet, hp: parseInt(hp) })
+              body: JSON.stringify({ pass: globalPass, wallet, hp: parseInt(hp) })
             });
             const data = await res.json();
             if(data.ok) alert('✓ HP actualizado a ' + hp); else alert('Error al actualizar');
+          }
+          async function resetPlatformHP() {
+            if(!confirm('¿Resetear los HP de la plataforma a 0?')) return;
+            const res = await fetch('/admin-reset-platform', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ pass: globalPass }) });
+            if(res.ok) alert('✓ HP de la plataforma reseteados.');
+          }
+          async function unlockAllHP() {
+            if(!confirm('¿Desbloquear todos los HP de jugadores? (Solo usar si hay bug)')) return;
+            const res = await fetch('/admin-unlock-hp', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ pass: globalPass }) });
+            if(res.ok) alert('✓ HP desbloqueados.');
           }
         </script>
       </body></html>
@@ -116,13 +134,36 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (urlPath === '/admin-update-hp' && req.method === 'POST') {
-    let body = '';
-    req.on('data', c => body += c);
+    let body = ''; req.on('data', c => body += c);
     req.on('end', async () => {
       try {
         const { pass, wallet, hp } = JSON.parse(body);
         if (pass !== (process.env.ADMIN_PASSWORD || 'vicamon_secret_key_07012010')) { res.writeHead(403); res.end(JSON.stringify({ ok: false })); return; }
         await adminSetHP(wallet, parseInt(hp));
+        res.writeHead(200); res.end(JSON.stringify({ ok: true }));
+      } catch(e) { res.writeHead(400); res.end(JSON.stringify({ ok: false })); }
+    });
+    return;
+  }
+  if (urlPath === '/admin-reset-platform' && req.method === 'POST') {
+    let body = ''; req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { pass } = JSON.parse(body);
+        if (pass !== (process.env.ADMIN_PASSWORD || 'vicamon_secret_key_07012010')) { res.writeHead(403); res.end(JSON.stringify({ ok: false })); return; }
+        await adminResetPlatform();
+        res.writeHead(200); res.end(JSON.stringify({ ok: true }));
+      } catch(e) { res.writeHead(400); res.end(JSON.stringify({ ok: false })); }
+    });
+    return;
+  }
+  if (urlPath === '/admin-unlock-hp' && req.method === 'POST') {
+    let body = ''; req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { pass } = JSON.parse(body);
+        if (pass !== (process.env.ADMIN_PASSWORD || 'vicamon_secret_key_07012010')) { res.writeHead(403); res.end(JSON.stringify({ ok: false })); return; }
+        await adminUnlockAllHP();
         res.writeHead(200); res.end(JSON.stringify({ ok: true }));
       } catch(e) { res.writeHead(400); res.end(JSON.stringify({ ok: false })); }
     });
