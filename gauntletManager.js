@@ -13,7 +13,6 @@ async function endGauntlet(bId, playerId, won) {
   if (!pl) return;
   const wallet = pl.wallet;
   const newHp = await settleGauntlet(wallet, won);
-  // No actualizamos stats (V/D) para el ranking, como acordamos.
   const stats = await getPlayerStats(wallet);
   const rank = await getPlayerRank(wallet);
   send(pl.ws, { type:'battle_end', won, isGauntlet: true, newHp, stats: { wins: stats.wins, losses: stats.losses, rank } });
@@ -31,29 +30,33 @@ async function checkGauntletCpuDeath(bId) {
   const plId  = b.cpuIsP1 ? b.p2id : b.p1id;
   
   if (cpuSt.hp <= 0) {
-    b.turnId = -2; // Bloquear ataques
+    b.turnId = -2; 
     pushCpuBattle(bId); 
     setTimeout(() => {
-      const bb = battles.get(bId); if (!bb) return;
-      bb.gauntletIndex++;
-      if (bb.gauntletIndex >= BEAST_KEYS.length) {
-        endGauntlet(bId, plId, true);
-      } else {
-        const pl = lobby.get(plId);
-        if (!pl) return endGauntlet(bId, plId, false);
-        bb.cpuBeast = BEAST_KEYS[bb.gauntletIndex];
-        bb.st1 = getStartState(bb.cpuBeast);
-        bb.turnId = CPU_ID; 
-        bb.logs.push({t:`¡Jefe derrotado! Prepárate para ${BEASTS[bb.cpuBeast].name} (${bb.gauntletIndex+1}/12). HP restaurado.`, c:'good'});
-        send(pl.ws, { type: 'gauntlet_next', battleId: bId, nextBeast: bb.cpuBeast, round: bb.gauntletIndex+1, logs: bb.logs.slice(-14) });
-      }
+      try {
+        const bb = battles.get(bId); if (!bb) return;
+        bb.gauntletIndex++;
+        if (bb.gauntletIndex >= BEAST_KEYS.length) {
+          endGauntlet(bId, plId, true);
+        } else {
+          const pl = lobby.get(plId);
+          if (!pl) return endGauntlet(bId, plId, false);
+          bb.cpuBeast = BEAST_KEYS[bb.gauntletIndex];
+          bb.st1 = getStartState(bb.cpuBeast);
+          bb.turnId = CPU_ID; 
+          bb.logs.push({t:`¡Jefe derrotado! Prepárate para ${BEASTS[bb.cpuBeast].name} (${bb.gauntletIndex+1}/12). HP restaurado.`, c:'good'});
+          send(pl.ws, { type: 'gauntlet_next', battleId: bId, nextBeast: bb.cpuBeast, round: bb.gauntletIndex+1, logs: bb.logs.slice(-14) });
+        }
+      } catch(e) { console.error("Gauntlet advance error:", e); }
     }, 1500); 
     return true;
   }
   if (plSt.hp <= 0) {
     b.turnId = -2;
     pushCpuBattle(bId);
-    setTimeout(() => endGauntlet(bId, plId, false), 1500);
+    setTimeout(() => {
+      try { endGauntlet(bId, plId, false); } catch(e) { console.error("Gauntlet loss error:", e); }
+    }, 1500);
     return true;
   }
   return false;
@@ -61,12 +64,10 @@ async function checkGauntletCpuDeath(bId) {
 
 function cpuPickAttack(cpuSt, oppSt, beastKey) {
   const atks = BEASTS[beastKey]?.attacks || [];
-  const validIndices = []; 
-  const weights = [];
+  const validIndices = []; const weights = [];
   atks.forEach((a, i) => {
     if (cpuSt.pp[i] > 0 || cpuSt.pp[i] === undefined || cpuSt.pp[i] === 99) {
-      validIndices.push(i); 
-      let s = 2;
+      validIndices.push(i); let s = 2;
       if (a.d > 30 && oppSt.hp < 40) s = 5;
       if ((a.fx === 'poison5' || a.fx === 'poison3l') && oppSt.poisonTurns === 0 && oppSt.hp > 40) s = 4;
       if ((a.fx === 'heal20' || a.fx === 'heal30' || a.fx === 'fortress') && cpuSt.hp < 35) s = 5;
@@ -79,10 +80,7 @@ function cpuPickAttack(cpuSt, oppSt, beastKey) {
   if (validIndices.length === 0) return 0;
   const tot = weights.reduce((a, b) => a + b, 0);
   let r = Math.random() * tot, idx = validIndices[0];
-  for (let i = 0; i < validIndices.length; i++) { 
-    r -= weights[i]; 
-    if (r <= 0) { idx = validIndices[i]; break; } 
-  }
+  for (let i = 0; i < validIndices.length; i++) { r -= weights[i]; if (r <= 0) { idx = validIndices[i]; break; } }
   return idx;
 }
 
@@ -90,7 +88,7 @@ function scheduleGauntletCpuTurn(bId) {
   const b = battles.get(bId); if (!b || !b.isCpu || b.turnId !== CPU_ID) return;
   setTimeout(async () => { 
     const bb = battles.get(bId); if (!bb || bb.turnId !== CPU_ID) return; 
-    await doGauntletCpuTurn(bId); 
+    try { await doGauntletCpuTurn(bId); } catch(e) { console.error("Gauntlet CPU turn error:", e); }
   }, 1100 + Math.random() * 600);
 }
 
@@ -126,7 +124,7 @@ async function doGauntletCpuTurn(bId) {
   if (plStNow.stun || plStNow.recharge > 0) {
     setTimeout(async () => { 
       const bbb = battles.get(bId); if (!bbb || bbb.turnId !== plId) return; 
-      await processGauntletPlayerTurn(bId, plId, -1); 
+      try { await processGauntletPlayerTurn(bId, plId, -1); } catch(e) { console.error(e); }
     }, 900);
   }
 }
@@ -164,4 +162,6 @@ async function processGauntletPlayerTurn(bId, playerId, atkIndex) {
   scheduleGauntletCpuTurn(bId);
 }
 
-module.exports = { processGauntletPlayerTurn, endGauntlet, scheduleGauntletCpuTurn };
+module.exports = { 
+  processGauntletPlayerTurn 
+};
