@@ -100,37 +100,46 @@ function showBestiaryDetail(k){ const b=BEASTS[k]; const panel=document.getEleme
 
 function goProfile(){ if(!myWallet){alert('Primero conecta tu wallet Phantom');return;} myName=document.getElementById('inp-name').value.trim(); if(!myName){alert('Escribe tu nombre de combate');return;} updateProfileUI(); buildBestiary(); show('s-profile'); updateHPDisplay(myCurrentHP); checkHPNow(false); }
 
-function openChallengeMenu(targetId, name, isTrainAvail) {
+// --- NUEVO: Menú de Reto Dinámico ---
+function openChallengeMenu(targetId, name, isTrain) {
   pendingChallengeTargetId = targetId;
-  document.getElementById('cm-title').textContent = `Retar a ${name}`;
-  const btn1v1 = document.getElementById('cm-1v1-btn');
-  const btn3v3 = document.getElementById('cm-3v3-btn');
-  const btnTrain = document.getElementById('cm-train-btn');
-  const btnTrain3v3 = document.getElementById('cm-train3v3-btn');
-  const isMaster = (targetId === null);
-  if(isMaster) {
-    btn1v1.textContent = '🤝 Entrenar 1 vs 1 (XP)';
-    btn3v3.textContent = '🤝 Entrenar 3 vs 3 (XP)';
-    btn1v1.disabled = false; btn3v3.disabled = false;
-    btnTrain.style.display = 'none'; btnTrain3v3.style.display = 'none';
+  pendingIsTraining = isTrain;
+  
+  const title = isTrain ? `Entrenar con ${name}` : `Retar a ${name}`;
+  let buttonsHtml = '';
+  
+  if (isTrain) {
+    buttonsHtml += `<button class="btn btn-blue" style="width:100%;margin-bottom:10px" onclick="selectChallengeMode('train')">🤝 Entrenar 1 vs 1 (XP)</button>`;
+    buttonsHtml += `<button class="btn btn-blue" style="width:100%" onclick="selectChallengeMode('train3v3')">🤝 Entrenar 3 vs 3 (XP)</button>`;
   } else {
-    btn1v1.textContent = '⚔️ 1 vs 1 (Apuesta 100 HP)';
-    btn3v3.textContent = '⚔️ 3 vs 3 (Apuesta 300 HP)';
-    btn1v1.disabled = myCurrentHP < 100; btn3v3.disabled = myCurrentHP < 300;
-    btnTrain.style.display = isTrainAvail ? 'block' : 'none'; btnTrain3v3.style.display = isTrainAvail ? 'block' : 'none';
+    buttonsHtml += `<button class="btn btn-blue" style="width:100%;margin-bottom:10px" ${myCurrentHP < 100 ? 'disabled' : ''} onclick="selectChallengeMode('1v1')">⚔️ 1 vs 1 (Apuesta 100 HP)</button>`;
+    buttonsHtml += `<button class="btn btn-blue" style="width:100%" ${myCurrentHP < 300 ? 'disabled' : ''} onclick="selectChallengeMode('3v3')">⚔️ 3 vs 3 (Apuesta 300 HP)</button>`;
   }
-  document.getElementById('modal-challenge-mode').classList.remove('hidden');
+  
+  const modal = document.getElementById('modal-challenge-mode');
+  modal.innerHTML = `
+    <div class="modal" style="max-width:350px">
+      <h3 style="margin-bottom:20px">${title}</h3>
+      <div style="display:flex;flex-direction:column;gap:5px">${buttonsHtml}</div>
+      <button class="btn btn-sm btn-red" style="margin-top:20px;width:100%" onclick="document.getElementById('modal-challenge-mode').classList.add('hidden')">Cancelar</button>
+    </div>
+  `;
+  modal.classList.remove('hidden');
 }
 
 function selectChallengeMode(mode) {
   document.getElementById('modal-challenge-mode').classList.add('hidden');
   teamSelectionMode = (mode === '3v3' || mode === 'train3v3') ? '3v3' : '1v1';
-  pendingIsTraining = (mode === 'train' || mode === 'train3v3');
+  // pendingIsTraining ya fue seteado en openChallengeMenu, pero lo reafirmamos por si acaso
+  pendingIsTraining = (mode === 'train' || mode === 'train3v3'); 
   selectedTeam = [];
+  
   const titleEl = document.getElementById('ts-mode-title');
   const isMaster = (pendingChallengeTargetId === null);
+  
   if(teamSelectionMode === '1v1') titleEl.textContent = (isMaster || pendingIsTraining) ? 'Entrenamiento: 1 vs 1 (Elige 1)' : 'Combate: 1 vs 1 (Elige 1)';
   if(teamSelectionMode === '3v3') titleEl.textContent = (isMaster || pendingIsTraining) ? 'Entrenamiento: 3 vs 3 (Elige 3)' : 'Combate: 3 vs 3 (Elige 3)';
+  
   buildTeamPickGrid();
   show('s-team-select');
 }
@@ -147,8 +156,8 @@ function confirmTeam() {
   if(ws && ws.readyState === 1) { if(!mode3v3) ws.send(JSON.stringify({type:'change_beast', beast: myBeast})); }
   
   if(pendingFrom !== null) { 
-    if(mode3v3) ws.send(JSON.stringify({type:'accept_3v3', fromId: pendingFrom, team: myTeam, isTraining: isTraining || pendingIsTraining}));
-    else ws.send(JSON.stringify({type:'accept', fromId: pendingFrom, isTraining: isTraining || pendingIsTraining}));
+    if(mode3v3) ws.send(JSON.stringify({type:'accept_3v3', fromId: pendingFrom, team: myTeam, isTraining: isTraining}));
+    else ws.send(JSON.stringify({type:'accept', fromId: pendingFrom, isTraining: isTraining}));
     pendingFrom = null; pendingIs3v3 = false; pendingIsTraining = false;
   } else if(pendingChallengeTargetId !== null) { 
     if(mode3v3 && isTraining) ws.send(JSON.stringify({type:'challenge_3v3_training', targetId: pendingChallengeTargetId, team: myTeam}));
@@ -171,7 +180,6 @@ function continueGauntlet() { document.getElementById('modal-gauntlet').classLis
 function selectGauntletBeast(k) { gauntletSelectedBeast = k; document.querySelectorAll('#g-beast-picker .bcard').forEach(c=>c.classList.remove('sel')); document.getElementById('gbc-'+k)?.classList.add('sel'); }
 function surrender() { if(!confirm('¿Rendirte?')) return; if(ws && ws.readyState === 1) ws.send(JSON.stringify({type:'surrender', battleId})); }
 
-// FIX: Pasamos el 'reason' al modal para que se muestre arriba, sin usar alert()
 function openSwitchMenu(reason = 'Elige tu siguiente Vicamon. ¡Perderás el turno!') { 
   const bench = window._myBench || []; 
   let html = `<div class="modal" style="max-width:400px"><h3>Cambiar Vicamon</h3><p style="font-size:12px;color:#F0997B;margin-bottom:15px">${reason}</p><div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">`; 
@@ -219,7 +227,6 @@ function handleMsg(m){
     if(oppSt.hp<prevOppHp) animHit('opp',prevOppHp-oppSt.hp);
     renderBattle(m.yourTurn,m.logs);
   }
-  // FIX: Se abre el modal directamente con el mensaje de razón
   if(m.type === 'team_force_switch'){ openSwitchMenu(m.reason); }
   
   if(m.type==='hp_updated'){ updateHPDisplay(m.hp); myCurrentHP=m.hp; }
@@ -246,23 +253,22 @@ function animHit(side, dmg){ const spr=document.getElementById('spr-'+side); if(
 function animAttack(side){ const spr=document.getElementById('spr-'+side); if(!spr) return; spr.classList.remove('anim-attack'); void spr.offsetWidth; spr.classList.add('anim-attack'); setTimeout(()=>spr.classList.remove('anim-attack'),400); }
 function updateLobbyBadge(){ document.getElementById('lbl-myname').textContent=myName; const hpEl = document.getElementById('lbl-myhp'); if(hpEl) hpEl.textContent = myCurrentHP + ' HP'; const b=BEASTS[myBeast]; if(b) document.getElementById('badge-img').src=b.img; }
 let _lastLobbyPlayers=[]; function renderLobbyFromCache(){ renderLobby(_lastLobbyPlayers); }
-function renderLobby(others){ _lastLobbyPlayers=others; const list=document.getElementById('players-list'); const myHp=myCurrentHP; const hpWarnEl=document.getElementById('lobby-hp-warn'); if(hpWarnEl) hpWarnEl.style.display=myHp<100?'block':'none'; if(!others.length){list.innerHTML='<p class="empty-lobby">No hay otros jugadores...</p>';return;} list.innerHTML=others.map(p=>{ const b=BEASTS[p.beast]||{name:p.beast,img:''}; const rivalHp=p.hp||0; const hpColor=rivalHp>=100?'#5DCAA5':'#F0997B'; return `<div class="p-row"><div class="p-info"><img class="p-img" src="${b.img}"><div><div class="p-name">${p.name}</div><div class="p-beast">${b.name} · <span style="color:${hpColor};font-size:10px">${rivalHp} HP</span></div></div></div><div style="display:flex;gap:6px"><button class="btn btn-sm" style="background:rgba(130,80,180,.15);color:#CFA9EC" onclick="openChallengeMenu(${p.id},'${p.name}', true)">⚔️ Retar</button></div></div>`; }).join(''); }
+
+// FIX: Botones separados de Entrenar y Retar
+function renderLobby(others){ _lastLobbyPlayers=others; const list=document.getElementById('players-list'); const myHp=myCurrentHP; const hpWarnEl=document.getElementById('lobby-hp-warn'); if(hpWarnEl) hpWarnEl.style.display=myHp<100?'block':'none'; if(!others.length){list.innerHTML='<p class="empty-lobby">No hay otros jugadores...</p>';return;} list.innerHTML=others.map(p=>{ const b=BEASTS[p.beast]||{name:p.beast,img:''}; const rivalHp=p.hp||0; const canChallenge = myHp >= 100 && rivalHp >= 100; const hpColor=rivalHp>=100?'#5DCAA5':'#F0997B'; return `<div class="p-row"><div class="p-info"><img class="p-img" src="${b.img}"><div><div class="p-name">${p.name}</div><div class="p-beast">${b.name} · <span style="color:${hpColor};font-size:10px">${rivalHp} HP</span></div></div></div><div style="display:flex;gap:6px"><button class="btn btn-sm" style="background:rgba(130,80,180,.15);border:1px solid rgba(130,80,180,.35);color:#CFA9EC" onclick="openChallengeMenu(${p.id},'${p.name}', true)">🤝 Entrenar</button><button class="btn btn-blue btn-sm" ${canChallenge?'':'disabled'} onclick="openChallengeMenu(${p.id},'${p.name}', false)">⚔️ Retar</button></div></div>`; }).join(''); }
+
 async function doCashout(){ const btn=document.getElementById('btn-cashout'); if(btn){btn.disabled=true;btn.textContent='Procesando...';} if(!ws || ws.readyState !== 1){ if(btn){btn.disabled=false;btn.textContent='💰 Cashout';} return; } ws.send(JSON.stringify({type:'cashout'})); }
 function updateHPDisplay(hp){ myCurrentHP = hp || 0; const el=document.getElementById('pick-hp-val'); if(el){ el.textContent=hp+' HP'; el.style.color=hp>=100?'#5DCAA5':'#EF9F27'; } const loginHp=document.getElementById('wallet-hp'); if(loginHp){ loginHp.textContent=hp+' HP'; loginHp.style.color=hp>=100?'#5DCAA5':'#EF9F27'; } const profHp=document.getElementById('profile-hp'); if(profHp){ profHp.textContent=hp+' HP'; profHp.style.color=hp>=100?'#5DCAA5':'#EF9F27'; } const btn=document.getElementById('btn-cashout'); if(btn){ btn.style.display=hp>0?'inline-block':'none'; btn.disabled=false; btn.textContent='💰 Cashout'; } if(document.getElementById('s-lobby')?.classList.contains('active')){ renderLobbyFromCache(); updateLobbyBadge(); } }
 
-function sendChallenge(targetId,name){ openChallengeMenu(targetId, name, false); }
-function sendChallengeTraining(targetId,name){ openChallengeMenu(targetId, name, true); }
 function challengeMaster(){ if(!ws || ws.readyState !== 1) return; openChallengeMenu(null, 'Zodiac Master', true); }
 
 function acceptChallenge(){
   document.getElementById('modal-challenged').classList.add('hidden');
   stopChallengeBeep();
   if(pendingFrom===null) return;
-  
-  // FIX: Tanto para 1v1 como para 3v3, enviar a la pantalla de selección de equipo
   teamSelectionMode = pendingIs3v3 ? '3v3' : '1v1';
   selectedTeam = [];
-  const title = pendingIs3v3 ? 'Combate: 3 vs 3 (Elige 3)' : 'Combate: 1 vs 1 (Elige 1)';
+  const title = (pendingIs3v3 ? '3 vs 3' : '1 vs 1') + (pendingIsTraining ? ' (Entrenamiento)' : ' (Combate)');
   document.getElementById('ts-mode-title').textContent = title;
   buildTeamPickGrid(); 
   show('s-team-select');
