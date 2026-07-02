@@ -162,6 +162,9 @@ async function processGauntletPlayerTurn(bId, playerId, atkIndex) {
   scheduleGauntletCpuTurn(bId);
 }
 
+// FIX: Exportar TODAS las funciones que el server.js necesita
 module.exports = { 
-  processGauntletPlayerTurn 
+  processGauntletPlayerTurn,
+  endGauntlet,
+  scheduleGauntletCpuTurn
 };
