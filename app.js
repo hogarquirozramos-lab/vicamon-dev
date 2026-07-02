@@ -22,7 +22,9 @@ let teamSelectionMode = '1v1';
 let selectedTeam = []; 
 let myTeam = [];
 let isGauntletChallenge = false;
-let lastMsgTime = Date.now(); // NUEVO: Para el heartbeat móvil
+let lastMsgTime = Date.now(); 
+
+let platformWalletAddress = ''; // NUEVO: Guardará la wallet de la plataforma
 
 const audioFiles = {
     lobby: new Audio('Audio/lobby.mp3'),
@@ -42,11 +44,42 @@ function startChallengeBeep() { if (challengeBeepInterval) return; playSfx('boto
 function stopChallengeBeep() { if (challengeBeepInterval) { clearInterval(challengeBeepInterval); challengeBeepInterval = null; } }
 document.addEventListener('click', (e) => { if(e.target.closest('.btn')) playSfx('boton'); });
 
-window.addEventListener('load', () => { const btnG = document.getElementById('btn-gauntlet'); if (btnG) btnG.style.display = GAUNTLET_HABILITADO ? 'inline-block' : 'none'; });
+window.addEventListener('load', () => { 
+  const btnG = document.getElementById('btn-gauntlet'); 
+  if (btnG) btnG.style.display = GAUNTLET_HABILITADO ? 'inline-block' : 'none'; 
+  fetchPlatformWallet(); // NUEVO: Obtener la wallet al cargar
+});
+
+// NUEVO: Obtiene la wallet de la plataforma desde el servidor
+async function fetchPlatformWallet() {
+  try {
+    const res = await fetch('/platform-wallet');
+    const data = await res.json();
+    if (data.wallet) {
+      platformWalletAddress = data.wallet;
+      // Actualizar el HTML estático del login si existe
+      const loginWalletSpan = document.querySelector('#step-charge div[onclick="copyWallet()"] span');
+      if (loginWalletSpan) loginWalletSpan.textContent = platformWalletAddress;
+    }
+  } catch(e) { console.error("Error cargando wallet de plataforma:", e); }
+}
 
 async function disconnectWallet() { try { const phantom = getPhantom(); if (phantom && phantom.isConnected) await phantom.disconnect(); } catch(e) {} myWallet = ''; myName = ''; myBeast = ''; if(ws) { try { ws.close(); } catch(e){} } document.getElementById('btn-phantom').style.display='flex'; document.getElementById('wallet-connected').style.display='none'; document.getElementById('no-phantom').style.display='none'; document.getElementById('inp-name').value = ''; show('s-login'); }
-function copyWallet() { navigator.clipboard.writeText('DIRECCION_WALLET_A').then(() => { const btn = event.currentTarget || event.target; const orig = btn.textContent; btn.textContent = '✓ Copiado!'; setTimeout(() => { btn.textContent = orig; }, 1500); }).catch(() => alert('Dirección: DIRECCION_WALLET_A')); }
-function depositWidgetHTML() { return `<div style="background:rgba(74,158,255,.06);border:0.5px solid rgba(74,158,255,.2);border-radius:10px;padding:10px 12px"><div style="font-size:11px;color:#85B7EB;margin-bottom:4px">💡 Deposita USDC para retar jugadores</div><div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:7px">0.10 USDC = 100 HP · cualquier monto funciona</div><div style="display:flex;gap:6px;align-items:center"><div style="flex:1;background:rgba(0,0,0,.35);border-radius:6px;padding:6px 8px;font-family:monospace;font-size:9px;color:#85B7EB;word-break:break-all;cursor:pointer" onclick="copyWallet()">DIRECCION_WALLET_A <span style="color:rgba(255,255,255,.3)">📋</span></div><button class="btn btn-sm" style="font-size:10px;white-space:nowrap;padding:5px 10px" onclick="checkHPNow()">Verificar HP</button></div></div>`; }
+
+// ACTUALIZADO: Ahora copia la wallet real dinámica
+function copyWallet() { 
+  if (!platformWalletAddress) return alert('La wallet no se ha cargado aún.');
+  navigator.clipboard.writeText(platformWalletAddress).then(() => { 
+    alert('¡Dirección copiada! Envía USDC a esa wallet.'); 
+  }).catch(() => alert('Dirección: ' + platformWalletAddress)); 
+}
+
+// ACTUALIZADO: Muestra la wallet real dinámica
+function depositWidgetHTML() { 
+  const walletAddr = platformWalletAddress || 'Cargando...';
+  return `<div style="background:rgba(74,158,255,.06);border:0.5px solid rgba(74,158,255,.2);border-radius:10px;padding:10px 12px"><div style="font-size:11px;color:#85B7EB;margin-bottom:4px">💡 Deposita USDC para retar jugadores</div><div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:7px">0.10 USDC = 100 HP · cualquier monto funciona</div><div style="display:flex;gap:6px;align-items:center"><div style="flex:1;background:rgba(0,0,0,.35);border-radius:6px;padding:6px 8px;font-family:monospace;font-size:9px;color:#85B7EB;word-break:break-all;cursor:pointer" onclick="copyWallet()">${walletAddr} <span style="color:rgba(255,255,255,.3)">📋</span></div><button class="btn btn-sm" style="font-size:10px;white-space:nowrap;padding:5px 10px" onclick="checkHPNow()">Verificar HP</button></div></div>`; 
+}
+
 function getPhantom() { return window.phantom?.solana || window.solana || null; }
 
 async function connectPhantom() {
@@ -98,10 +131,9 @@ window.addEventListener('load', async () => {
   } 
 });
 
-// HEARTBEAT MÓVIL: Revisa cada 10s si la conexión sigue viva
 setInterval(() => {
   if (ws && ws.readyState === 1) {
-    if (Date.now() - lastMsgTime > 25000) { // Si no recibimos nada en 25s, forzar reconexión
+    if (Date.now() - lastMsgTime > 25000) {
       console.log("WS timeout, forzando reconexión...");
       try { ws.close(); } catch(e) {}
       return;
