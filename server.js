@@ -19,7 +19,7 @@ const { lobby, battles, uid, send, broadcast, pushLobby, pushBattle, pushCpuBatt
 const { getStartState, processTurn, endBattle } = require('./battleEngine');
 const { CPU_ID, processCpuPlayerTurn, scheduleCpuTurn } = require('./cpuLogic');
 const { processGauntletPlayerTurn, endGauntlet, scheduleGauntletCpuTurn } = require('./gauntletManager');
-const { pushTeamBattle, processTeamTurn, processTeamSwitch, processTeamCpuPlayerTurn } = require('./teamEngine');
+const { pushTeamBattle, processTeamTurn, processTeamSwitch, processTeamCpuPlayerTurn, endTeamBattle } = require('./teamEngine');
 
 async function getPlatformUSDCBalance() {
   const { Connection, PublicKey } = require('@solana/web3.js');
@@ -191,6 +191,14 @@ wss.on('connection', ws => {
       }
 
       if (msg.type === 'change_beast') { const p = lobby.get(id); if (p && !p.inBattle) { p.beast = msg.beast; await pushLobby(); } }
+      if (msg.type === 'update_nickname') { 
+        const p = lobby.get(id); if (p) { 
+          p.name = msg.name; 
+          await updatePlayerName(p.wallet, msg.name); 
+          await pushLobby(); 
+          send(ws, { type: 'nickname_updated', name: msg.name });
+        } 
+      }
 
       if (msg.type === 'challenge') {
         const challenger = lobby.get(id); const target = lobby.get(msg.targetId);
@@ -289,7 +297,6 @@ wss.on('connection', ws => {
       if (msg.type === 'team_switch') { const b = battles.get(msg.battleId); if (!b) return; await processTeamSwitch(msg.battleId, id, msg.index); }
       if (msg.type === 'surrender') {
         const b = battles.get(msg.battleId); if (!b) return;
-        const { endTeamBattle } = require('./teamEngine');
         if (b.isTeamBattle) { const otherId = b.p1id === id ? b.p2id : b.p1id; await endTeamBattle(msg.battleId, otherId, id, 0); }
         else if (b.isGauntlet) await endGauntlet(msg.battleId, id, false);
         else if (b.isCpu) await endBattle(msg.battleId, CPU_ID, id, 0, true);
@@ -298,7 +305,7 @@ wss.on('connection', ws => {
 
       if (msg.type === 'challenge_gauntlet') {
         const pl = lobby.get(id); if (!pl || pl.inBattle) return;
-        if (msg.beast) pl.beast = msg.beast; // ARREGLO: Usa el beast elegido en la interfaz
+        if (msg.beast) pl.beast = msg.beast; 
         if (!await hasHP(pl.wallet, 100)) { send(ws, { type: 'error', msg: 'Necesitas 100 HP para la Torre.' }); return; }
         await lockHP(pl.wallet, 100); pl.inBattle = true;
         const cpuBeast = BEAST_KEYS[0];
@@ -342,7 +349,6 @@ wss.on('connection', ws => {
       for (const [bId, b] of battles) {
         if (b.isTraining && (b.p1id === id || b.p2id === id)) { battles.delete(bId); } 
         else if (b.isTeamBattle && (b.p1id === id || b.p2id === id)) { 
-          const { endTeamBattle } = require('./teamEngine');
           const otherId = b.p1id === id ? b.p2id : b.p1id;
           await endTeamBattle(bId, otherId, id, 0);
         } 
