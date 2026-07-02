@@ -1,11 +1,11 @@
 const { Connection, PublicKey } = require('@solana/web3.js');
 const { getAssociatedTokenAddress } = require('@solana/spl-token');
+const { PLATFORM_WALLET } = require('./hp-balance'); // UNIFICACIÓN: Leemos la wallet de la base de datos
 
-const PLATFORM_WALLET = 'C7pezdMQV5SnXWuzpt9YHnW1JrAAjvjdybNqoE8uZFTb'; // WALLET A
 const USDC_MINT       = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 const USDC_DECIMALS   = 6;
 const MIN_AMOUNT      = 100_000;
-const CHECK_INTERVAL  = 30000; // 30 segundos para no hacer enojar a Solana
+const CHECK_INTERVAL  = 30000; // 30 segundos
 const GAME_SERVER_URL = 'http://localhost:' + (process.env.PORT || 3000) + '/payment';
 
 const RPC_ENDPOINTS = [
