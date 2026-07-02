@@ -20,7 +20,6 @@ pool.query(`
   );
 `).catch(e => console.error("Error creando tabla platform:", e));
 
-// NUEVA TABLA PARA EVITAR PAGOS DUPLICADOS
 pool.query(`CREATE TABLE IF NOT EXISTS processed_txs (signature VARCHAR(100) PRIMARY KEY);`).catch(e=>{});
 
 pool.query(`INSERT INTO platform (id, hp) VALUES (1, 0) ON CONFLICT DO NOTHING;`).catch(e=>{});
@@ -36,7 +35,6 @@ async function getAllPlayersDebug() {
   return res.rows;
 }
 
-// NUEVAS FUNCIONES PARA PAGOS
 async function isTxProcessed(signature) {
   const res = await pool.query('SELECT 1 FROM processed_txs WHERE signature = $1', [signature]);
   return res.rows.length > 0;
@@ -45,7 +43,6 @@ async function markTxProcessed(signature) {
   await pool.query('INSERT INTO processed_txs (signature) VALUES ($1) ON CONFLICT DO NOTHING', [signature]);
 }
 
-// NUEVA FUNCIÓN PARA EL PANEL DE ADMIN
 async function adminSetHP(wallet, hp) {
   await pool.query(`INSERT INTO players (wallet, hp) VALUES ($1, $2) ON CONFLICT (wallet) DO UPDATE SET hp = $2`, [wallet, hp]);
   return await getHP(wallet);
@@ -125,6 +122,26 @@ async function settleTeamMatch(winnerWallet, loserWallet, winnerRemainingHp) {
     return { winnerNewHp };
   } catch(e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
 }
+async function settleGauntlet(wallet, won) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('UPDATE players SET locked_hp = GREATEST(0, locked_hp - 100) WHERE wallet = $1', [wallet]);
+    if (won) {
+      await client.query('UPDATE players SET hp = hp + 200 WHERE wallet = $1', [wallet]);
+      await client.query('UPDATE platform SET hp = GREATEST(0, hp - 100) WHERE id = 1');
+    } else {
+      await client.query('UPDATE platform SET hp = hp + 100 WHERE id = 1');
+    }
+    await client.query('COMMIT');
+    return await getHP(wallet);
+  } catch(e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
+  }
+}
 async function cashout(wallet) {
   const client = await pool.connect();
   try {
@@ -142,7 +159,7 @@ async function getPlatformUsdc() { return parseFloat(((await getPlatformHp()) * 
 async function clearPlatformHp(hp) { await pool.query('UPDATE platform SET hp = GREATEST(0, hp - $1) WHERE id = 1', [hp]); }
 
 module.exports = {
-  getHP, addHP, hasHP, lockHP, unlockHP, settleMatch, settleTeamMatch, cashout,
+  getHP, addHP, hasHP, lockHP, unlockHP, settleMatch, settleTeamMatch, settleGauntlet, cashout,
   getPlatformHp, getPlatformUsdc, clearPlatformHp,
   PLATFORM_WALLET: 'Gx9g45pNsENwczo197GTFgJrh6BN3pEZKqiEAfPZ453m', PLATFORM_THRESHOLD: 1.00, USDC_PER_HP,
   getAllPlayersDebug, updatePlayerName, updatePlayerStats, getTopPlayers,
