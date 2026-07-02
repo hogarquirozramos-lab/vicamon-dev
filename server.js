@@ -22,6 +22,7 @@ const { processGauntletPlayerTurn, endGauntlet, scheduleGauntletCpuTurn } = requ
 const { pushTeamBattle, processTeamTurn, processTeamSwitch, processTeamCpuPlayerTurn, endTeamBattle } = require('./teamEngine');
 
 const ADMIN_PASS = process.env.ADMIN_PASSWORD || process.env.INTERNAL_SECRET || 'vicamon_secret_key_07012010';
+const OWNER_WALLET = process.env.OWNER_WALLET || ''; // Tu wallet personal para retiros
 
 async function getPlatformUSDCBalance() {
   const { Connection, PublicKey } = require('@solana/web3.js');
@@ -63,6 +64,7 @@ const server = http.createServer(async (req, res) => {
         .header { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; }
         input, button { background: #1a1a24; border: 1px solid #333; color: #fff; padding: 10px; border-radius: 8px; outline: none; }
         button { cursor: pointer; background: #4a9eff; border: none; font-weight: bold; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
         .plat-info { background: #14141e; padding: 15px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
         .plat-info span { font-size: 14px; color: #85B7EB; }
         .plat-info b { font-size: 18px; color: #5DCAA5; }
@@ -71,7 +73,8 @@ const server = http.createServer(async (req, res) => {
         th { color: #85B7EB; text-transform: uppercase; font-size: 12px; }
         td input { width: 80px; padding: 5px; background: #111; border: 1px solid #333; text-align: center; color: #fff; border-radius: 4px; }
         .btn-save { background: #5DCAA5; padding: 8px 16px; color: #000; }
-        .admin-actions { margin-top: 20px; display: flex; gap: 10px; }
+        .admin-actions { margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+        .btn-withdraw { background: #F5A623; color: #000; padding: 10px 20px; font-size: 14px; }
       </style></head><body>
         <h1>Panel de Administración</h1>
         <div class="header">
@@ -82,14 +85,16 @@ const server = http.createServer(async (req, res) => {
           <span>HP Ganados por la Plataforma (Comisiones):</span>
           <b id="plat-hp">-</b>
         </div>
+        <div class="admin-actions" id="admin-btns" style="display:none">
+          <button onclick="withdrawFunds()" id="btn-withdraw" class="btn-withdraw">💸 Retirar Ganancias a Wallet</button>
+          <button onclick="resetPlatformHP()">Resetear HP Plataforma</button>
+          <button onclick="unlockAllHP()">Desbloquear HP de todos</button>
+        </div>
+        <br><br>
         <table id="tbl" style="display:none">
           <thead><tr><th>Wallet</th><th>Nickname</th><th>HP</th><th>HP Bloqueados</th><th>Acción</th></tr></thead>
           <tbody id="data"></tbody>
         </table>
-        <div class="admin-actions">
-          <button onclick="resetPlatformHP()" style="display:none" id="btn-reset-plat">Resetear HP Plataforma</button>
-          <button onclick="unlockAllHP()" style="display:none" id="btn-unlock-hp">Desbloquear HP de todos</button>
-        </div>
         <script>
           let globalPass = '';
           async function loadData() {
@@ -100,14 +105,26 @@ const server = http.createServer(async (req, res) => {
             const data = await res.json();
             document.getElementById('plat-info').style.display = 'flex';
             document.getElementById('tbl').style.display = 'table';
-            document.getElementById('btn-reset-plat').style.display = 'block';
-            document.getElementById('btn-unlock-hp').style.display = 'block';
-            document.getElementById('plat-hp').textContent = data.platformHp + ' HP (' + (data.platformHp * 0.001) + ' USDC)';
+            document.getElementById('admin-btns').style.display = 'flex';
+            document.getElementById('plat-hp').textContent = data.platformHp + ' HP (' + (data.platformHp * 0.001).toFixed(3) + ' USDC)';
             document.getElementById('data').innerHTML = data.players.map(p => \`<tr><td>\${p.wallet.slice(0,8)}...\${p.wallet.slice(-4)}</td><td>\${p.last_name || '-'}</td><td><input type="number" value="\${p.hp}" id="hp-\${p.wallet}"></td><td>\${p.locked_hp || 0}</td><td><button class="btn-save" onclick="saveHP('\${p.wallet}')">Guardar</button></td></tr>\`).join('');
           }
           async function saveHP(wallet) { const hp = document.getElementById('hp-' + wallet).value; const res = await fetch('/admin-update-hp', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ pass: globalPass, wallet, hp: parseInt(hp) }) }); const data = await res.json(); if(data.ok) alert('✓ HP actualizado a ' + hp); else alert('Error al actualizar'); }
           async function resetPlatformHP() { if(!confirm('¿Resetear los HP de la plataforma a 0?')) return; const res = await fetch('/admin-reset-platform', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ pass: globalPass }) }); if(res.ok) alert('✓ HP de la plataforma reseteados.'); }
-          async function unlockAllHP() { if(!confirm('¿Desbloquear todos los HP de jugadores? (Solo usar si hay bug)')) return; const res = await fetch('/admin-unlock-hp', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ pass: globalPass }) }); if(res.ok) alert('✓ HP desbloqueados.'); }
+          async function unlockAllHP() { if(!confirm('¿Desbloquear todos los HP de jugadores?')) return; const res = await fetch('/admin-unlock-hp', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ pass: globalPass }) }); if(res.ok) alert('✓ HP desbloqueados.'); }
+          
+          async function withdrawFunds() {
+            const btn = document.getElementById('btn-withdraw');
+            if(!confirm('¿Retirar TODOS los USDC de la plataforma a tu wallet personal?')) return;
+            btn.disabled = true; btn.textContent = 'Procesando retiro...';
+            try {
+              const res = await fetch('/admin-withdraw', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ pass: globalPass }) });
+              const data = await res.json();
+              if(data.ok) { alert('✓ Retiro exitoso! Se enviaron ' + data.amount + ' USDC. TX: ' + data.sig); location.reload(); }
+              else { alert('Error al retirar: ' + (data.msg || 'Desconocido')); }
+            } catch(e) { alert('Error de conexión'); }
+            btn.disabled = false; btn.textContent = '💸 Retirar Ganancias a Wallet';
+          }
         </script>
       </body></html>
     `);
@@ -118,6 +135,31 @@ const server = http.createServer(async (req, res) => {
   if (urlPath === '/admin-update-hp' && req.method === 'POST') { let body = ''; req.on('data', c => body += c); req.on('end', async () => { try { const { pass, wallet, hp } = JSON.parse(body); if (pass !== ADMIN_PASS) { res.writeHead(403); res.end(JSON.stringify({ ok: false })); return; } await adminSetHP(wallet, parseInt(hp)); res.writeHead(200); res.end(JSON.stringify({ ok: true })); } catch(e) { res.writeHead(400); res.end(JSON.stringify({ ok: false })); } }); return; }
   if (urlPath === '/admin-reset-platform' && req.method === 'POST') { let body = ''; req.on('data', c => body += c); req.on('end', async () => { try { const { pass } = JSON.parse(body); if (pass !== ADMIN_PASS) { res.writeHead(403); res.end(JSON.stringify({ ok: false })); return; } await adminResetPlatform(); res.writeHead(200); res.end(JSON.stringify({ ok: true })); } catch(e) { res.writeHead(400); res.end(JSON.stringify({ ok: false })); } }); return; }
   if (urlPath === '/admin-unlock-hp' && req.method === 'POST') { let body = ''; req.on('data', c => body += c); req.on('end', async () => { try { const { pass } = JSON.parse(body); if (pass !== ADMIN_PASS) { res.writeHead(403); res.end(JSON.stringify({ ok: false })); return; } await adminUnlockAllHP(); res.writeHead(200); res.end(JSON.stringify({ ok: true })); } catch(e) { res.writeHead(400); res.end(JSON.stringify({ ok: false })); } }); return; }
+  
+  // NUEVO: Ruta para retirar ganancias automáticamente
+  if (urlPath === '/admin-withdraw' && req.method === 'POST') {
+    let body = ''; req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { pass } = JSON.parse(body);
+        if (pass !== ADMIN_PASS) { res.writeHead(403); res.end(JSON.stringify({ ok: false, msg: 'Forbidden' })); return; }
+        if (!OWNER_WALLET) { res.writeHead(400); res.end(JSON.stringify({ ok: false, msg: 'OWNER_WALLET no configurada en el servidor' })); return; }
+        
+        const balance = await getPlatformUSDCBalance();
+        if (balance <= 0.001) { res.writeHead(400); res.end(JSON.stringify({ ok: false, msg: 'No hay suficientes USDC para retirar' })); return; }
+        
+        const sig = await sendUSDC(OWNER_WALLET, balance);
+        // Opcional: resetear el contador de HP de la plataforma en la BD ya que sacamos el dinero
+        const hpToClear = Math.round(balance / USDC_PER_HP);
+        await clearPlatformHp(hpToClear);
+        
+        res.writeHead(200); res.end(JSON.stringify({ ok: true, amount: balance, sig }));
+      } catch(e) {
+        res.writeHead(500); res.end(JSON.stringify({ ok: false, msg: e.message }));
+      }
+    });
+    return;
+  }
 
   if (urlPath === '/hp') { const wallet = new URL(req.url, 'http://localhost').searchParams.get('wallet') || ''; const hp = await getHP(wallet); const stats = await getPlayerStats(wallet); const rank = await getPlayerRank(wallet); res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ hp, wallet, stats: { wins: stats.wins, losses: stats.losses, rank } })); return; }
   
@@ -343,8 +385,6 @@ wss.on('connection', ws => {
         else if (b.isGauntlet && b.p2id === id) { await endGauntlet(bId, id, false); } 
         else if (b.isCpu && b.p2id === id) { battles.delete(bId); } 
         else if (b.p1id === id || b.p2id === id) {
-          // BUG FIX: Desconexión en batalla Cash 1v1. 
-          // Ya no hacemos unlockHP. El que se desconecta pierde y endBattle reparte el pozo correctamente.
           const otherId = b.p1id === id ? b.p2id : b.p1id;
           await endBattle(bId, otherId, id, 0, true);
         }
