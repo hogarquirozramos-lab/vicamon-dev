@@ -244,30 +244,23 @@ async function processTeamCpuPlayerTurn(bId, playerId, atkIndex) {
 
 async function processTeamSwitch(bId, playerId, switchToIndex) {
   const b = battles.get(bId); if (!b) return;
-  
-  // FIX DEL CONGELAMIENTO: Solo se puede cambiar si es tu turno (turnId === playerId) 
-  // o si estás forzado a cambiar (turnId === -4)
   if (b.turnId !== -4 && b.turnId !== playerId) {
     const player = lobby.get(playerId);
     if (player) send(player.ws, { type: 'error', msg: 'No es tu turno para cambiar.' });
     return;
   }
-
   const isP1 = b.p1id === playerId;
   const isCpu = b.isTeamCpu;
   const player = lobby.get(playerId);
-  
   const team = isP1 ? b.team1 : b.team2;
   if (switchToIndex < 0 || switchToIndex >= team.length) return;
   if (team[switchToIndex].hp <= 0) {
     send(player.ws, { type: 'error', msg: 'Ese Vicamon está debilitado.' });
     return;
   }
-  
   if (isP1) b.active1 = switchToIndex; else b.active2 = switchToIndex;
   const beastName = BEASTS[player.team[switchToIndex]].name;
   b.logs.push({t: `${player.name} cambia a ${beastName}`, c: 'special'});
-  
   if(isCpu) {
     b.turnId = CPU_ID;
     pushTeamCpuBattle(bId);
@@ -282,5 +275,6 @@ module.exports = {
   pushTeamBattle, pushTeamCpuBattle,
   processTeamTurn, processTeamSwitch,
   processTeamCpuPlayerTurn,
-  doTeamCpuTurn
+  doTeamCpuTurn,
+  endTeamBattle // EXPORTADO CORRECTAMENTE
 };
