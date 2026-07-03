@@ -30,6 +30,29 @@ function pushTeamCpuBattle(bId) {
   send(pl.ws, { type: 'battle_state', battleId: bId, p1: cpuSide, p2: plSide, logs: b.logs.slice(-14), isTeamBattle: true, yourTurn: b.turnId !== CPU_ID });
 }
 
+// NUEVO: Función mágica que desbloquea el juego si alguien está aturdido o recargando
+function autoResolveTeamIfBlocked(bId) {
+  const b = battles.get(bId); if (!b) return;
+  const currentId = b.turnId;
+  // Si es turno de la IA, de pausa por muerte o pausa por torre, no hacer nada
+  if (currentId === CPU_ID || currentId === -4 || currentId === -2) return; 
+
+  const isP1 = b.p1id === currentId;
+  const currentSt = isP1 ? b.team1[b.active1] : b.team2[b.active2];
+  const isCpu = b.isTeamCpu;
+
+  if (currentSt.stun || currentSt.recharge > 0) {
+    setTimeout(async () => {
+      const bb = battles.get(bId); if (!bb || bb.turnId !== currentId) return;
+      if (isCpu) {
+        await processTeamCpuPlayerTurn(bId, currentId, -1);
+      } else {
+        await processTeamTurn(bId, currentId, -1);
+      }
+    }, 900);
+  }
+}
+
 async function endTeamBattle(bId, winnerId, loserId, winnerRemainingHp) {
   const b = battles.get(bId);
   const isTraining = b?.isTeamTraining || false;
@@ -39,7 +62,6 @@ async function endTeamBattle(bId, winnerId, loserId, winnerRemainingHp) {
   const hp = Math.max(0, Math.min(300, winnerRemainingHp));
   
   if (isTraining || isCpu) {
-    // ARREGLADO: Simula apuesta de 300 + HP restante del equipo. Máximo 600 XP.
     let winnerXp = 300 + hp; 
     let loserXp = 0;
     if(winner) winner.ws.send(JSON.stringify({ type:'battle_end', won:true, isTeamBattle:true, isTraining:true, winnerXp, loserXp }));
@@ -152,7 +174,7 @@ async function processTeamTurn(bId, attackerId, atkIndex) {
     if (!atk) return false;
     if (aSt.pp[atkIndex] <= 0) {
       b.logs.push({t: `${aPlayer.name} intentó usar ${atk.n} pero no tiene PP. ¡Turno perdido!`, c: 'bad'});
-      b.turnId = isP1 ? b.p2id : b.p1id; pushTeamBattle(bId); return false;
+      b.turnId = isP1 ? b.p2id : b.p1id; pushTeamBattle(bId); autoResolveTeamIfBlocked(bId); return false;
     }
     if (aSt.pp[atkIndex] < 99) aSt.pp[atkIndex]--;
     b.logs.push(...applyAtk(aSt, dSt, atk, BEASTS[atkKey].name));
@@ -160,6 +182,7 @@ async function processTeamTurn(bId, attackerId, atkIndex) {
   }
   b.turnId = isP1 ? b.p2id : b.p1id;
   pushTeamBattle(bId);
+  autoResolveTeamIfBlocked(bId);
   return false;
 }
 
@@ -185,15 +208,7 @@ async function doTeamCpuTurn(bId) {
 
   b.turnId = plId;
   pushTeamCpuBattle(bId);
-
-  const bb = battles.get(bId); if (!bb) return;
-  const plStNow = bb.team2[bb.active2];
-  if (plStNow.stun || plStNow.recharge > 0) {
-    setTimeout(async () => { 
-      const bbb = battles.get(bId); if (!bbb || bbb.turnId !== plId) return; 
-      await processTeamCpuPlayerTurn(bId, plId, -1); 
-    }, 900);
-  }
+  autoResolveTeamIfBlocked(bId);
 }
 
 async function processTeamCpuPlayerTurn(bId, playerId, atkIndex) {
