@@ -9,7 +9,6 @@ const {
 } = require('@solana/spl-token');
 const fs   = require('fs');
 const path = require('path');
-const bs58 = require('bs58'); // NUEVO: Para leer la llave en formato texto
 
 const USDC_MINT  = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'); // mainnet
 const DECIMALS   = 6;
@@ -30,9 +29,8 @@ async function getWorkingConnection() {
   return new Connection(RPCS[0], 'confirmed');
 }
 
-const connection = new Connection(RPCS[0], 'confirmed');
-
-function loadPlatformWallet() {
+// CORRECCIÓN: Función async para poder importar bs58 de forma dinámica
+async function loadPlatformWallet() {
   // 1. Si estamos en la nube (Render), usar la variable de entorno secreta
   const secretEnv = process.env.PLATFORM_WALLET_SECRET;
   if (secretEnv) {
@@ -42,7 +40,9 @@ function loadPlatformWallet() {
         const secret = JSON.parse(secretEnv);
         return Keypair.fromSecretKey(Uint8Array.from(secret));
       }
-      // Si es texto (formato nuevo Base58)
+      // Si es texto (formato nuevo Base58 de Phantom)
+      // Importamos bs58 dinámicamente porque la versión 6 es ESM y da error con require()
+      const bs58 = (await import('bs58')).default;
       const secretKey = bs58.decode(secretEnv);
       return Keypair.fromSecretKey(secretKey);
     } catch(e) {
@@ -56,7 +56,7 @@ function loadPlatformWallet() {
 }
 
 async function sendUSDC(toWalletAddress, amountUSDC) {
-  const platform    = loadPlatformWallet();
+  const platform    = await loadPlatformWallet(); // Ahora esperamos a que cargue
   const toPublicKey = new PublicKey(toWalletAddress);
   const amount      = Math.round(amountUSDC * Math.pow(10, DECIMALS));
   const conn        = await getWorkingConnection();
