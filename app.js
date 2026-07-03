@@ -220,7 +220,17 @@ function confirmTeam() {
     show('s-lobby');
     return;
   }
-  const isTraining = pendingIsTraining || pendingChallengeTargetId === null;
+  
+  // CORRECCIÓN DEFINITIVA: Calcular si es entrenamiento de forma segura
+  let isTraining;
+  if (pendingFrom !== null) {
+    // Si estamos ACEPTANDO un reto, usamos la bandera que nos mandó el retador
+    isTraining = pendingIsTraining;
+  } else {
+    // Si estamos INICIANDO un reto (vs Master o vs jugador), verificamos las reglas
+    isTraining = pendingIsTraining || pendingChallengeTargetId === null;
+  }
+
   const mode3v3 = teamSelectionMode === '3v3';
   if(mode3v3) { myTeam = selectedTeam.slice(); } else { myBeast = selectedTeam[0]; myTeam = [myBeast]; }
   if(ws && ws.readyState === 1) { if(!mode3v3) ws.send(JSON.stringify({type:'change_beast', beast: myBeast})); }
