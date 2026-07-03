@@ -24,7 +24,7 @@ let myTeam = [];
 let isGauntletChallenge = false;
 let lastMsgTime = Date.now(); 
 
-let platformWalletAddress = ''; // NUEVO: Guardará la wallet de la plataforma
+let platformWalletAddress = ''; 
 
 const audioFiles = {
     lobby: new Audio('Audio/lobby.mp3'),
@@ -47,17 +47,15 @@ document.addEventListener('click', (e) => { if(e.target.closest('.btn')) playSfx
 window.addEventListener('load', () => { 
   const btnG = document.getElementById('btn-gauntlet'); 
   if (btnG) btnG.style.display = GAUNTLET_HABILITADO ? 'inline-block' : 'none'; 
-  fetchPlatformWallet(); // NUEVO: Obtener la wallet al cargar
+  fetchPlatformWallet(); 
 });
 
-// NUEVO: Obtiene la wallet de la plataforma desde el servidor
 async function fetchPlatformWallet() {
   try {
     const res = await fetch('/platform-wallet');
     const data = await res.json();
     if (data.wallet) {
       platformWalletAddress = data.wallet;
-      // Actualizar el HTML estático del login si existe
       const loginWalletSpan = document.querySelector('#step-charge div[onclick="copyWallet()"] span');
       if (loginWalletSpan) loginWalletSpan.textContent = platformWalletAddress;
     }
@@ -66,7 +64,6 @@ async function fetchPlatformWallet() {
 
 async function disconnectWallet() { try { const phantom = getPhantom(); if (phantom && phantom.isConnected) await phantom.disconnect(); } catch(e) {} myWallet = ''; myName = ''; myBeast = ''; if(ws) { try { ws.close(); } catch(e){} } document.getElementById('btn-phantom').style.display='flex'; document.getElementById('wallet-connected').style.display='none'; document.getElementById('no-phantom').style.display='none'; document.getElementById('inp-name').value = ''; show('s-login'); }
 
-// ACTUALIZADO: Ahora copia la wallet real dinámica
 function copyWallet() { 
   if (!platformWalletAddress) return alert('La wallet no se ha cargado aún.');
   navigator.clipboard.writeText(platformWalletAddress).then(() => { 
@@ -74,7 +71,6 @@ function copyWallet() {
   }).catch(() => alert('Dirección: ' + platformWalletAddress)); 
 }
 
-// ACTUALIZADO: Muestra la wallet real dinámica
 function depositWidgetHTML() { 
   const walletAddr = platformWalletAddress || 'Cargando...';
   return `<div style="background:rgba(74,158,255,.06);border:0.5px solid rgba(74,158,255,.2);border-radius:10px;padding:10px 12px"><div style="font-size:11px;color:#85B7EB;margin-bottom:4px">💡 Deposita USDC para retar jugadores</div><div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:7px">0.10 USDC = 100 HP · cualquier monto funciona</div><div style="display:flex;gap:6px;align-items:center"><div style="flex:1;background:rgba(0,0,0,.35);border-radius:6px;padding:6px 8px;font-family:monospace;font-size:9px;color:#85B7EB;word-break:break-all;cursor:pointer" onclick="copyWallet()">${walletAddr} <span style="color:rgba(255,255,255,.3)">📋</span></div><button class="btn btn-sm" style="font-size:10px;white-space:nowrap;padding:5px 10px" onclick="checkHPNow()">Verificar HP</button></div></div>`; 
@@ -297,7 +293,6 @@ function handleMsg(m){
     window._isTeamBattle = !!m.isTeamBattle;
     const empty={hp:100,maxHp:100,poisonDmg:0,poisonTurns:0,burnDmg:0,burnTurns:0,shield:0,shieldReflect:0,reflect50:0,stun:false,recharge:0,regen:0,regenTurns:0,blind:0,weakAtk:0,weaken:0,corrode:0,analyzed:0,lastDmgReceived:0,pp:[]};
     mySt={...empty}; oppSt={...empty};
-    window._isCpuBattle=!!m.isCpu; window._isTrainingBattle=!!m.isTraining; window._isGauntlet=!!m.isGauntlet;
     const isCpu=!!m.isCpu; const isTraining=!!m.isTraining;
     let startMsg = `¡Combate! ${myName} vs ${oppName}`;
     if(isTraining) startMsg = `¡Entrenamiento! ${myName} vs ${oppName}`;
@@ -317,9 +312,11 @@ function handleMsg(m){
   if(m.type==='hp_updated'){ updateHPDisplay(m.hp); myCurrentHP=m.hp; }
   if(m.type==='cashout_result'){ const btn=document.getElementById('btn-cashout'); if(!m.ok){ if(btn){btn.disabled=false;btn.textContent='💰 Cashout';} alert('Error: '+m.reason); return; } if(m.status==='confirmed'){ if(btn){btn.disabled=false;btn.textContent='💰 Cashout';} updateHPDisplay(0); alert(`✓ Cashout: ${m.usdc} USDC`); } }
   if(m.type==='error'){ alert('⚠ ' + m.msg); }
+  
   if(m.type==='battle_end'){
     const won=m.won; 
-    // CORRECCIÓN: Limpiar banderas persistentes que causan bugs
+    
+    // CORRECCIÓN DEFINITIVA: Solo creemos en lo que el servidor nos dice EN ESTE MENSAJE
     const isCpuResult = m.isCpu === true; 
     const isTrainingResult = m.isTraining === true;
     const isGauntletResult = m.isGauntlet === true; 
@@ -329,11 +326,12 @@ function handleMsg(m){
     const newHp=m.newHp||0; 
     if(m.stats) updateProfileUI(m.stats); 
     show('s-result');
+    
+    // Actualizar HP en la UI solo si es batalla real (Cash)
     if(!isCpuResult && !isTrainingResult) updateHPDisplay(newHp); 
     if(isGauntletResult) updateHPDisplay(newHp); 
     if(isTeamResult && !isTrainingResult) updateHPDisplay(newHp);
     
-    const b1=BEASTS[myBeast],b2=BEASTS[oppBeast]; 
     let resultBody='';
     
     if(isTeamResult && isTrainingResult){
