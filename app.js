@@ -319,10 +319,11 @@ function handleMsg(m){
   if(m.type==='error'){ alert('⚠ ' + m.msg); }
   if(m.type==='battle_end'){
     const won=m.won; 
-    const isCpuResult=m.isCpu||window._isCpuBattle; 
-    const isTrainingResult=m.isTraining === true || (window._isTrainingBattle && m.isTraining !== false);
-    const isGauntletResult=m.isGauntlet || window._isGauntlet; 
-    const isTeamResult = m.isTeamBattle || window._isTeamBattle;
+    // CORRECCIÓN: Limpiar banderas persistentes que causan bugs
+    const isCpuResult = m.isCpu === true; 
+    const isTrainingResult = m.isTraining === true;
+    const isGauntletResult = m.isGauntlet === true; 
+    const isTeamResult = m.isTeamBattle === true;
     
     const winnerHp=m.winnerHp||0; 
     const newHp=m.newHp||0; 
