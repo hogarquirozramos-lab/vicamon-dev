@@ -107,16 +107,14 @@ async function endBattle(bId, winnerId, loserId, winnerHp, forfeit=false) {
   const hp = forfeit ? 100 : Math.max(0, Math.min(100, winnerHp));
 
   if (isTraining) {
-    // ARREGLADO: Simula apuesta de 100 + HP restante
     const winnerXp = forfeit ? 0 : 100 + Math.max(0, Math.min(100, winnerHp));
     const loserXp = 0;
-    if(winner) winner.ws.send(JSON.stringify({ type:'battle_end', won:true, isTraining:true, winnerXp, loserXp, forfeit }));
-    if(loser) loser.ws.send(JSON.stringify({ type:'battle_end', won:false, isTraining:true, winnerXp, loserXp }));
+    if(winner) winner.ws.send(JSON.stringify({ type:'battle_end', won:true, isTraining:true, isCpu:false, winnerXp, loserXp, forfeit }));
+    if(loser) loser.ws.send(JSON.stringify({ type:'battle_end', won:false, isTraining:true, isCpu:false, winnerXp, loserXp }));
   } else if (isCpu) {
-    // ARREGLADO: Simula apuesta de 100 + HP restante
     const winnerXp = forfeit ? 0 : 100 + Math.max(0, Math.min(100, winnerHp));
-    if(winner) winner.ws.send(JSON.stringify({ type:'battle_end', won:true, isCpu:true, winnerXp, loserXp:0, winnerHp:hp, forfeit }));
-    if(loser) loser.ws.send(JSON.stringify({ type:'battle_end', won:false, isCpu:true, winnerXp, loserXp:0, winnerHp:hp }));
+    if(winner) winner.ws.send(JSON.stringify({ type:'battle_end', won:true, isCpu:true, isTraining:false, winnerXp, loserXp:0, winnerHp:hp, forfeit }));
+    if(loser) loser.ws.send(JSON.stringify({ type:'battle_end', won:false, isCpu:true, isTraining:false, winnerXp, loserXp:0, winnerHp:hp }));
   } else {
     const winnerWallet = winner?.wallet || '';
     const loserWallet = loser?.wallet || '';
@@ -128,8 +126,9 @@ async function endBattle(bId, winnerId, loserId, winnerHp, forfeit=false) {
     const lRank = await getPlayerRank(loserWallet);
     const winnerUsdc = parseFloat(((100 + hp) * USDC_PER_HP).toFixed(3));
     const platformUsdc = parseFloat(((100 - hp) * USDC_PER_HP).toFixed(3));
-    if(winner) winner.ws.send(JSON.stringify({ type:'battle_end', won:true, isCpu:false, winnerHp:hp, winnerUsdc, platformUsdc, newHp: result.winnerNewHp, forfeit, stats: { wins: wStats.wins, losses: wStats.losses, rank: wRank } }));
-    if(loser) loser.ws.send(JSON.stringify({ type:'battle_end', won:false, isCpu:false, winnerHp:hp, winnerUsdc, platformUsdc, newHp: await getHP(loserWallet), stats: { wins: lStats.wins, losses: lStats.losses, rank: lRank } }));
+    // CORRECCIÓN: Se envía explícitamente isCpu: false e isTraining: false
+    if(winner) winner.ws.send(JSON.stringify({ type:'battle_end', won:true, isCpu:false, isTraining:false, winnerHp:hp, winnerUsdc, platformUsdc, newHp: result.winnerNewHp, forfeit, stats: { wins: wStats.wins, losses: wStats.losses, rank: wRank } }));
+    if(loser) loser.ws.send(JSON.stringify({ type:'battle_end', won:false, isCpu:false, isTraining:false, winnerHp:hp, winnerUsdc, platformUsdc, newHp: await getHP(loserWallet), stats: { wins: lStats.wins, losses: lStats.losses, rank: lRank } }));
     const top = await getTopPlayers(3);
     broadcast({ type: 'leaderboard_update', top });
   }
