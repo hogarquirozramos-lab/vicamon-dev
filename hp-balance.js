@@ -15,6 +15,9 @@ pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS last_name VARCHAR(20);`
 
 const USDC_PER_HP = 0.001;
 
+// UNIFICACIÓN: Tu wallet real de la plataforma.
+const PLATFORM_WALLET = process.env.PLATFORM_WALLET || 'U3jwNBDnw4kCQ5CYRp5mAf4hbr4dadyUGXDhXdyLXMv';
+
 async function getAllPlayersDebug() { const res = await pool.query('SELECT wallet, hp, locked_hp, wins, losses, last_name FROM players'); return res.rows; }
 async function isTxProcessed(signature) { const res = await pool.query('SELECT 1 FROM processed_txs WHERE signature = $1', [signature]); return res.rows.length > 0; }
 async function markTxProcessed(signature) { await pool.query('INSERT INTO processed_txs (signature) VALUES ($1) ON CONFLICT DO NOTHING', [signature]); }
@@ -42,7 +45,7 @@ async function clearPlatformHp(hp) { await pool.query('UPDATE platform SET hp = 
 module.exports = {
   getHP, addHP, hasHP, lockHP, unlockHP, settleMatch, settleTeamMatch, settleGauntlet, cashout,
   getPlatformHp, getPlatformUsdc, clearPlatformHp,
-  PLATFORM_WALLET: 'Gx9g45pNsENwczo197GTFgJrh6BN3pZ453m', PLATFORM_THRESHOLD: 1.00, USDC_PER_HP,
+  PLATFORM_WALLET, PLATFORM_THRESHOLD: 1.00, USDC_PER_HP,
   getAllPlayersDebug, updatePlayerName, updatePlayerStats, getTopPlayers,
   getPlayerStats, getPlayerRank,
   isTxProcessed, markTxProcessed,
