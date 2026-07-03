@@ -2,7 +2,7 @@ const BEASTS = require('./beasts.js');
 const { lobby, battles, send, broadcast, pushLobby } = require('./state');
 const { applyAtk, tickEffects, getStartState } = require('./battleEngine');
 const { settleTeamMatch, updatePlayerStats, getPlayerStats, getPlayerRank, getTopPlayers } = require('./hp-balance');
-const { cpuPickAttack } = require('./cpuAI'); // NUEVO: Importar IA unificada
+const { cpuPickAttack } = require('./cpuAI');
 
 const CPU_ID = -1;
 const CPU_NAME = 'Zodiac Master';
@@ -39,17 +39,9 @@ async function endTeamBattle(bId, winnerId, loserId, winnerRemainingHp) {
   const hp = Math.max(0, Math.min(300, winnerRemainingHp));
   
   if (isTraining || isCpu) {
-    // ARREGLADO: Cálculo de XP para entrenamientos 3v3
-    let winnerXp = 0, loserXp = 0;
-    if (winner) {
-      const winnerTeamStates = (b.p1id === winnerId) ? b.team1 : b.team2;
-      const winnerActive = (b.p1id === winnerId) ? b.active1 : b.active2;
-      const unusedBeasts = winnerTeamStates.filter((st, i) => i !== winnerActive && st.hp > 0).length;
-      winnerXp = 300 + (unusedBeasts * 100) + hp;
-    }
-    if(loser) {
-      loserXp = 50; // Consolation XP
-    }
+    // ARREGLADO: Simula apuesta de 300 + HP restante del equipo. Máximo 600 XP.
+    let winnerXp = 300 + hp; 
+    let loserXp = 0;
     if(winner) winner.ws.send(JSON.stringify({ type:'battle_end', won:true, isTeamBattle:true, isTraining:true, winnerXp, loserXp }));
     if(loser) loser.ws.send(JSON.stringify({ type:'battle_end', won:false, isTeamBattle:true, isTraining:true, winnerXp, loserXp }));
   } else {
@@ -184,7 +176,7 @@ async function doTeamCpuTurn(bId) {
   if (cpuSt.stun) { cpuSt.stun = false; b.logs.push({t: `${CPU_NAME} aturdido — pierde turno`, c: 'special'}); } 
   else if (cpuSt.recharge > 0) { cpuSt.recharge--; b.logs.push({t: `${CPU_NAME} recargando...`, c: 'special'}); } 
   else {
-    const idx = cpuPickAttack(cpuSt, plSt, b.cpuTeam[b.active1]); // USA IA UNIFICADA
+    const idx = cpuPickAttack(cpuSt, plSt, b.cpuTeam[b.active1]);
     const atk = BEASTS[b.cpuTeam[b.active1]].attacks[idx];
     if (cpuSt.pp[idx] < 99) cpuSt.pp[idx]--;
     b.logs.push(...applyAtk(cpuSt, plSt, atk, BEASTS[b.cpuTeam[b.active1]].name));
