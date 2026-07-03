@@ -107,12 +107,14 @@ async function endBattle(bId, winnerId, loserId, winnerHp, forfeit=false) {
   const hp = forfeit ? 100 : Math.max(0, Math.min(100, winnerHp));
 
   if (isTraining) {
-    const winnerXp = forfeit ? 0 : Math.max(0, Math.min(100, winnerHp));
+    // ARREGLADO: Simula apuesta de 100 + HP restante
+    const winnerXp = forfeit ? 0 : 100 + Math.max(0, Math.min(100, winnerHp));
     const loserXp = 0;
     if(winner) winner.ws.send(JSON.stringify({ type:'battle_end', won:true, isTraining:true, winnerXp, loserXp, forfeit }));
     if(loser) loser.ws.send(JSON.stringify({ type:'battle_end', won:false, isTraining:true, winnerXp, loserXp }));
   } else if (isCpu) {
-    const winnerXp = forfeit ? 0 : Math.max(0, Math.min(100, winnerHp));
+    // ARREGLADO: Simula apuesta de 100 + HP restante
+    const winnerXp = forfeit ? 0 : 100 + Math.max(0, Math.min(100, winnerHp));
     if(winner) winner.ws.send(JSON.stringify({ type:'battle_end', won:true, isCpu:true, winnerXp, loserXp:0, winnerHp:hp, forfeit }));
     if(loser) loser.ws.send(JSON.stringify({ type:'battle_end', won:false, isCpu:true, winnerXp, loserXp:0, winnerHp:hp }));
   } else {
