@@ -73,7 +73,7 @@ function copyWallet() {
 
 function depositWidgetHTML() { 
   const walletAddr = platformWalletAddress || 'Cargando...';
-  return `<div style="background:rgba(74,158,255,.06);border:0.5px solid rgba(74,158,255,.2);border-radius:10px;padding:10px 12px"><div style="font-size:11px;color:#85B7EB;margin-bottom:4px">💡 Deposita USDC para retar jugadores</div><div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:7px">0.10 USDC = 100 HP · cualquier monto funciona</div><div style="display:flex;gap:6px;align-items:center"><div style="flex:1;background:rgba(0,0,0,.35);border-radius:6px;padding:6px 8px;font-family:monospace;font-size:9px;color:#85B7EB;word-break:break-all;cursor:pointer" onclick="copyWallet()">${walletAddr} <span style="color:rgba(255,255,255,.3)">📋</span></div><button class="btn btn-sm" style="font-size:10px;white-space:nowrap;padding:5px 10px" onclick="checkHPNow()">Verificar HP</button></div></div>`; 
+  return `<div style="background:rgba(74,158,255,.06);border:0.5px solid rgba(74,158,255,.2);border-radius:10px;padding:10px 12px"><div style="font-size:11px;color:#85B7EB;margin-bottom:4px">💡 Deposita USDC para obtener HP</div><div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:7px">0.10 USDC = 100 HP · cualquier monto funciona</div><div style="display:flex;gap:6px;align-items:center"><div style="flex:1;background:rgba(0,0,0,.35);border-radius:6px;padding:6px 8px;font-family:monospace;font-size:9px;color:#85B7EB;word-break:break-all;cursor:pointer" onclick="copyWallet()">${walletAddr} <span style="color:rgba(255,255,255,.3)">📋</span></div><button class="btn btn-sm" style="font-size:10px;white-space:nowrap;padding:5px 10px" onclick="checkHPNow()">Verificar HP</button></div></div>`; 
 }
 
 function getPhantom() { return window.phantom?.solana || window.solana || null; }
@@ -165,7 +165,7 @@ function dmgClassPick(a){ if(a.d===0) return 'dmg-zero'; const e=a.fx==='double'
 function buildBestiary(){ const keys=Object.entries(BEASTS); let html=''; const cats = {}; keys.forEach(([k,b])=>{ if(!cats[b.cat]) cats[b.cat] = []; cats[b.cat].push({k,b}); }); for(const catName in cats){ html += `<div style="grid-column:1/-1; margin-top:15px; border-bottom:0.5px solid rgba(255,255,255,.2); padding-bottom:5px; color:#CFA9EC; font-weight:600; text-transform:uppercase; letter-spacing:.08em; font-size:13px">✦ ${catName} Series</div>`; cats[catName].forEach(({k,b})=>{ html+=`<div class="bcard" id="bc-${k}" onclick="showBestiaryDetail('${k}')"><img src="${b.img}" alt="${b.name}"><div class="bname">${b.name}</div><div class="bsub">${b.sub}</div><span class="bstyle" style="${STCSS[b.style]}">${b.style}</span><div class="elbar" style="background:${EL[b.el]}"></div></div>`; }); } html+=`<div class="beast-detail" id="bestiary-detail-panel"></div>`; document.getElementById('bestiary-grid').innerHTML=html; }
 function showBestiaryDetail(k){ const b=BEASTS[k]; const panel=document.getElementById('bestiary-detail-panel'); const statData={atk:{aries:70,tauro:55,geminis:65,cancer:45,leo:70,virgo:60,libra:62,escorpio:65,sagitario:68,capricornio:50,acuario:72,piscis:58},def:{aries:30,tauro:90,geminis:50,cancer:95,leo:65,virgo:70,libra:62,escorpio:55,sagitario:55,capricornio:92,acuario:45,piscis:68},spd:{aries:90,tauro:30,geminis:80,cancer:40,leo:70,virgo:65,libra:62,escorpio:70,sagitario:75,capricornio:35,acuario:85,piscis:60}}; const atksHtml=b.attacks.map(a=>{ const tags=[]; if(a.pierce) tags.push('<span class="atk-tag tag-pierce">Ignora escudo</span>'); if(a.fx==='double') tags.push('<span class="atk-tag tag-nobreak">Doble golpe</span>'); if(a.fx==='triple') tags.push('<span class="atk-tag tag-nobreak">Triple golpe</span>'); if(a.risk||a.self>0) tags.push(`<span class="atk-tag tag-risk">Riesgo${a.self>0?' -'+a.self+' HP':''}</span>`); if(a.buff) tags.push('<span class="atk-tag tag-buff">Buff</span>'); if(a.dot) tags.push('<span class="atk-tag tag-dot">Daño/turno</span>'); if(a.debuff) tags.push('<span class="atk-tag tag-debuff">Debuff</span>'); const ppText = a.pp === 99 || a.pp === undefined ? 'PP: ∞' : `PP: ${a.pp}`; return `<div class="bd-atk"><div class="bd-atk-top"><span class="bd-atk-name">${a.n}</span><span class="bd-atk-dmg ${dmgClassPick(a)}">${dmgLabelPick(a)}</span></div>${tags.length?`<div class="bd-atk-tags">${tags.join('')}</div>`:''}<div class="bd-atk-desc">${a.desc}</div><div style="display:flex;justify-content:space-between;align-items:center"><div class="bd-atk-acc">${a.acc}% precisión</div><div class="bd-atk-pp">${ppText}</div></div></div>`; }).join(''); panel.innerHTML=`<div class="bd-left"><img src="${b.img}" alt="${b.name}"><div class="bd-name">${b.name}</div><div class="bd-sub">${b.sub}</div><div class="bd-stats"><div class="bd-stat"><div class="bd-stat-val">${statData.atk[k]||'—'}</div><div class="bd-stat-lbl">ATK</div></div><div class="bd-stat"><div class="bd-stat-val">${statData.def[k]||'—'}</div><div class="bd-stat-lbl">DEF</div></div><div class="bd-stat"><div class="bd-stat-val">${statData.spd[k]||'—'}</div><div class="bd-stat-lbl">VEL</div></div></div></div><div class="bd-attacks">${atksHtml}</div>`; panel.classList.add('open'); panel.scrollIntoView({behavior:'smooth',block:'nearest'}); }
 
-function goProfile(){ if(!myWallet){alert('Primero conecta tu wallet Phantom');return;} myName=document.getElementById('inp-name').value.trim(); if(!myName){alert('Escribe tu nombre de combate');return;} localStorage.setItem('vicamon_nick', myName); updateProfileUI(); buildBestiary(); show('s-profile'); updateHPDisplay(myCurrentHP); checkHPNow(false); }
+function goProfile(){ if(!myWallet){alert('Primero conecta tu wallet Phantom');return;} myName=document.getElementById('inp-name').value.trim(); if(!myName){alert('Escribe tu nombre de combate');return;} localStorage.setItem('vicamon_nick', myName); updateProfileUI(); buildBestiary(); show('s-profile'); updateHPDisplay(myCurrentHP); checkHPNow(false); const profWidget = document.getElementById('profile-deposit-widget'); if(profWidget) profWidget.innerHTML = depositWidgetHTML(); }
 
 function toggleEditName() { const box = document.getElementById('edit-name-box'); const input = document.getElementById('inp-edit-name'); if (box.style.display === 'none' || box.style.display === '') { input.value = myName; box.style.display = 'block'; } else { box.style.display = 'none'; } }
 function saveNickname() { const newName = document.getElementById('inp-edit-name').value.trim(); if (!newName) return alert('Ingresa un nombre válido'); myName = newName; localStorage.setItem('vicamon_nick', myName); document.getElementById('profile-name').textContent = myName; document.getElementById('edit-name-box').style.display = 'none'; if (ws && ws.readyState === 1) ws.send(JSON.stringify({type:'update_nickname', name: myName})); updateLobbyBadge(); }
@@ -220,17 +220,12 @@ function confirmTeam() {
     show('s-lobby');
     return;
   }
-  
-  // CORRECCIÓN DEFINITIVA: Calcular si es entrenamiento de forma segura
   let isTraining;
   if (pendingFrom !== null) {
-    // Si estamos ACEPTANDO un reto, usamos la bandera que nos mandó el retador
     isTraining = pendingIsTraining;
   } else {
-    // Si estamos INICIANDO un reto (vs Master o vs jugador), verificamos las reglas
     isTraining = pendingIsTraining || pendingChallengeTargetId === null;
   }
-
   const mode3v3 = teamSelectionMode === '3v3';
   if(mode3v3) { myTeam = selectedTeam.slice(); } else { myBeast = selectedTeam[0]; myTeam = [myBeast]; }
   if(ws && ws.readyState === 1) { if(!mode3v3) ws.send(JSON.stringify({type:'change_beast', beast: myBeast})); }
@@ -325,8 +320,6 @@ function handleMsg(m){
   
   if(m.type==='battle_end'){
     const won=m.won; 
-    
-    // CORRECCIÓN DEFINITIVA: Solo creemos en lo que el servidor nos dice EN ESTE MENSAJE
     const isCpuResult = m.isCpu === true; 
     const isTrainingResult = m.isTraining === true;
     const isGauntletResult = m.isGauntlet === true; 
@@ -337,7 +330,6 @@ function handleMsg(m){
     if(m.stats) updateProfileUI(m.stats); 
     show('s-result');
     
-    // Actualizar HP en la UI solo si es batalla real (Cash)
     if(!isCpuResult && !isTrainingResult) updateHPDisplay(newHp); 
     if(isGauntletResult) updateHPDisplay(newHp); 
     if(isTeamResult && !isTrainingResult) updateHPDisplay(newHp);
@@ -381,10 +373,45 @@ function animHit(side, dmg){ const spr=document.getElementById('spr-'+side); if(
 function animAttack(side){ const spr=document.getElementById('spr-'+side); if(!spr) return; spr.classList.remove('anim-attack'); void spr.offsetWidth; spr.classList.add('anim-attack'); setTimeout(()=>spr.classList.remove('anim-attack'),400); }
 function updateLobbyBadge(){ document.getElementById('lbl-myname').textContent=myName; const hpEl = document.getElementById('lbl-myhp'); if(hpEl) hpEl.textContent = myCurrentHP + ' HP'; const b=BEASTS[myBeast]; if(b) document.getElementById('badge-img').src=b.img; }
 let _lastLobbyPlayers=[]; function renderLobbyFromCache(){ renderLobby(_lastLobbyPlayers); }
-function renderLobby(others){ _lastLobbyPlayers=others; const list=document.getElementById('players-list'); const myHp=myCurrentHP; const hpWarnEl=document.getElementById('lobby-hp-warn'); if(hpWarnEl) hpWarnEl.style.display=myHp<100?'block':'none'; if(!others.length){list.innerHTML='<p class="empty-lobby">No hay otros jugadores...</p>';return;} list.innerHTML=others.map(p=>{ const b=BEASTS[p.beast]||{name:p.beast,img:''}; const rivalHp=p.hp||0; const canChallenge = myHp >= 100 && rivalHp >= 100; const hpColor=rivalHp>=100?'#5DCAA5':'#F0997B'; return `<div class="p-row"><div class="p-info"><img class="p-img" src="${b.img}"><div><div class="p-name">${p.name}</div><div class="p-beast">${b.name} · <span style="color:${hpColor};font-size:10px">${rivalHp} HP</span></div></div></div><div style="display:flex;gap:6px"><button class="btn btn-sm" style="background:rgba(130,80,180,.15);border:1px solid rgba(130,80,180,.35);color:#CFA9EC" onclick="openChallengeMenu(${p.id},'${p.name}', true)">🤝 Entrenar</button><button class="btn btn-blue btn-sm" ${canChallenge?'':'disabled'} onclick="openChallengeMenu(${p.id},'${p.name}', false)">⚔️ Retar</button></div></div>`; }).join(''); }
+function renderLobby(others){ 
+  _lastLobbyPlayers=others; 
+  const list=document.getElementById('players-list'); 
+  const myHp=myCurrentHP; 
+  const hpWarnEl=document.getElementById('low-hp-warning'); 
+  if(hpWarnEl) {
+    hpWarnEl.style.display = 'block'; 
+    const warnMsg = hpWarnEl.querySelector('div:first-child');
+    if (warnMsg) warnMsg.style.display = myHp < 100 ? 'block' : 'none';
+  }
+  if(!others.length){list.innerHTML='<p class="empty-lobby">No hay otros jugadores...</p>';return;} 
+  list.innerHTML=others.map(p=>{ 
+    const b=BEASTS[p.beast]||{name:p.beast,img:''}; 
+    const rivalHp=p.hp||0; 
+    const canChallenge = myHp >= 100 && rivalHp >= 100; 
+    const hpColor=rivalHp>=100?'#5DCAA5':'#F0997B'; 
+    return `<div class="p-row"><div class="p-info"><img class="p-img" src="${b.img}"><div><div class="p-name">${p.name}</div><div class="p-beast">${b.name} · <span style="color:${hpColor};font-size:10px">${rivalHp} HP</span></div></div></div><div style="display:flex;gap:6px"><button class="btn btn-sm" style="background:rgba(130,80,180,.15);border:1px solid rgba(130,80,180,.35);color:#CFA9EC" onclick="openChallengeMenu(${p.id},'${p.name}', true)">🤝 Entrenar</button><button class="btn btn-blue btn-sm" ${canChallenge?'':'disabled'} onclick="openChallengeMenu(${p.id},'${p.name}', false)">⚔️ Retar</button></div></div>`; 
+  }).join(''); 
+}
 
 async function doCashout(){ const btn=document.getElementById('btn-cashout'); if(btn){btn.disabled=true;btn.textContent='Procesando...';} if(!ws || ws.readyState !== 1){ if(btn){btn.disabled=false;btn.textContent='💰 Cashout';} return; } ws.send(JSON.stringify({type:'cashout'})); }
-function updateHPDisplay(hp){ myCurrentHP = hp || 0; const el=document.getElementById('pick-hp-val'); if(el){ el.textContent=hp+' HP'; el.style.color=hp>=100?'#5DCAA5':'#EF9F27'; } const loginHp=document.getElementById('wallet-hp'); if(loginHp){ loginHp.textContent=hp+' HP'; loginHp.style.color=hp>=100?'#5DCAA5':'#EF9F27'; } const profHp=document.getElementById('profile-hp'); if(profHp){ profHp.textContent=hp+' HP'; profHp.style.color=hp>=100?'#5DCAA5':'#EF9F27'; } const btn=document.getElementById('btn-cashout'); if(btn){ btn.style.display=hp>0?'inline-block':'none'; btn.disabled=false; btn.textContent='💰 Cashout'; } if(document.getElementById('s-lobby')?.classList.contains('active')){ renderLobbyFromCache(); updateLobbyBadge(); } }
+function updateHPDisplay(hp){ 
+  myCurrentHP = hp || 0; 
+  const el=document.getElementById('pick-hp-val'); if(el){ el.textContent=hp+' HP'; el.style.color=hp>=100?'#5DCAA5':'#EF9F27'; } 
+  const loginHp=document.getElementById('wallet-hp'); if(loginHp){ loginHp.textContent=hp+' HP'; loginHp.style.color=hp>=100?'#5DCAA5':'#EF9F27'; } 
+  const profHp=document.getElementById('profile-hp'); if(profHp){ profHp.textContent=hp+' HP'; profHp.style.color=hp>=100?'#5DCAA5':'#EF9F27'; } 
+  const btn=document.getElementById('btn-cashout'); if(btn){ btn.style.display=hp>0?'inline-block':'none'; btn.disabled=false; btn.textContent='💰 Cashout'; } 
+  
+  // INYECTAR WALLET DE PLATAFORMA SIEMPRE
+  const lobbyWidget = document.getElementById('lobby-deposit-widget');
+  if(lobbyWidget) lobbyWidget.innerHTML = depositWidgetHTML();
+  const profWidget = document.getElementById('profile-deposit-widget');
+  if(profWidget) profWidget.innerHTML = depositWidgetHTML();
+
+  if(document.getElementById('s-lobby')?.classList.contains('active')){ 
+    renderLobbyFromCache(); 
+    updateLobbyBadge(); 
+  } 
+}
 
 function challengeMaster(){ if(!ws || ws.readyState !== 1) return; openChallengeMenu(null, 'Zodiac Master', true); }
 
