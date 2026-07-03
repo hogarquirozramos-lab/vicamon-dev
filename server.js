@@ -325,7 +325,13 @@ wss.on('connection', ws => {
       
       if (msg.type === 'surrender') {
         const b = battles.get(msg.battleId); if (!b) return;
-        if (b.isTeamBattle) { const otherId = b.p1id === id ? b.p2id : b.p1id; await endTeamBattle(msg.battleId, otherId, id, 0); }
+        if (b.isTeamBattle) { 
+          const otherId = b.p1id === id ? b.p2id : b.p1id; 
+          // CORRECCIÓN: Calcular HP real del equipo ganador al rendirse
+          const winnerTeam = b.p1id === otherId ? b.team1 : b.team2;
+          const winnerRemainingHp = winnerTeam.reduce((sum, st) => sum + Math.max(0, st.hp), 0);
+          await endTeamBattle(msg.battleId, otherId, id, winnerRemainingHp); 
+        }
         else if (b.isGauntlet) await endGauntlet(msg.battleId, id, false);
         else if (b.isCpu) await endBattle(msg.battleId, CPU_ID, id, 0, true);
         else if (b.p1id === id || b.p2id === id) { const otherId = b.p1id === id ? b.p2id : b.p1id; await endBattle(msg.battleId, otherId, id, 0, true); }
@@ -380,7 +386,10 @@ wss.on('connection', ws => {
         if (b.isTraining && (b.p1id === id || b.p2id === id)) { battles.delete(bId); } 
         else if (b.isTeamBattle && (b.p1id === id || b.p2id === id)) { 
           const otherId = b.p1id === id ? b.p2id : b.p1id;
-          await endTeamBattle(bId, otherId, id, 0);
+          // CORRECCIÓN: Calcular HP real del equipo ganador al desconectarse
+          const winnerTeam = b.p1id === otherId ? b.team1 : b.team2;
+          const winnerRemainingHp = winnerTeam.reduce((sum, st) => sum + Math.max(0, st.hp), 0);
+          await endTeamBattle(bId, otherId, id, winnerRemainingHp);
         } 
         else if (b.isGauntlet && b.p2id === id) { await endGauntlet(bId, id, false); } 
         else if (b.isCpu && b.p2id === id) { battles.delete(bId); } 
