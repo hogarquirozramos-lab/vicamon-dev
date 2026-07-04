@@ -82,8 +82,8 @@ async function endTeamBattle(bId, winnerId, loserId, winnerRemainingHp) {
   }
   if (winner) winner.inBattle = false;
   if (loser) loser.inBattle = false;
-
-    // NUEVO: Limpiar mapa de reconexión al terminar batalla 3v3
+  
+  // NUEVO: Limpiar mapa de reconexión al terminar batalla 3v3
   const { walletToBattle } = require('./state');
   if (b && b.p1Wallet) walletToBattle.delete(b.p1Wallet);
   if (b && b.p2Wallet) walletToBattle.delete(b.p2Wallet);
