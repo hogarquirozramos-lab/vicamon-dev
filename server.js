@@ -223,7 +223,7 @@ wss.on('connection', ws => {
       if (msg.type === 'join') {
         const wallet = msg.wallet || '';
         
-        // ═══════════════════════════════════════════
+                // ═══════════════════════════════════════════
         // SISTEMA DE RECONEXIÓN A BATALLAS PVP (Maneja refrescas rápidas)
         // ═══════════════════════════════════════════
         if (walletToBattle.has(wallet)) {
@@ -248,7 +248,13 @@ wss.on('connection', ws => {
             
             // 2. Actualizar la batalla con el nuevo ID de WebSocket
             const isP1 = b.p1Wallet === wallet;
+            const oldId = isP1 ? b.p1id : b.p2id; // Guardamos el viejo ID
             if (isP1) b.p1id = id; else b.p2id = id;
+            
+            // FIX: Si era el turno del viejo ID, actualizar el turnId al nuevo ID
+            if (b.turnId === oldId) {
+                b.turnId = id;
+            }
             
             // 3. Restaurar al jugador en el lobby interno
             lobby.set(id, { ws, name: msg.name, beast: isP1 ? b.p1Beast : b.p2Beast, wallet, inBattle: true, id });
@@ -284,7 +290,7 @@ wss.on('connection', ws => {
             walletToBattle.delete(wallet);
           }
         }
-
+        
         // ═══════════════════════════════════════════
         // LÓGICA NORMAL DE JOIN (Si no hay batalla pendiente)
         // ═══════════════════════════════════════════
