@@ -34,11 +34,11 @@ function handleDcAutoSkip(bId) {
   
   // Si ahora es el turno del jugador desconectado, iniciar cuenta de 15s
   if (b.turnId === b.dcPlayerId) {
-    b.dcTurnTimer = setTimeout(() => {
+    b.dcTurnTimer = setTimeout(async () => {
       const currentB = battles.get(bId);
       if (currentB && currentB.dcPlayerId && currentB.turnId === currentB.dcPlayerId) {
-        if (currentB.isTeamBattle) processTeamTurn(bId, currentB.dcPlayerId, -1);
-        else processTurn(bId, currentB.dcPlayerId, -1);
+        if (currentB.isTeamBattle) await processTeamTurn(bId, currentB.dcPlayerId, -1);
+        else await processTurn(bId, currentB.dcPlayerId, -1);
       }
     }, 15000);
   }
@@ -206,13 +206,13 @@ const server = http.createServer(async (req, res) => {
   fs.readFile(fp, (err, data) => { if (err) { res.writeHead(404); res.end('Not found'); return; } res.writeHead(200, { 'Content-Type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream' }); res.end(data); });
 });
 
-const wss = new WebSocketServer({ server });
-
 async function checkPlatformTransfer() {
   const usdc = await getPlatformUsdc();
   if (usdc < PLATFORM_THRESHOLD) return;
   try { const sig = await sendUSDC(PLATFORM_WALLET, usdc); const hpCleared = Math.round(usdc / USDC_PER_HP); await clearPlatformHp(hpCleared); } catch (e) {}
 }
+
+const wss = new WebSocketServer({ server });
 
 wss.on('connection', ws => {
   const id = uid();
@@ -223,8 +223,8 @@ wss.on('connection', ws => {
       if (msg.type === 'join') {
         const wallet = msg.wallet || '';
         
-                // ═══════════════════════════════════════════
-        // SISTEMA DE RECONEXIÓN A BATALLAS PVP (Maneja refrescas rápidas)
+        // ═══════════════════════════════════════════
+        // SISTEMA DE RECONEXIÓN A BATALLAS PVP
         // ═══════════════════════════════════════════
         if (walletToBattle.has(wallet)) {
           const bId = walletToBattle.get(wallet);
@@ -268,6 +268,7 @@ wss.on('connection', ws => {
             if (b.isTeamBattle) {
               send(ws, { 
                 type: 'reconnect_battle', battleId: bId, role: isP1 ? 'p1' : 'p2', 
+                id: id, // <--- FIX LOBBY DUPLICADO
                 isTeamBattle: true, opponent: opp?.name || 'Rival',
                 yourTurn: b.turnId === id, myBeast: isP1 ? b.p1Beast : b.p2Beast,
                 oppBeast: isP1 ? b.p2Beast : b.p1Beast
@@ -276,6 +277,7 @@ wss.on('connection', ws => {
             } else {
               send(ws, { 
                 type: 'reconnect_battle', battleId: bId, role: isP1 ? 'p1' : 'p2', 
+                id: id, // <--- FIX LOBBY DUPLICADO
                 isTeamBattle: false, opponent: opp?.name || 'Rival',
                 yourTurn: b.turnId === id, myBeast: isP1 ? b.p1Beast : b.p2Beast,
                 oppBeast: isP1 ? b.p2Beast : b.p1Beast
@@ -290,7 +292,7 @@ wss.on('connection', ws => {
             walletToBattle.delete(wallet);
           }
         }
-        
+
         // ═══════════════════════════════════════════
         // LÓGICA NORMAL DE JOIN (Si no hay batalla pendiente)
         // ═══════════════════════════════════════════
