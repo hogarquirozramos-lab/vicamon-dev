@@ -345,6 +345,37 @@ function handleMsg(m){
   if(m.type==='hp_updated'){ updateHPDisplay(m.hp); myCurrentHP=m.hp; }
   if(m.type==='cashout_result'){ const btn=document.getElementById('btn-cashout'); if(!m.ok){ if(btn){btn.disabled=false;btn.textContent='💰 Cashout';} alert('Error: '+m.reason); return; } if(m.status==='confirmed'){ if(btn){btn.disabled=false;btn.textContent='💰 Cashout';} updateHPDisplay(0); alert(`✓ Cashout: ${m.usdc} USDC`); } }
   if(m.type==='error'){ alert('⚠ ' + m.msg); }
+
+    // ═══════════════════════════════════════════
+  // SISTEMA DE DESCONEXIÓN / RECONEXIÓN PVP
+  // ═══════════════════════════════════════════
+  if(m.type==='opponent_disconnected'){ 
+    const turnBar = document.getElementById('turn-bar');
+    if(turnBar) turnBar.innerHTML = '<span style="color:#EF9F27">⏳ Rival desconectado. Esperando reconexión (60s)...</span>';
+    // Deshabilitar botones de ataque temporalmente
+    document.querySelectorAll('.atk-btn').forEach(btn => btn.disabled = true);
+  }
+  
+  if(m.type==='opponent_reconnected'){ 
+    const turnBar = document.getElementById('turn-bar');
+    if(turnBar) turnBar.innerHTML = '<span>Turno del rival...</span>'; // Se actualizará con el próximo battle_state
+  }
+
+  if(m.type==='reconnect_battle'){
+    battleId = m.battleId; 
+    myRole = m.role; 
+    oppName = m.opponent;
+    myBeast = m.myBeast;
+    oppBeast = m.oppBeast;
+    window._isTeamBattle = !!m.isTeamBattle;
+    
+    // Forzar entrada a la pantalla de batalla
+    show('s-battle'); 
+    
+    // Mostrar mensaje de reconexión exitosa
+    const turnBar = document.getElementById('turn-bar');
+    if(turnBar) turnBar.innerHTML = '<span style="color:#5DCAA5">✓ ¡Reconectado con éxito! Sincronizando...</span>';
+  }
   
   if(m.type==='battle_end'){
     const won=m.won; 
