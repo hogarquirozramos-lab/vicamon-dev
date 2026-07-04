@@ -111,7 +111,7 @@ function tickEffects(st) {
   return logs;
 }
 
-async function endBattle(bId, winnerId, loserId, winnerHp, forfeit=false) {
+async function (bId, winnerId, loserId, winnerHp, forfeit=false) {
   const b = battles.get(bId);
   const isCpu = b?.isCpu || false;
   const isTraining = b?.isTraining || false;
@@ -146,6 +146,12 @@ async function endBattle(bId, winnerId, loserId, winnerHp, forfeit=false) {
   }
   if (winner) winner.inBattle=false;
   if (loser) loser.inBattle=false;
+
+    // NUEVO: Limpiar mapa de reconexión al terminar batalla
+  const { walletToBattle } = require('./state');
+  if (b && b.p1Wallet) walletToBattle.delete(b.p1Wallet);
+  if (b && b.p2Wallet) walletToBattle.delete(b.p2Wallet);
+  
   battles.delete(bId);
   await pushLobby();
 }
