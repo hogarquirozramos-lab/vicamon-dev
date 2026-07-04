@@ -224,25 +224,33 @@ wss.on('connection', ws => {
         const wallet = msg.wallet || '';
         
         // ═══════════════════════════════════════════
-        // SISTEMA DE RECONEXIÓN A BATALLAS PVP
+        // SISTEMA DE RECONEXIÓN A BATALLAS PVP (Maneja refrescas rápidas)
         // ═══════════════════════════════════════════
         if (walletToBattle.has(wallet)) {
           const bId = walletToBattle.get(wallet);
           const b = battles.get(bId);
           
-          // Si la batalla sigue activa y él era el desconectado
-          if (b && b.dcWallet === wallet) {
+          // Si la batalla sigue activa
+          if (b) {
+            // ¡Reconectado! (Rápido o lento, da igual)
             clearTimeout(b.dcTimer);
             clearTimeout(b.dcTurnTimer);
-            
-            const isP1 = b.p1Wallet === wallet;
-            const oldId = isP1 ? b.p1id : b.p2id;
-            if (isP1) b.p1id = id; else b.p2id = id; // Actualizar al nuevo ID del WS
-            
             b.dcPlayerId = null;
             b.dcWallet = null;
             
-            // Restaurar al jugador en el lobby interno
+            // 1. Limpiar CUALQUIER vieja conexión de esta wallet para evitar el bug
+            for (const [oldId, p] of lobby) {
+              if (p.wallet === wallet && oldId !== id) {
+                lobby.delete(oldId); // Borramos del lobby la vieja conexión
+                try { p.ws.close(); } catch(e) {} // Forzamos cierre del viejo socket
+              }
+            }
+            
+            // 2. Actualizar la batalla con el nuevo ID de WebSocket
+            const isP1 = b.p1Wallet === wallet;
+            if (isP1) b.p1id = id; else b.p2id = id;
+            
+            // 3. Restaurar al jugador en el lobby interno
             lobby.set(id, { ws, name: msg.name, beast: isP1 ? b.p1Beast : b.p2Beast, wallet, inBattle: true, id });
             
             // Avisar al oponente que volvimos
@@ -270,9 +278,9 @@ wss.on('connection', ws => {
             }
             
             await pushLobby();
-            return; // ¡NO enviamos al lobby normal, lo dejamos en la batalla!
+            return; // ¡FIN! No enviamos al lobby normal, lo dejamos en la batalla
           } else {
-            // La batalla ya terminó mientras estaba desconectado (expiró el timer)
+            // La batalla ya terminó mientras estaba desconectado (expiró el timer de 60s)
             walletToBattle.delete(wallet);
           }
         }
