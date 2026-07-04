@@ -1,284 +1,219 @@
 const BEASTS = require('./beasts.js');
-const { lobby, battles, send, broadcast, pushLobby } = require('./state');
-const { applyAtk, tickEffects, getStartState } = require('./battleEngine');
-const { settleTeamMatch, updatePlayerStats, getPlayerStats, getPlayerRank, getTopPlayers } = require('./hp-balance');
-const { cpuPickAttack } = require('./cpuAI');
+const { 
+  settleMatch, getHP, updatePlayerStats, 
+  getPlayerStats, getPlayerRank, getTopPlayers, 
+  USDC_PER_HP 
+} = require('./hp-balance');
+const { lobby, battles, pushBattle, pushLobby, broadcast } = require('./state');
 
-const CPU_ID = -1;
-const CPU_NAME = 'Zodiac Master';
-
-function pushTeamBattle(bId) {
-  const b = battles.get(bId); if (!b) return;
-  const p1 = lobby.get(b.p1id), p2 = lobby.get(b.p2id);
-  if (!p1 || !p2) return;
-  const formatSide = (player, teamStates, activeIdx) => {
-    return { name: player.name, activeBeast: player.team[activeIdx], activeState: teamStates[activeIdx], bench: player.team.map((beastKey, i) => ({ beast: beastKey, state: teamStates[i], isDead: teamStates[i].hp <= 0, isActive: i === activeIdx })) };
-  };
-  const p1Side = formatSide(p1, b.team1, b.active1);
-  const p2Side = formatSide(p2, b.team2, b.active2);
-  const base = { type: 'battle_state', battleId: bId, p1: p1Side, p2: p2Side, logs: b.logs.slice(-14), isTeamBattle: true };
-  send(p1.ws, { ...base, yourTurn: b.turnId === b.p1id });
-  send(p2.ws, { ...base, yourTurn: b.turnId === b.p2id });
+function newState() {
+  return { hp:100, maxHp:100, poisonDmg:0, poisonTurns:0, burnDmg:0, burnTurns:0,
+    shield:0, shieldReflect:0, reflect50:0, stun:false, recharge:0,
+    regen:0, regenTurns:0, blind:0, weakAtk:0, weaken:0,
+    corrode:0, analyzed:0, lastDmgReceived:0, pp:[] };
 }
 
-function pushTeamCpuBattle(bId) {
-  const b = battles.get(bId); if (!b) return;
-  const pl = lobby.get(b.p2id); if (!pl) return;
-  const cpuTeam = b.team1; const plTeam = b.team2; const activeCpu = b.active1; const activePl = b.active2;
-  const cpuSide = { name: CPU_NAME, activeBeast: b.cpuTeam[activeCpu], activeState: cpuTeam[activeCpu], bench: b.cpuTeam.map((beastKey, i) => ({ beast: beastKey, state: cpuTeam[i], isDead: cpuTeam[i].hp <= 0, isActive: i === activeCpu })) };
-  const plSide = { name: pl.name, activeBeast: pl.team[activePl], activeState: plTeam[activePl], bench: pl.team.map((beastKey, i) => ({ beast: beastKey, state: plTeam[i], isDead: plTeam[i].hp <= 0, isActive: i === activePl })) };
-  send(pl.ws, { type: 'battle_state', battleId: bId, p1: cpuSide, p2: plSide, logs: b.logs.slice(-14), isTeamBattle: true, yourTurn: b.turnId !== CPU_ID });
+function getStartState(beastKey) { 
+  const st = newState(); 
+  const beast = BEASTS[beastKey]; 
+  if (beast) { 
+    st.pp = beast.attacks.map(a => a.pp === undefined ? 99 : a.pp); 
+  } else { 
+    st.pp = [99, 99, 99, 99]; 
+  } 
+  return st; 
 }
 
-// NUEVO: Función mágica que desbloquea el juego si alguien está aturdido o recargando
-function autoResolveTeamIfBlocked(bId) {
-  const b = battles.get(bId); if (!b) return;
-  const currentId = b.turnId;
-  // Si es turno de la IA, de pausa por muerte o pausa por torre, no hacer nada
-  if (currentId === CPU_ID || currentId === -4 || currentId === -2) return; 
-
-  const isP1 = b.p1id === currentId;
-  const currentSt = isP1 ? b.team1[b.active1] : b.team2[b.active2];
-  const isCpu = b.isTeamCpu;
-
-  if (currentSt.stun || currentSt.recharge > 0) {
-    setTimeout(async () => {
-      const bb = battles.get(bId); if (!bb || bb.turnId !== currentId) return;
-      if (isCpu) {
-        await processTeamCpuPlayerTurn(bId, currentId, -1);
-      } else {
-        await processTeamTurn(bId, currentId, -1);
-      }
-    }, 900);
+function applyAtk(aSt, dSt, atk, aName) { 
+  const logs = []; 
+  const blind = aSt.blind > 0 ? 30 : 0; 
+  const weakMul = aSt.weakAtk > 0 ? 0.8 : 1; 
+  const anaMul = aSt.analyzed > 0 ? 1.15 : 1; 
+  const fx = atk.fx;
+  
+  if (fx==='shield2') { aSt.shield=2; aSt.shieldReflect=0; logs.push({t:`${aName} activa Escudo ×2`,c:'good'}); return logs; }
+  if (fx==='shield1r') { aSt.shield=1; aSt.shieldReflect=15; logs.push({t:`${aName} activa Escudo Lunar`,c:'good'}); return logs; }
+  if (fx==='reflect50'){ aSt.reflect50=1; logs.push({t:`${aName} prepara Reflejo 50%`,c:'good'}); return logs; }
+  if (fx==='heal20') { aSt.hp=Math.min(aSt.maxHp,aSt.hp+20); logs.push({t:`${aName} se cura 20 HP`,c:'good'}); return logs; }
+  if (fx==='heal30') { aSt.hp=Math.min(aSt.maxHp,aSt.hp+30); logs.push({t:`${aName} se cura 30 HP`,c:'good'}); return logs; }
+  if (fx==='fortress') { aSt.shield=2; aSt.hp=Math.min(aSt.maxHp,aSt.hp+15); aSt.regen=6; aSt.regenTurns=2; logs.push({t:`${aName} activa Fortaleza`,c:'good'}); return logs; }
+  if (fx==='analyze') { aSt.analyzed=3; logs.push({t:`${aName} analiza al rival`,c:'good'}); return logs; }
+  if (fx==='purify') { aSt.poisonTurns=aSt.burnTurns=aSt.blind=aSt.weakAtk=aSt.weaken=0; aSt.stun=false; aSt.hp=Math.min(aSt.maxHp,aSt.hp+15); logs.push({t:`${aName} se purifica +15 HP`,c:'good'}); return logs; }
+  if (fx==='weaken') { dSt.weaken=2; logs.push({t:`${aName} debilita al rival`,c:'special'}); return logs; }
+  if (fx==='counter') { const h=aSt.lastDmgReceived||0; aSt.hp=Math.min(aSt.maxHp,aSt.hp+h); logs.push({t:`${aName} usa Contrapeso: +${h} HP`,c:'good'}); return logs; }
+  
+  // CORRECCIÓN: Bug de Géminis arreglado - Ahora intercambia TODOS los estados negativos
+  if (fx==='swap') { 
+    const propsToSwap = ['stun', 'poisonDmg', 'poisonTurns', 'burnDmg', 'burnTurns', 'blind', 'weakAtk', 'weaken', 'corrode'];
+    propsToSwap.forEach(prop => {
+      const temp = dSt[prop];
+      dSt[prop] = aSt[prop];
+      aSt[prop] = temp;
+    });
+    logs.push({t:`${aName} intercambia estados negativos con el rival`,c:'special'}); 
+    return logs; 
   }
+  // FIN CORRECCIÓN
+
+  if (fx==='equalize') { const diff=Math.abs(aSt.hp-dSt.hp); dSt.hp=Math.max(0,dSt.hp-diff); logs.push({t:`${aName} → Equilibrio: ${diff} HP`,c:'bad'}); return logs; }
+  if (fx==='chaos'||fx==='chaosHi') { if (Math.random()*100 >= atk.acc-blind) { logs.push({t:`${aName} → ¡falló!`,c:'bad'}); return logs; } const dmg=fx==='chaosHi'?Math.floor(Math.random()*36)+10:Math.floor(Math.random()*36)+5; dSt.hp=Math.max(0,dSt.hp-dmg); logs.push({t:`${aName} → Caos: ${dmg} HP`,c:'bad'}); return logs; }
+  
+  const hit = Math.random()*100 < Math.max(5, atk.acc-blind);
+  if (!hit) { if (fx==='overload') { aSt.hp=Math.max(0,aSt.hp-25); logs.push({t:`${aName} → Sobrecarga falló! -25 HP`,c:'bad'}); } else logs.push({t:`${aName} → ¡falló!`,c:'bad'}); return logs; }
+  
+  if (atk.d > 0 && !atk.pierce) {
+    if (dSt.shield > 0) { dSt.shield--; const ref=dSt.shieldReflect||0; if (ref>0) { aSt.hp=Math.max(0,aSt.hp-ref); logs.push({t:`¡Escudo! Bloqueado — refleja ${ref} HP`,c:'special'}); } else logs.push({t:`¡Escudo! Ataque bloqueado`,c:'special'}); return logs; }
+    if (dSt.reflect50 > 0) { dSt.reflect50=0; const ref=Math.floor(atk.d*0.5); aSt.hp=Math.max(0,aSt.hp-ref); logs.push({t:`¡Reflejo! Devuelve ${ref} HP`,c:'special'}); return logs; }
+  }
+  
+  let dmg=atk.d;
+  if (fx==='double') dmg=atk.d*2; if (fx==='triple') dmg=atk.d*3;
+  if (fx==='drain10') { dmg=15; aSt.hp=Math.min(aSt.maxHp,aSt.hp+10); }
+  if (fx==='selfheal10') aSt.hp=Math.min(aSt.maxHp,aSt.hp+10);
+  if (fx==='shieldbonus' && dSt.shield>0) dmg+=10;
+  if (fx==='weakbonus' && dSt.weaken>0) dmg+=10;
+  if (fx==='stateBonus' && (dSt.poisonTurns>0||dSt.burnTurns>0||dSt.stun||dSt.blind>0)) dmg+=10;
+  if (fx==='poisonBonus') dmg+=(dSt.poisonTurns||0)*5;
+  if (fx==='poisonDouble'&&dSt.poisonTurns>0) dmg*=2;
+  if (fx==='lowHPbonus' &&aSt.hp<dSt.hp) dmg+=10;
+  if (fx==='lowHPx15' &&aSt.hp<aSt.maxHp*0.3) dmg=Math.floor(dmg*1.5);
+  if (dSt.weaken>0) dmg=Math.floor(dmg*1.25);
+  dmg=Math.floor(dmg*weakMul*anaMul);
+  
+  dSt.hp=Math.max(0,dSt.hp-dmg); dSt.lastDmgReceived=dmg; if (atk.self>0) aSt.hp=Math.max(0,aSt.hp-atk.self);
+  
+  let extra='';
+  if (fx==='poison5') { dSt.poisonDmg=8; dSt.poisonTurns=5; }
+  if (fx==='poison3l') { dSt.poisonDmg=3; dSt.poisonTurns=3; }
+  if (fx==='corrode') { dSt.corrode=3; }
+  if (fx==='burn') { dSt.burnDmg=6; dSt.burnTurns=2; }
+  if (fx==='stun') { dSt.stun=true; }
+  if (fx==='stun_blind') { dSt.stun=true; dSt.blind=2; }
+  if (fx==='stun_ifless'&&dSt.hp>aSt.hp) { dSt.stun=true; }
+  if (fx==='slow'||fx==='slow2') { dSt.blind=(fx==='slow2'?2:1); }
+  if (fx==='blind') { dSt.blind=2; }
+  if (fx==='weakAtk') { dSt.weakAtk=2; }
+  if (fx==='recharge') { aSt.recharge=1; }
+  if (fx==='random_fx') { const opts=['poison','stun','blind','weakAtk']; const r=opts[Math.floor(Math.random()*opts.length)]; if(r==='poison'){dSt.poisonDmg=5;dSt.poisonTurns=3;} if(r==='stun'){dSt.stun=true;} if(r==='blind'){dSt.blind=2;} if(r==='weakAtk'){dSt.weakAtk=2;} }
+  
+  const selfNote=atk.self>0?` (-${atk.self} propio)`:''; 
+  const healNote=fx==='drain10'?' (drena 10)':fx==='selfheal10'?' (+10 propio)':'';
+  logs.push({t:`${aName} → ${dmg} HP${selfNote}${healNote}${extra}`,c:dmg>25?'bad':'normal'});
+  return logs;
 }
 
-async function endTeamBattle(bId, winnerId, loserId, winnerRemainingHp) {
+function tickEffects(st) {
+  const logs=[];
+  if (st.poisonTurns>0){ st.hp=Math.max(0,st.hp-st.poisonDmg); st.poisonTurns--; logs.push({t:`Veneno`,c:'special'}); }
+  if (st.burnTurns>0) { st.hp=Math.max(0,st.hp-st.burnDmg); st.burnTurns--; logs.push({t:`Quema`,c:'special'}); }
+  if (st.regenTurns>0){ st.hp=Math.min(st.maxHp,st.hp+st.regen); st.regenTurns--; logs.push({t:`Regen`,c:'good'}); }
+  if (st.blind>0) st.blind--; if (st.weakAtk>0) st.weakAtk--; if (st.weaken>0) st.weaken--; if (st.corrode>0) st.corrode--; if (st.analyzed>0) st.analyzed--;
+  return logs;
+}
+
+async function endBattle(bId, winnerId, loserId, winnerHp, forfeit=false) {
   const b = battles.get(bId);
-  const isTraining = b?.isTeamTraining || false;
-  const isCpu = b?.isTeamCpu || false;
+  const isCpu = b?.isCpu || false;
+  const isTraining = b?.isTraining || false;
   const winner = lobby.get(winnerId);
   const loser = lobby.get(loserId);
-  const hp = Math.max(0, Math.min(300, winnerRemainingHp));
-  
-  if (isTraining || isCpu) {
-    let winnerXp = 300 + hp; 
-    let loserXp = 0;
-    if(winner) winner.ws.send(JSON.stringify({ type:'battle_end', won:true, isTeamBattle:true, isTraining:true, winnerXp, loserXp }));
-    if(loser) loser.ws.send(JSON.stringify({ type:'battle_end', won:false, isTeamBattle:true, isTraining:true, winnerXp, loserXp }));
+  const hp = forfeit ? 100 : Math.max(0, Math.min(100, winnerHp));
+
+  if (isTraining) {
+    const winnerXp = forfeit ? 0 : 100 + Math.max(0, Math.min(100, winnerHp));
+    const loserXp = 0;
+    if(winner) winner.ws.send(JSON.stringify({ type:'battle_end', won:true, isTraining:true, isCpu:false, winnerXp, loserXp, forfeit }));
+    if(loser) loser.ws.send(JSON.stringify({ type:'battle_end', won:false, isTraining:true, isCpu:false, winnerXp, loserXp }));
+  } else if (isCpu) {
+    const winnerXp = forfeit ? 0 : 100 + Math.max(0, Math.min(100, winnerHp));
+    if(winner) winner.ws.send(JSON.stringify({ type:'battle_end', won:true, isCpu:true, isTraining:false, winnerXp, loserXp:0, winnerHp:hp, forfeit }));
+    if(loser) loser.ws.send(JSON.stringify({ type:'battle_end', won:false, isCpu:true, isTraining:false, winnerXp, loserXp:0, winnerHp:hp }));
   } else {
     const winnerWallet = winner?.wallet || '';
     const loserWallet = loser?.wallet || '';
-    const result = await settleTeamMatch(winnerWallet, loserWallet, hp);
+    const result = await settleMatch(winnerWallet, loserWallet, hp);
     await updatePlayerStats(winnerWallet, loserWallet);
     const wStats = await getPlayerStats(winnerWallet);
     const lStats = await getPlayerStats(loserWallet);
     const wRank = await getPlayerRank(winnerWallet);
     const lRank = await getPlayerRank(loserWallet);
-    if(winner) winner.ws.send(JSON.stringify({ type:'battle_end', won:true, isTeamBattle:true, winnerHp:hp, newHp: result.winnerNewHp, stats: { wins: wStats.wins, losses: wStats.losses, rank: wRank } }));
-    if(loser) loser.ws.send(JSON.stringify({ type:'battle_end', won:false, isTeamBattle:true, winnerHp:hp, newHp: 0, stats: { wins: lStats.wins, losses: lStats.losses, rank: lRank } }));
+    const winnerUsdc = parseFloat(((100 + hp) * USDC_PER_HP).toFixed(3));
+    const platformUsdc = parseFloat(((100 - hp) * USDC_PER_HP).toFixed(3));
+    if(winner) winner.ws.send(JSON.stringify({ type:'battle_end', won:true, isCpu:false, isTraining:false, winnerHp:hp, winnerUsdc, platformUsdc, newHp: result.winnerNewHp, forfeit, stats: { wins: wStats.wins, losses: wStats.losses, rank: wRank } }));
+    if(loser) loser.ws.send(JSON.stringify({ type:'battle_end', won:false, isCpu:false, isTraining:false, winnerHp:hp, winnerUsdc, platformUsdc, newHp: await getHP(loserWallet), stats: { wins: lStats.wins, losses: lStats.losses, rank: lRank } }));
     const top = await getTopPlayers(3);
     broadcast({ type: 'leaderboard_update', top });
   }
-  if (winner) winner.inBattle = false;
-  if (loser) loser.inBattle = false;
-  
-  // NUEVO: Limpiar mapa de reconexión al terminar batalla 3v3
+  if (winner) winner.inBattle=false;
+  if (loser) loser.inBattle=false;
+
+  // NUEVO: Limpiar mapa de reconexión al terminar batalla
   const { walletToBattle } = require('./state');
   if (b && b.p1Wallet) walletToBattle.delete(b.p1Wallet);
   if (b && b.p2Wallet) walletToBattle.delete(b.p2Wallet);
-  
+
   battles.delete(bId);
   await pushLobby();
 }
 
-async function checkTeamDeath(bId, isP1Attacker, isCpu) {
-  const b = battles.get(bId); if (!b) return false;
-  const aSt = isP1Attacker ? b.team1[b.active1] : b.team2[b.active2];
-  const dSt = isP1Attacker ? b.team2[b.active2] : b.team1[b.active1];
-  const aId = isP1Attacker ? b.p1id : b.p2id;
-  const dId = isP1Attacker ? b.p2id : b.p1id;
-  const aPlayer = lobby.get(aId);
-  const dPlayer = lobby.get(dId);
-
-  if (dSt.hp <= 0) {
-    const defenderTeam = isP1Attacker ? b.team2 : b.team1;
-    const defenderActive = isP1Attacker ? b.active2 : b.active1;
-    const livingBench = [];
-    defenderTeam.forEach((st, i) => { if (i !== defenderActive && st.hp > 0) livingBench.push(i); });
-
-    if (livingBench.length === 0) {
-      const winnerRemainingHp = (isP1Attacker ? b.team1 : b.team2).reduce((sum, st) => sum + Math.max(0, st.hp), 0);
-      await endTeamBattle(bId, aId, dId, winnerRemainingHp);
-      return true;
-    } else {
-      b.turnId = -4; 
-      const defenderIsCpu = isCpu && !isP1Attacker; 
-      if (defenderIsCpu) {
-        b.active1 = livingBench[0]; 
-        b.logs.push({t: `${CPU_NAME} cambia a ${BEASTS[b.cpuTeam[b.active1]].name}`, c: 'special'});
-        b.turnId = b.p2id; 
-        pushTeamCpuBattle(bId);
-      } else {
-        if(isCpu) pushTeamCpuBattle(bId); else pushTeamBattle(bId);
-        if (dPlayer && dPlayer.ws) {
-          send(dPlayer.ws, { type: 'team_force_switch', battleId: bId, reason: '¡Tu Vicamon fue derrotado! Elige el siguiente.' });
-        }
-      }
-      return true;
-    }
-  }
-
-  if (aSt.hp <= 0) {
-    const attackerTeam = isP1Attacker ? b.team1 : b.team2;
-    const attackerActive = isP1Attacker ? b.active1 : b.active2;
-    const livingBench = [];
-    attackerTeam.forEach((st, i) => { if (i !== attackerActive && st.hp > 0) livingBench.push(i); });
-
-    if (livingBench.length === 0) {
-      const winnerRemainingHp = (isP1Attacker ? b.team2 : b.team1).reduce((sum, st) => sum + Math.max(0, st.hp), 0);
-      await endTeamBattle(bId, dId, aId, winnerRemainingHp);
-      return true;
-    } else {
-      b.turnId = -4;
-      const attackerIsCpu = isCpu && isP1Attacker; 
-      if (attackerIsCpu) {
-        b.active1 = livingBench[0];
-        b.logs.push({t: `${CPU_NAME} cambia a ${BEASTS[b.cpuTeam[b.active1]].name}`, c: 'special'});
-        b.turnId = b.p2id; 
-        pushTeamCpuBattle(bId);
-      } else {
-        if(isCpu) pushTeamCpuBattle(bId); else pushTeamBattle(bId);
-        if (aPlayer && aPlayer.ws) {
-          send(aPlayer.ws, { type: 'team_force_switch', battleId: bId, reason: '¡Tu Vicamon fue derrotado! Elige el siguiente.' });
-        }
-      }
-      return true;
-    }
-  }
+async function checkDeath(bId, isP1Attacker) {
+  const b=battles.get(bId); if (!b) return false;
+  const aSt=isP1Attacker?b.st1:b.st2;
+  const dSt=isP1Attacker?b.st2:b.st1;
+  const aId=isP1Attacker?b.p1id:b.p2id;
+  const dId=isP1Attacker?b.p2id:b.p1id;
+  if (dSt.hp<=0) { await endBattle(bId,aId,dId,Math.max(0,aSt.hp)); return true; }
+  if (aSt.hp<=0) { await endBattle(bId,dId,aId,0); return true; }
   return false;
 }
 
-async function processTeamTurn(bId, attackerId, atkIndex) {
-  const b = battles.get(bId); if (!b) return true;
+async function processTurn(bId, attackerId, atkIndex) {
+  const b=battles.get(bId); if (!b) return true;
   if (b.turnId !== attackerId) return false;
-  const isP1 = b.p1id === attackerId;
-  const aSt = isP1 ? b.team1[b.active1] : b.team2[b.active2];
-  const dSt = isP1 ? b.team2[b.active2] : b.team1[b.active1];
-  const aPlayer = lobby.get(attackerId);
-  const dPlayer = lobby.get(isP1 ? b.p2id : b.p1id);
-  if (!aPlayer || !dPlayer) return true;
+  const isP1 = b.p1id===attackerId;
+  const aSt = isP1 ? b.st1 : b.st2;
+  const dSt = isP1 ? b.st2 : b.st1;
+  const aPlayer= lobby.get(attackerId);
+  const dPlayer= lobby.get(isP1 ? b.p2id : b.p1id);
+  if (!aPlayer||!dPlayer) return true;
 
   b.logs.push(...tickEffects(aSt));
-  if (await checkTeamDeath(bId, isP1, false)) return true;
+  if (await checkDeath(bId, isP1)) return true;
 
-  if (aSt.stun) { aSt.stun = false; b.logs.push({t: `${aPlayer.name} aturdido — pierde turno`, c: 'special'}); } 
-  else if (aSt.recharge > 0) { aSt.recharge--; b.logs.push({t: `${aPlayer.name} recargando...`, c: 'special'}); } 
-  else if (atkIndex >= 0) {
-    const atkKey = isP1 ? aPlayer.team[b.active1] : aPlayer.team[b.active2];
-    const atk = BEASTS[atkKey]?.attacks[atkIndex];
+  if (aSt.stun) {
+    aSt.stun=false; b.logs.push({t:`${aPlayer.name} aturdido — pierde turno`,c:'special'});
+  } else if (aSt.recharge>0) {
+    aSt.recharge--; b.logs.push({t:`${aPlayer.name} recargando...`,c:'special'});
+  } else if (atkIndex >= 0) {
+    const atks=BEASTS[aPlayer.beast]?.attacks;
+    const atk=atks?.[atkIndex];
     if (!atk) return false;
     if (aSt.pp[atkIndex] <= 0) {
-      b.logs.push({t: `${aPlayer.name} intentó usar ${atk.n} pero no tiene PP. ¡Turno perdido!`, c: 'bad'});
-      b.turnId = isP1 ? b.p2id : b.p1id; pushTeamBattle(bId); autoResolveTeamIfBlocked(bId); return false;
+      b.logs.push({t:`${aPlayer.name} intentó usar ${atk.n} pero no tiene PP. ¡Turno perdido!`,c:'bad'});
+      b.turnId = isP1 ? b.p2id : b.p1id; pushBattle(bId); autoResolveIfBlocked(bId); return false;
     }
     if (aSt.pp[atkIndex] < 99) aSt.pp[atkIndex]--;
-    b.logs.push(...applyAtk(aSt, dSt, atk, BEASTS[atkKey].name));
-    if (await checkTeamDeath(bId, isP1, false)) return true;
+    b.logs.push(...applyAtk(aSt,dSt,atk,aPlayer.name));
+    if (await checkDeath(bId, isP1)) return true;
   }
   b.turnId = isP1 ? b.p2id : b.p1id;
-  pushTeamBattle(bId);
-  autoResolveTeamIfBlocked(bId);
+  pushBattle(bId); autoResolveIfBlocked(bId);
   return false;
 }
 
-async function doTeamCpuTurn(bId) {
-  const b = battles.get(bId); if (!b) return;
-  const cpuSt = b.team1[b.active1];
-  const plSt  = b.team2[b.active2];
-  const plId  = b.p2id;
-  const pl = lobby.get(plId); if (!pl) return;
-
-  b.logs.push(...tickEffects(cpuSt));
-  if (await checkTeamDeath(bId, true, true)) return; 
-
-  if (cpuSt.stun) { cpuSt.stun = false; b.logs.push({t: `${CPU_NAME} aturdido — pierde turno`, c: 'special'}); } 
-  else if (cpuSt.recharge > 0) { cpuSt.recharge--; b.logs.push({t: `${CPU_NAME} recargando...`, c: 'special'}); } 
-  else {
-    const idx = cpuPickAttack(cpuSt, plSt, b.cpuTeam[b.active1]);
-    const atk = BEASTS[b.cpuTeam[b.active1]].attacks[idx];
-    if (cpuSt.pp[idx] < 99) cpuSt.pp[idx]--;
-    b.logs.push(...applyAtk(cpuSt, plSt, atk, BEASTS[b.cpuTeam[b.active1]].name));
-    if (await checkTeamDeath(bId, true, true)) return;
-  }
-
-  b.turnId = plId;
-  pushTeamCpuBattle(bId);
-  autoResolveTeamIfBlocked(bId);
-}
-
-async function processTeamCpuPlayerTurn(bId, playerId, atkIndex) {
-  const b = battles.get(bId); if (!b || b.turnId !== playerId) return;
-  const plSt = b.team2[b.active2];
-  const cpuSt = b.team1[b.active1];
-  const pl = lobby.get(playerId); if (!pl) return;
-
-  b.logs.push(...tickEffects(plSt));
-  if (await checkTeamDeath(bId, false, true)) return;
-
-  if (plSt.stun) { plSt.stun = false; b.logs.push({t: `${pl.name} aturdido — pierde turno`, c: 'special'}); } 
-  else if (plSt.recharge > 0) { plSt.recharge--; b.logs.push({t: `${pl.name} recargando...`, c: 'special'}); } 
-  else if (atkIndex >= 0) {
-    const atkKey = pl.team[b.active2];
-    const atk = BEASTS[atkKey]?.attacks[atkIndex]; if (!atk) return;
-    if (plSt.pp[atkIndex] <= 0) {
-      b.logs.push({t: `${pl.name} intentó usar ${atk.n} pero no tiene PP. ¡Turno perdido!`, c: 'bad'});
-      b.turnId = CPU_ID; pushTeamCpuBattle(bId); 
-      setTimeout(() => doTeamCpuTurn(bId), 1000);
-      return;
-    }
-    if (plSt.pp[atkIndex] < 99) plSt.pp[atkIndex]--;
-    b.logs.push(...applyAtk(plSt, cpuSt, atk, BEASTS[atkKey].name));
-    if (await checkTeamDeath(bId, false, true)) return;
-  }
-  b.turnId = CPU_ID; 
-  pushTeamCpuBattle(bId);
-  setTimeout(() => doTeamCpuTurn(bId), 1000);
-}
-
-async function processTeamSwitch(bId, playerId, switchToIndex) {
-  const b = battles.get(bId); if (!b) return;
-  if (b.turnId !== -4 && b.turnId !== playerId) {
-    const player = lobby.get(playerId);
-    if (player) send(player.ws, { type: 'error', msg: 'No es tu turno para cambiar.' });
-    return;
-  }
-  const isP1 = b.p1id === playerId;
-  const isCpu = b.isTeamCpu;
-  const player = lobby.get(playerId);
-  const team = isP1 ? b.team1 : b.team2;
-  if (switchToIndex < 0 || switchToIndex >= team.length) return;
-  if (team[switchToIndex].hp <= 0) {
-    send(player.ws, { type: 'error', msg: 'Ese Vicamon está debilitado.' });
-    return;
-  }
-  if (isP1) b.active1 = switchToIndex; else b.active2 = switchToIndex;
-  const beastName = BEASTS[player.team[switchToIndex]].name;
-  b.logs.push({t: `${player.name} cambia a ${beastName}`, c: 'special'});
-  if(isCpu) {
-    b.turnId = CPU_ID;
-    pushTeamCpuBattle(bId);
-    setTimeout(() => doTeamCpuTurn(bId), 1000);
-  } else {
-    b.turnId = isP1 ? b.p2id : b.p1id;
-    pushTeamBattle(bId);
+function autoResolveIfBlocked(bId) {
+  const b=battles.get(bId); if (!b) return;
+  const currentId=b.turnId;
+  const currentSt=b.p1id===currentId ? b.st1 : b.st2;
+  if (currentSt.stun || currentSt.recharge>0) {
+    setTimeout(async () => {
+      const bb=battles.get(bId); if (!bb||bb.turnId!==currentId) return;
+      await processTurn(bId, currentId, -1);
+    }, 900);
   }
 }
 
-module.exports = { 
-  pushTeamBattle, pushTeamCpuBattle,
-  processTeamTurn, processTeamSwitch,
-  processTeamCpuPlayerTurn,
-  doTeamCpuTurn,
-  endTeamBattle
+module.exports = {
+  newState, getStartState, applyAtk, tickEffects, 
+  endBattle, checkDeath, processTurn, autoResolveIfBlocked
 };
