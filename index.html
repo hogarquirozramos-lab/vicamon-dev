@@ -16,7 +16,7 @@
   <div class="login-sub">The Vitality Cash Game · Dev</div>
   <div class="login-box">
     <div id="step-wallet" style="margin-bottom:16px">
-      <div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Paso 1 — Conectar wallet</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Paso 1 — Conectar o Jugar</div>
       <button class="btn" id="btn-phantom" style="width:100%;padding:11px;display:flex;align-items:center;justify-content:center;gap:10px" onclick="connectPhantom()">👻 Conectar Phantom</button>
       <div id="wallet-connected" style="display:none;background:rgba(93,202,165,.1);border:0.5px solid rgba(93,202,165,.3);border-radius:8px;padding:10px 12px;margin-top:8px">
         <div style="font-size:10px;color:#5DCAA5;margin-bottom:2px">✓ Wallet conectada</div>
@@ -29,6 +29,8 @@
       <div id="no-phantom" style="display:none;background:rgba(240,153,122,.1);border:0.5px solid rgba(240,153,122,.3);border-radius:8px;padding:10px 12px;margin-top:8px;font-size:12px;color:#F0997B">
         Phantom no detectado. <a href="https://phantom.app" target="_blank" style="color:#F0997B;text-decoration:underline">Instalalo aqui</a> y recarga la pagina.
       </div>
+      <!-- NUEVO: Botón de Invitado -->
+      <button class="btn" id="btn-guest" style="width:100%;padding:11px;display:flex;align-items:center;justify-content:center;gap:10px;margin-top:10px;background:rgba(130,80,180,.2);border:1px solid rgba(130,80,180,.4);color:#CFA9EC" onclick="joinAsGuest()">🎮 Jugar sin Wallet (Solo XP)</button>
     </div>
     <div id="step-name" style="opacity:.4;pointer-events:none">
       <div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Paso 2 — Tu nombre de combate</div>
@@ -39,7 +41,7 @@
       <div style="font-size:11px;color:#85B7EB;margin-bottom:5px">💡 Deposita USDC para retar jugadores reales</div>
       <div style="font-size:11px;color:rgba(255,255,255,.45);margin-bottom:8px">0.10 USDC = 100 HP · cualquier monto funciona</div>
       <div style="background:rgba(0,0,0,.35);border-radius:6px;padding:8px 10px;font-family:monospace;font-size:10px;color:#85B7EB;word-break:break-all;margin-bottom:6px;cursor:pointer;display:flex;justify-content:space-between;align-items:center" onclick="copyWallet()">
-        <span>DIRECCION_WALLET_A</span>
+        <span id="platform-wallet-span">DIRECCION_WALLET_A</span>
         <span style="font-size:10px;margin-left:8px;white-space:nowrap">📋 copiar</span>
       </div>
       <button class="btn btn-sm" style="width:100%;font-size:11px" onclick="checkHPNow()">Ya deposité — verificar HP</button>
@@ -51,7 +53,11 @@
 <div id="s-profile" class="screen">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
     <h1 style="margin:0">Perfil del Entrenador</h1>
-    <button class="btn btn-sm btn-red" onclick="disconnectWallet()">🚪 Desconectar Wallet</button>
+    <div style="display:flex;gap:8px">
+      <!-- NUEVO: Botón para conectar wallet si eres invitado -->
+      <button class="btn btn-sm" id="btn-connect-wallet-profile" style="display:none;background:rgba(93,202,165,.2);border:1px solid rgba(93,202,165,.4);color:#5DCAA5" onclick="connectPhantom()">👻 Conectar Wallet</button>
+      <button class="btn btn-sm btn-red" onclick="disconnectWallet()">🚪 Salir</button>
+    </div>
   </div>
   <div style="background:rgba(255,255,255,.04);border:0.5px solid rgba(255,255,255,.1);border-radius:12px;padding:16px;margin-bottom:16px">
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
@@ -203,7 +209,7 @@
 
 <div class="modal-bg hidden" id="modal-gauntlet">
   <div class="modal" style="max-width:450px">
-    <h3 id="g-title" style="color:#F6E266"></h3>
+    <h3 id="g-title" style="color:#F6E265"></h3>
     <p id="g-sub" style="font-size:13px;margin-bottom:15px"></p>
     <div id="g-beast-picker" style="display:grid;grid-template-columns:repeat(4, 1fr);gap:8px;margin-bottom:20px;max-height:300px;overflow-y:auto"></div>
     <button class="btn btn-blue" style="width:100%" onclick="continueGauntlet()">Continuar al siguiente Jefe →</button>
