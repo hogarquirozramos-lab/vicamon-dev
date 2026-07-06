@@ -62,11 +62,16 @@ const server = http.createServer(async (req, res) => {
   const urlPath = req.url.split('?')[0];
   
   if (urlPath === '/ver-db-secreta') { try { const players = await getAllPlayersDebug(); res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(players, null, 2)); } catch(e) { res.writeHead(500); res.end('Error leyendo DB'); } return; }
-  if (urlPath === '/platform-wallet') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ wallet: PLATFORM_WALLET })); return; }
+  
+  if (urlPath === '/platform-wallet') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ wallet: PLATFORM_WALLET }));
+    return;
+  }
 
-  if (urlPath === '/admin') { /* ... admin html ... */ 
+  if (urlPath === '/admin') {
     res.writeHead(200, { 'Content-Type': 'text/html' });
-    res.end(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Admin</title><style>body{font-family:system-ui;background:#0a0a0f;color:#fff;padding:20px;max-width:1000px;margin:0 auto}input,button{background:#1a1a24;border:1px solid #333;color:#fff;padding:10px;border-radius:8px;outline:none}button{cursor:pointer;background:#4a9eff;border:none;font-weight:bold}button:disabled{opacity:.5;cursor:not-allowed}.plat-info{background:#14141e;padding:15px;border-radius:12px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center}table{width:100%;border-collapse:collapse;background:#14141e;border-radius:12px;overflow:hidden}th,td{padding:12px;border-bottom:1px solid #2a2a35;text-align:left;font-size:14px}th{color:#85B7EB;text-transform:uppercase;font-size:12px}td input{width:80px;padding:5px;background:#111;border:1px solid #333;text-align:center;color:#fff;border-radius:4px}.btn-save{background:#5DCAA5;padding:8px 16px;color:#000}</style></head><body><h1>Panel de Administración</h1><div style="margin-bottom:20px"><input type="password" id="pass" placeholder="Contraseña de admin"> <button onclick="loadData()">Desbloquear</button></div><div class="plat-info" id="plat-info" style="display:none"><span>HP Ganados por la Plataforma:</span><b id="plat-hp">-</b></div><br><table id="tbl" style="display:none"><thead><tr><th>Wallet</th><th>Nickname</th><th>HP</th><th>HP Bloqueados</th><th>Acción</th></tr></thead><tbody id="data"></tbody></table><script>let P='';async function loadData(){P=document.getElementById('pass').value;if(!P)return alert('Ingresa la contraseña');const r=await fetch('/admin-data?pass='+encodeURIComponent(P));if(!r.ok)return alert('Contraseña incorrecta');const d=await r.json();document.getElementById('plat-info').style.display='flex';document.getElementById('tbl').style.display='table';document.getElementById('plat-hp').textContent=d.platformHp+' HP ('+(d.platformHp*0.001).toFixed(3)+' USDC)';document.getElementById('data').innerHTML=d.players.map(p=>'<tr><td>'+p.wallet.slice(0,8)+'...'+p.wallet.slice(-4)+'</td><td>'+(p.last_name||'-')+'</td><td><input type="number" value="'+p.hp+'" id="hp-'+p.wallet+'"></td><td>'+(p.locked_hp||0)+'</td><td><button class=\"btn-save\" onclick=\"saveHP(\''+p.wallet+'\')\">Guardar</button></td></tr>').join('')}async function saveHP(w){const hp=document.getElementById('hp-'+w).value;await fetch('/admin-update-hp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pass:P,wallet:w,hp:parseInt(hp)})});alert('✓ Actualizado')}</script></body></html>`);
+    res.end(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Admin - VICAMON</title><style>body{font-family:system-ui;background:#0a0a0f;color:#fff;padding:20px;max-width:1000px;margin:0 auto}.header{display:flex;gap:10px;margin-bottom:20px;align-items:center}input,button{background:#1a1a24;border:1px solid #333;color:#fff;padding:10px;border-radius:8px;outline:none}button{cursor:pointer;background:#4a9eff;border:none;font-weight:bold}button:disabled{opacity:.5;cursor:not-allowed}.plat-info{background:#14141e;padding:15px;border-radius:12px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center}.plat-info span{font-size:14px;color:#85B7EB}.plat-info b{font-size:18px;color:#5DCAA5}table{width:100%;border-collapse:collapse;background:#14141e;border-radius:12px;overflow:hidden}th,td{padding:12px;border-bottom:1px solid #2a2a35;text-align:left;font-size:14px}th{color:#85B7EB;text-transform:uppercase;font-size:12px}td input{width:80px;padding:5px;background:#111;border:1px solid #333;text-align:center;color:#fff;border-radius:4px}.btn-save{background:#5DCAA5;padding:8px 16px;color:#000}.admin-actions{margin-top:20px;display:flex;gap:10px;flex-wrap:wrap}.btn-withdraw{background:#F5A623;color:#000;padding:10px 20px;font-size:14px}</style></head><body><h1>Panel de Administración</h1><div class="header"><input type="password" id="pass" placeholder="Contraseña de admin"><button onclick="loadData()">Desbloquear y Cargar</button></div><div class="plat-info" id="plat-info" style="display:none"><span>HP Ganados por la Plataforma (Comisiones):</span><b id="plat-hp">-</b></div><div class="admin-actions" id="admin-btns" style="display:none"><button onclick="withdrawFunds()" id="btn-withdraw" class="btn-withdraw">💸 Retirar Ganancias a Wallet</button><button onclick="resetPlatformHP()">Resetear HP Plataforma</button><button onclick="unlockAllHP()">Desbloquear HP de todos</button></div><br><br><table id="tbl" style="display:none"><thead><tr><th>Wallet</th><th>Nickname</th><th>HP</th><th>HP Bloqueados</th><th>Acción</th></tr></thead><tbody id="data"></tbody></table><script>let globalPass='';async function loadData(){globalPass=document.getElementById('pass').value;if(!globalPass)return alert('Ingresa la contraseña');const res=await fetch('/admin-data?pass='+encodeURIComponent(globalPass));if(!res.ok){alert('Contraseña incorrecta');return}const data=await res.json();document.getElementById('plat-info').style.display='flex';document.getElementById('tbl').style.display='table';document.getElementById('admin-btns').style.display='flex';document.getElementById('plat-hp').textContent=data.platformHp+' HP ('+(data.platformHp*0.001).toFixed(3)+' USDC)';document.getElementById('data').innerHTML=data.players.map(p=>'<tr><td>'+p.wallet.slice(0,8)+'...'+p.wallet.slice(-4)+'</td><td>'+(p.last_name||'-')+'</td><td><input type="number" value="'+p.hp+'" id="hp-'+p.wallet+'"></td><td>'+(p.locked_hp||0)+'</td><td><button class="btn-save" onclick="saveHP(\''+p.wallet+'\')">Guardar</button></td></tr>').join('')}async function saveHP(wallet){const hp=document.getElementById('hp-'+wallet).value;const res=await fetch('/admin-update-hp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pass:globalPass,wallet,hp:parseInt(hp)})});const data=await res.json();if(data.ok)alert('✓ HP actualizado a '+hp);else alert('Error al actualizar')}async function resetPlatformHP(){if(!confirm('¿Resetear los HP de la plataforma a 0?'))return;const res=await fetch('/admin-reset-platform',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pass:globalPass})});if(res.ok)alert('✓ HP de la plataforma reseteados.')}async function unlockAllHP(){if(!confirm('¿Desbloquear todos los HP de jugadores?'))return;const res=await fetch('/admin-unlock-hp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pass:globalPass})});if(res.ok)alert('✓ HP desbloqueados.')}async function withdrawFunds(){const btn=document.getElementById('btn-withdraw');if(!confirm('¿Retirar TODOS los USDC de la plataforma a tu wallet personal?'))return;btn.disabled=true;btn.textContent='Procesando retiro...';try{const res=await fetch('/admin-withdraw',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pass:globalPass})});const data=await res.json();if(data.ok){alert('✓ Retiro exitoso! Se enviaron '+data.amount+' USDC. TX: '+data.sig);location.reload()}else{alert('Error al retirar: '+(data.msg||'Desconocido'))}}catch(e){alert('Error de conexión')}btn.disabled=false;btn.textContent='💸 Retirar Ganancias a Wallet'}</script></body></html>`);
     return;
   }
 
@@ -74,11 +79,27 @@ const server = http.createServer(async (req, res) => {
   if (urlPath === '/admin-update-hp' && req.method === 'POST') { let body = ''; req.on('data', c => body += c); req.on('end', async () => { try { const { pass, wallet, hp } = JSON.parse(body); if (pass !== ADMIN_PASS) { res.writeHead(403); res.end(JSON.stringify({ ok: false })); return; } await adminSetHP(wallet, parseInt(hp)); res.writeHead(200); res.end(JSON.stringify({ ok: true })); } catch(e) { res.writeHead(400); res.end(JSON.stringify({ ok: false })); } }); return; }
   if (urlPath === '/admin-reset-platform' && req.method === 'POST') { let body = ''; req.on('data', c => body += c); req.on('end', async () => { try { const { pass } = JSON.parse(body); if (pass !== ADMIN_PASS) { res.writeHead(403); res.end(JSON.stringify({ ok: false })); return; } await adminResetPlatform(); res.writeHead(200); res.end(JSON.stringify({ ok: true })); } catch(e) { res.writeHead(400); res.end(JSON.stringify({ ok: false })); } }); return; }
   if (urlPath === '/admin-unlock-hp' && req.method === 'POST') { let body = ''; req.on('data', c => body += c); req.on('end', async () => { try { const { pass } = JSON.parse(body); if (pass !== ADMIN_PASS) { res.writeHead(403); res.end(JSON.stringify({ ok: false })); return; } await adminUnlockAllHP(); res.writeHead(200); res.end(JSON.stringify({ ok: true })); } catch(e) { res.writeHead(400); res.end(JSON.stringify({ ok: false })); } }); return; }
-  if (urlPath === '/admin-withdraw' && req.method === 'POST') { let body = ''; req.on('data', c => body += c); req.on('end', async () => { try { const { pass } = JSON.parse(body); if (pass !== ADMIN_PASS) { res.writeHead(403); res.end(JSON.stringify({ ok: false, msg: 'Forbidden' })); return; } if (!OWNER_WALLET) { res.writeHead(400); res.end(JSON.stringify({ ok: false, msg: 'OWNER_WALLET no configurada' })); return; } const balance = await getPlatformUSDCBalance(); if (balance <= 0.001) { res.writeHead(400); res.end(JSON.stringify({ ok: false, msg: 'No hay suficientes USDC' })); return; } const sig = await sendUSDC(OWNER_WALLET, balance); const hpToClear = Math.round(balance / USDC_PER_HP); await clearPlatformHp(hpToClear); res.writeHead(200); res.end(JSON.stringify({ ok: true, amount: balance, sig })); } catch(e) { res.writeHead(500); res.end(JSON.stringify({ ok: false, msg: e.message })); } }); return; }
+  
+  if (urlPath === '/admin-withdraw' && req.method === 'POST') {
+    let body = ''; req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { pass } = JSON.parse(body);
+        if (pass !== ADMIN_PASS) { res.writeHead(403); res.end(JSON.stringify({ ok: false, msg: 'Forbidden' })); return; }
+        if (!OWNER_WALLET) { res.writeHead(400); res.end(JSON.stringify({ ok: false, msg: 'OWNER_WALLET no configurada en el servidor' })); return; }
+        const balance = await getPlatformUSDCBalance();
+        if (balance <= 0.001) { res.writeHead(400); res.end(JSON.stringify({ ok: false, msg: 'No hay suficientes USDC para retirar' })); return; }
+        const sig = await sendUSDC(OWNER_WALLET, balance);
+        const hpToClear = Math.round(balance / USDC_PER_HP);
+        await clearPlatformHp(hpToClear);
+        res.writeHead(200); res.end(JSON.stringify({ ok: true, amount: balance, sig }));
+      } catch(e) { res.writeHead(500); res.end(JSON.stringify({ ok: false, msg: e.message })); }
+    });
+    return;
+  }
 
   if (urlPath === '/hp') { 
     const wallet = new URL(req.url, 'http://localhost').searchParams.get('wallet') || ''; 
-    // SEGURIDAD: Consultas de HP para invitados devuelven 0 sin tocar la DB
     if (wallet.startsWith('guest_')) {
       res.writeHead(200, { 'Content-Type': 'application/json' }); 
       res.end(JSON.stringify({ hp: 0, wallet, stats: { wins: 0, losses: 0, rank: null } })); 
@@ -88,7 +109,7 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ hp, wallet, stats: { wins: stats.wins, losses: stats.losses, rank } })); return; 
   }
   
-  if (urlPath === '/payment' && req.method === 'POST') { /* ... payment logic ... */ 
+  if (urlPath === '/payment' && req.method === 'POST') {
     const secret = req.headers['x-internal-secret'];
     if (secret !== (process.env.INTERNAL_SECRET || 'dev-secret')) { res.writeHead(403); res.end(JSON.stringify({ error: 'Forbidden' })); return; }
     let body = '';
@@ -129,11 +150,8 @@ wss.on('connection', ws => {
     try {
       if (msg.type === 'join') {
         const wallet = msg.wallet || '';
-        const isGuest = msg.isGuest || wallet.startsWith('guest_'); // SEGURIDAD: Verificar en backend
+        const isGuest = msg.isGuest || wallet.startsWith('guest_'); 
         
-        // ═══════════════════════════════════════════
-        // SISTEMA DE RECONEXIÓN (Solo para wallets reales)
-        // ═══════════════════════════════════════════
         if (!isGuest && walletToBattle.has(wallet)) {
           const bId = walletToBattle.get(wallet);
           const b = battles.get(bId);
@@ -160,9 +178,6 @@ wss.on('connection', ws => {
           } else { walletToBattle.delete(wallet); }
         }
 
-        // ═══════════════════════════════════════════
-        // LÓGICA NORMAL DE JOIN
-        // ═══════════════════════════════════════════
         for (const [oldId, p] of lobby) {
           if (p.wallet === wallet && oldId !== id) {
             send(p.ws, { type: 'kicked', msg: 'Tu wallet se conectó en otra pestaña.' });
@@ -173,7 +188,6 @@ wss.on('connection', ws => {
         lobby.set(id, { ws, name: msg.name, beast: msg.beast, wallet, inBattle: false, id, isGuest });
         
         if (isGuest) {
-          // SEGURIDAD: Invitados no tocan la DB
           send(ws, { type: 'joined', id, hp: 0, isGuest: true, stats: { wins: 0, losses: 0, rank: null } });
         } else {
           await updatePlayerName(wallet, msg.name);
@@ -192,12 +206,11 @@ wss.on('connection', ws => {
         const p = lobby.get(id); 
         if (p) { 
           p.name = msg.name; 
-          if (!p.isGuest) await updatePlayerName(p.wallet, msg.name); // SEGURIDAD: Solo DB si no es invitado
+          if (!p.isGuest) await updatePlayerName(p.wallet, msg.name);
           await pushLobby(); send(ws, { type: 'nickname_updated', name: msg.name }); 
         } 
       }
 
-      // SEGURIDAD: Bloquear batallas por HP para invitados
       if (msg.type === 'challenge') {
         const challenger = lobby.get(id); const target = lobby.get(msg.targetId);
         if (!challenger || !target || target.inBattle || challenger.inBattle) return;
@@ -224,7 +237,6 @@ wss.on('connection', ws => {
           send(p2.ws, { type: 'battle_start', battleId: bId, role: 'p2', opponent: p1.name, opponentBeast: p1.beast, isTraining: true });
           await pushLobby(); setTimeout(() => pushBattle(bId), 120);
         } else {
-          // SEGURIDAD: Verificar que ninguno sea invitado en batallas por HP
           if (p1.isGuest || p2.isGuest) { send(ws, { type: 'error', msg: 'Los invitados no pueden hacer batallas por HP.' }); return; }
           if (!await hasHP(p1.wallet, 100) || !await hasHP(p2.wallet, 100)) { send(p1.ws, { type: 'error', msg: 'Fondos insuficientes.' }); return; }
           await lockHP(p1.wallet, 100); await lockHP(p2.wallet, 100);
@@ -242,7 +254,7 @@ wss.on('connection', ws => {
       if (msg.type === 'challenge_3v3') {
         const challenger = lobby.get(id); const target = lobby.get(msg.targetId);
         if (!challenger || !target || target.inBattle || challenger.inBattle) return;
-        if (challenger.isGuest || target.isGuest) { send(ws, { type: 'error', msg: 'Los invitados no pueden hacer batallas por HP.' }); return; } // SEGURIDAD
+        if (challenger.isGuest || target.isGuest) { send(ws, { type: 'error', msg: 'Los invitados no pueden hacer batallas por HP.' }); return; }
         const challengerHP = await getHP(challenger.wallet); const targetHP = await getHP(target.wallet);
         if (challengerHP < 300) { send(ws, { type: 'error', msg: `Necesitas 300 HP.` }); return; }
         if (targetHP < 300) { send(ws, { type: 'error', msg: `Ese jugador no tiene 300 HP.` }); return; }
@@ -260,7 +272,7 @@ wss.on('connection', ws => {
         if (!p1 || !p2 || p1.inBattle || p2.inBattle) return;
         p2.team = msg.team;
         if (!msg.isTraining) {
-          if (p1.isGuest || p2.isGuest) { send(ws, { type: 'error', msg: 'Los invitados no pueden hacer batallas por HP.' }); return; } // SEGURIDAD
+          if (p1.isGuest || p2.isGuest) { send(ws, { type: 'error', msg: 'Los invitados no pueden hacer batallas por HP.' }); return; }
           if (!await hasHP(p1.wallet, 300) || !await hasHP(p2.wallet, 300)) { send(p1.ws, { type: 'error', msg: 'Fondos insuficientes para 3v3.' }); return; }
           await lockHP(p1.wallet, 300); await lockHP(p2.wallet, 300);
         }
@@ -315,7 +327,7 @@ wss.on('connection', ws => {
 
       if (msg.type === 'challenge_gauntlet') {
         const pl = lobby.get(id); if (!pl || pl.inBattle) return;
-        if (pl.isGuest) { send(ws, { type: 'error', msg: 'Los invitados no pueden entrar a la Torre.' }); return; } // SEGURIDAD
+        if (pl.isGuest) { send(ws, { type: 'error', msg: 'Los invitados no pueden entrar a la Torre.' }); return; }
         if (msg.beast) pl.beast = msg.beast; 
         if (!await hasHP(pl.wallet, 100)) { send(ws, { type: 'error', msg: 'Necesitas 100 HP para la Torre.' }); return; }
         await lockHP(pl.wallet, 100); pl.inBattle = true;
@@ -334,7 +346,7 @@ wss.on('connection', ws => {
       
       if (msg.type === 'cashout') {
         const pl = lobby.get(id);
-        if (!pl || pl.inBattle || pl.isGuest) { send(ws, { type: 'cashout_result', ok: false, reason: 'No permitido para invitados' }); return; } // SEGURIDAD
+        if (!pl || pl.inBattle || pl.isGuest) { send(ws, { type: 'cashout_result', ok: false, reason: 'No permitido para invitados' }); return; }
         const currentHp = await getHP(pl.wallet);
         if (currentHp <= 0) { send(ws, { type: 'cashout_result', ok: false, reason: 'Sin HP' }); return; }
         const usdcNeeded = parseFloat((currentHp * 0.001).toFixed(6));
@@ -360,13 +372,9 @@ wss.on('connection', ws => {
     try {
       const p = lobby.get(id); if (!p) return;
 
-      // ═══════════════════════════════════════════
-      // SISTEMA DE DESCONEXIÓN
-      // ═══════════════════════════════════════════
       const bId = walletToBattle.get(p.wallet);
       const b = battles.get(bId);
 
-      // SEGURIDAD: Si es invitado, NO hay tiempo de gracia. Pierde instantáneamente.
       if (p.isGuest && b && !b.isTraining && !b.isCpu && !b.isGauntlet) {
         const winnerId = (id === b.p1id) ? b.p2id : b.p1id;
         const winnerSt = (id === b.p1id) ? b.st2 : b.st1;
@@ -374,7 +382,6 @@ wss.on('connection', ws => {
         walletToBattle.delete(p.wallet);
       } 
       else if (b && !b.isTraining && !b.isCpu && !b.isGauntlet) {
-        // Lógica normal de gracia para wallets reales
         b.dcPlayerId = id; b.dcWallet = p.wallet; b.dcTime = Date.now();
         b.dcTimer = setTimeout(async () => {
           const currentB = battles.get(bId);
@@ -407,7 +414,6 @@ wss.on('connection', ws => {
         lobby.delete(id); await pushLobby(); return;
       }
 
-      // Lógica normal de desconexión (CPU, Entrenamiento, etc.)
       for (const [bId, b] of battles) {
         if (b.isTraining && (b.p1id === id || b.p2id === id)) { battles.delete(bId); } 
         else if (b.isTeamBattle && (b.p1id === id || b.p2id === id)) { 
