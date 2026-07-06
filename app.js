@@ -25,6 +25,7 @@ let isGauntletChallenge = false;
 let lastMsgTime = Date.now(); 
 
 let platformWalletAddress = ''; 
+let isGuest = false; // NUEVO: Flag para modo invitado
 
 const audioFiles = {
     lobby: new Audio('Audio/lobby.mp3'),
@@ -48,10 +49,24 @@ window.addEventListener('load', () => {
   const btnG = document.getElementById('btn-gauntlet'); 
   if (btnG) {
     btnG.style.display = GAUNTLET_HABILITADO ? 'inline-block' : 'none'; 
-    btnG.disabled = true; // NUEVO: Inicia deshabilitado hasta cargar HP
+    btnG.disabled = true; 
   }
   fetchPlatformWallet(); 
 });
+
+// NUEVO: Función para entrar como invitado
+function joinAsGuest() {
+  myWallet = 'guest_' + Math.random().toString(36).substring(2, 10);
+  isGuest = true;
+  document.getElementById('btn-phantom').style.display = 'none';
+  document.getElementById('no-phantom').style.display = 'none';
+  document.getElementById('wallet-connected').style.display = 'none';
+  document.getElementById('step-charge').style.display = 'none';
+  document.getElementById('step-name').style.opacity = '1';
+  document.getElementById('step-name').style.pointerEvents = 'auto';
+  const savedName = localStorage.getItem('vicamon_nick');
+  if (savedName) document.getElementById('inp-name').value = savedName;
+}
 
 async function fetchPlatformWallet() {
   try {
@@ -65,7 +80,15 @@ async function fetchPlatformWallet() {
   } catch(e) { console.error("Error cargando wallet de plataforma:", e); }
 }
 
-async function disconnectWallet() { try { const phantom = getPhantom(); if (phantom && phantom.isConnected) await phantom.disconnect(); } catch(e) {} myWallet = ''; myName = ''; myBeast = ''; if(ws) { try { ws.close(); } catch(e){} } document.getElementById('btn-phantom').style.display='flex'; document.getElementById('wallet-connected').style.display='none'; document.getElementById('no-phantom').style.display='none'; document.getElementById('inp-name').value = ''; show('s-login'); }
+async function disconnectWallet() { 
+  try { const phantom = getPhantom(); if (phantom && phantom.isConnected) await phantom.disconnect(); } catch(e) {} 
+  myWallet = ''; myName = ''; myBeast = ''; isGuest = false; 
+  if(ws) { try { ws.close(); } catch(e){} } 
+  document.getElementById('btn-phantom').style.display='flex'; 
+  document.getElementById('wallet-connected').style.display='none'; 
+  document.getElementById('no-phantom').style.display='none'; 
+  document.getElementById('inp-name').value = ''; show('s-login'); 
+}
 
 function copyWallet() { 
   if (!platformWalletAddress) return alert('La wallet no se ha cargado aún.');
@@ -75,6 +98,7 @@ function copyWallet() {
 }
 
 function depositWidgetHTML() { 
+  if (isGuest) return ''; // NUEVO: No mostrar widget a invitados
   const walletAddr = platformWalletAddress || 'Cargando...';
   return `<div style="background:rgba(74,158,255,.06);border:0.5px solid rgba(74,158,255,.2);border-radius:10px;padding:10px 12px"><div style="font-size:11px;color:#85B7EB;margin-bottom:4px">💡 Deposita USDC para obtener HP</div><div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:7px">0.10 USDC = 100 HP · cualquier monto funciona</div><div style="display:flex;gap:6px;align-items:center"><div style="flex:1;background:rgba(0,0,0,.35);border-radius:6px;padding:6px 8px;font-family:monospace;font-size:9px;color:#85B7EB;word-break:break-all;cursor:pointer" onclick="copyWallet()">${walletAddr} <span style="color:rgba(255,255,255,.3)">📋</span></div><button class="btn btn-sm" style="font-size:10px;white-space:nowrap;padding:5px 10px" onclick="checkHPNow()">Verificar HP</button></div></div>`; 
 }
@@ -95,6 +119,7 @@ async function connectPhantom() {
   try {
     const resp = await phantom.connect();
     myWallet = resp.publicKey.toString();
+    isGuest = false; // NUEVO: Conectó wallet, ya no es invitado
     document.getElementById('btn-phantom').style.display='none';
     document.getElementById('wallet-connected').style.display='block';
     document.getElementById('wallet-addr').textContent = myWallet.slice(0,8)+'...'+myWallet.slice(-6);
@@ -116,6 +141,7 @@ window.addEventListener('load', async () => {
     try {
       const r2 = await ph2.connect({ onlyIfTrusted: true }); 
       myWallet = r2.publicKey.toString(); 
+      isGuest = false;
       document.getElementById('btn-phantom').style.display='none'; 
       document.getElementById('wallet-connected').style.display='block'; 
       document.getElementById('wallet-addr').textContent = myWallet.slice(0,8)+'...'+myWallet.slice(-6); 
@@ -142,6 +168,7 @@ setInterval(() => {
 }, 10000);
 
 async function checkHPNow(fromConnect=false) {
+  if (isGuest) { updateHPDisplay(0); return; } // NUEVO: Invitados no tienen HP
   if (!myWallet) return;
   try {
     const res = await fetch('/hp?wallet='+myWallet); const data = await res.json(); const hp = data.hp || 0;
@@ -155,7 +182,7 @@ async function checkHPNow(fromConnect=false) {
   } catch(e) { document.getElementById('wallet-hp').textContent = 'Error'; }
 }
 
-function updateProfileUI(stats) { if (stats) myStats = stats; const nameEl = document.getElementById('profile-name'); if (nameEl) { nameEl.textContent = myName || 'Jugador'; document.getElementById('profile-wallet').textContent = myWallet ? myWallet.slice(0,8)+'...'+myWallet.slice(-6) : 'Desconectado'; document.getElementById('profile-wins').textContent = myStats.wins || 0; document.getElementById('profile-losses').textContent = myStats.losses || 0; document.getElementById('profile-rank').textContent = myStats.rank ? '#' + myStats.rank : 'Sin clasificado'; } }
+function updateProfileUI(stats) { if (stats) myStats = stats; const nameEl = document.getElementById('profile-name'); if (nameEl) { nameEl.textContent = myName || 'Jugador'; document.getElementById('profile-wallet').textContent = isGuest ? 'Modo Invitado (Sin Wallet)' : (myWallet ? myWallet.slice(0,8)+'...'+myWallet.slice(-6) : 'Desconectado'); document.getElementById('profile-wins').textContent = myStats.wins || 0; document.getElementById('profile-losses').textContent = myStats.losses || 0; document.getElementById('profile-rank').textContent = myStats.rank ? '#' + myStats.rank : 'Sin clasificado'; } }
 function show(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); if(id === 's-login' || id === 's-pick' || id === 's-lobby' || id === 's-profile' || id === 's-team-select') playMusic('lobby'); if(id === 's-battle' || id === 's-result') playMusic('batalla'); }
 function hpColor(pct){return pct>50?'#5DCAA5':pct>25?'#EF9F27':'#F0997B';}
 function stTags(st,right=false){ let t=''; if(st.poisonTurns>0) t+=`<span class="stag" style="background:rgba(83,150,40,.3);color:#9ECC5A">☠×${st.poisonTurns}</span>`; if(st.burnTurns>0) t+=`<span class="stag" style="background:rgba(216,90,48,.3);color:#F0997B">🔥×${st.burnTurns}</span>`; if(st.shield>0) t+=`<span class="stag" style="background:rgba(55,138,221,.3);color:#85B7EB">🛡×${st.shield}</span>`; if(st.reflect50>0) t+=`<span class="stag" style="background:rgba(55,138,221,.2);color:#85B7EB">↩50%</span>`; if(st.stun) t+=`<span class="stag" style="background:rgba(212,83,126,.3);color:#ED93B1">💫stun</span>`; if(st.recharge>0) t+=`<span class="stag" style="background:rgba(136,135,128,.3);color:#B4B2A9">⚡×${st.recharge}</span>`; if(st.blind>0) t+=`<span class="stag" style="background:rgba(186,117,23,.3);color:#EF9F27">👁×${st.blind}</span>`; if(st.weakAtk>0) t+=`<span class="stag" style="background:rgba(15,110,86,.3);color:#5DCAA5">⬇atk×${st.weakAtk}</span>`; if(st.weaken>0) t+=`<span class="stag" style="background:rgba(15,110,86,.3);color:#5DCAA5">⬇dmg×${st.weaken}</span>`; if(st.analyzed>0) t+=`<span class="stag" style="background:rgba(130,80,180,.3);color:#CFA9EC">🔍×${st.analyzed}</span>`; return t; }
@@ -169,7 +196,7 @@ function buildBestiary(){ const keys=Object.entries(BEASTS); let html=''; const 
 function showBestiaryDetail(k){ const b=BEASTS[k]; const panel=document.getElementById('bestiary-detail-panel'); const statData={atk:{aries:70,tauro:55,geminis:65,cancer:45,leo:70,virgo:60,libra:62,escorpio:65,sagitario:68,capricornio:50,acuario:72,piscis:58},def:{aries:30,tauro:90,geminis:50,cancer:95,leo:65,virgo:70,libra:62,escorpio:55,sagitario:55,capricornio:92,acuario:45,piscis:68},spd:{aries:90,tauro:30,geminis:80,cancer:40,leo:70,virgo:65,libra:62,escorpio:70,sagitario:75,capricornio:35,acuario:85,piscis:60}}; const atksHtml=b.attacks.map(a=>{ const tags=[]; if(a.pierce) tags.push('<span class="atk-tag tag-pierce">Ignora escudo</span>'); if(a.fx==='double') tags.push('<span class="atk-tag tag-nobreak">Doble golpe</span>'); if(a.fx==='triple') tags.push('<span class="atk-tag tag-nobreak">Triple golpe</span>'); if(a.risk||a.self>0) tags.push(`<span class="atk-tag tag-risk">Riesgo${a.self>0?' -'+a.self+' HP':''}</span>`); if(a.buff) tags.push('<span class="atk-tag tag-buff">Buff</span>'); if(a.dot) tags.push('<span class="atk-tag tag-dot">Daño/turno</span>'); if(a.debuff) tags.push('<span class="atk-tag tag-debuff">Debuff</span>'); const ppText = a.pp === 99 || a.pp === undefined ? 'PP: ∞' : `PP: ${a.pp}`; return `<div class="bd-atk"><div class="bd-atk-top"><span class="bd-atk-name">${a.n}</span><span class="bd-atk-dmg ${dmgClassPick(a)}">${dmgLabelPick(a)}</span></div>${tags.length?`<div class="bd-atk-tags">${tags.join('')}</div>`:''}<div class="bd-atk-desc">${a.desc}</div><div style="display:flex;justify-content:space-between;align-items:center"><div class="bd-atk-acc">${a.acc}% precisión</div><div class="bd-atk-pp">${ppText}</div></div></div>`; }).join(''); panel.innerHTML=`<div class="bd-left"><img src="${b.img}" alt="${b.name}"><div class="bd-name">${b.name}</div><div class="bd-sub">${b.sub}</div><div class="bd-stats"><div class="bd-stat"><div class="bd-stat-val">${statData.atk[k]||'—'}</div><div class="bd-stat-lbl">ATK</div></div><div class="bd-stat"><div class="bd-stat-val">${statData.def[k]||'—'}</div><div class="bd-stat-lbl">DEF</div></div><div class="bd-stat"><div class="bd-stat-val">${statData.spd[k]||'—'}</div><div class="bd-stat-lbl">VEL</div></div></div></div><div class="bd-attacks">${atksHtml}</div>`; panel.classList.add('open'); panel.scrollIntoView({behavior:'smooth',block:'nearest'}); }
 
 function goProfile(){ 
-  if(!myWallet){alert('Primero conecta tu wallet Phantom');return;} 
+  if(!myWallet){alert('Primero conecta tu wallet o elige modo invitado');return;} 
   myName=document.getElementById('inp-name').value.trim(); 
   if(!myName){alert('Escribe tu nombre de combate');return;} 
   localStorage.setItem('vicamon_nick', myName); 
@@ -180,6 +207,8 @@ function goProfile(){
   checkHPNow(false); 
   const profWidget = document.getElementById('profile-deposit-widget'); 
   if(profWidget) profWidget.innerHTML = depositWidgetHTML();
+  // NUEVO: Mostrar botón de conectar wallet si es invitado
+  document.getElementById('btn-connect-wallet-profile').style.display = isGuest ? 'inline-block' : 'none';
   if (!ws || ws.readyState !== 1) {
     connectWS();
   }
@@ -192,13 +221,17 @@ function openChallengeMenu(targetId, name, isTrain) {
   pendingChallengeTargetId = targetId;
   pendingIsTraining = isTrain;
   isGauntletChallenge = false;
-  const title = isTrain ? `Entrenar con ${name}` : `Retar a ${name}`;
+  const targetIsGuest = _lastLobbyPlayers.find(p => p.id === targetId)?.isGuest || false; // NUEVO
+  const canBet = !isGuest && !targetIsGuest; // NUEVO: Solo apuestas si ambos tienen wallet
+  const title = (!canBet && !isTrain) ? `Entrenar con ${name} (Solo XP)` : (isTrain ? `Entrenar con ${name}` : `Retar a ${name}`);
   let buttonsHtml = '';
-  if (isTrain) {
+  if (isTrain || !canBet) {
     buttonsHtml += `<button class="btn btn-blue" style="width:100%;margin-bottom:10px" onclick="selectChallengeMode('train')">🤝 Entrenar 1 vs 1 (XP)</button>`;
     buttonsHtml += `<button class="btn btn-blue" style="width:100%" onclick="selectChallengeMode('train3v3')">🤝 Entrenar 3 vs 3 (XP)</button>`;
   } else {
+    buttonsHtml += `<button class="btn btn-blue" style="width:100%;margin-bottom:10px" onclick="selectChallengeMode('train')">🤝 Entrenar 1 vs 1 (XP)</button>`;
     buttonsHtml += `<button class="btn btn-blue" style="width:100%;margin-bottom:10px" ${myCurrentHP < 100 ? 'disabled' : ''} onclick="selectChallengeMode('1v1')">⚔️ 1 vs 1 (Apuesta 100 HP)</button>`;
+    buttonsHtml += `<button class="btn btn-blue" style="width:100%" onclick="selectChallengeMode('train3v3')">🤝 Entrenar 3 vs 3 (XP)</button>`;
     buttonsHtml += `<button class="btn btn-blue" style="width:100%" ${myCurrentHP < 300 ? 'disabled' : ''} onclick="selectChallengeMode('3v3')">⚔️ 3 vs 3 (Apuesta 300 HP)</button>`;
   }
   const modal = document.getElementById('modal-challenge-mode');
@@ -266,11 +299,12 @@ function confirmTeam() {
 }
 
 function enterLobby(){ if(ws && ws.readyState === 1) { show('s-lobby'); ws.send(JSON.stringify({type:'ping'})); } else { if(!myBeast) myBeast = 'aries'; connectWS(); } }
-function connectWS(){ clearTimeout(reconnectTimer); isKicked=false; const proto=location.protocol==='https:'?'wss':'ws'; const localWs = new WebSocket(`${proto}://${location.host}`); localWs.onopen=()=>{ clearTimeout(reconnectTimer); lastMsgTime = Date.now(); localWs.send(JSON.stringify({type:'join',name:myName,beast:myBeast||'aries',wallet:myWallet})); }; localWs.onmessage=e=>{ lastMsgTime = Date.now(); try{handleMsg(JSON.parse(e.data));}catch(err){console.error(err);} }; localWs.onerror=()=>{}; localWs.onclose=()=>{ if(ws !== localWs) return; const inBattle=document.getElementById('s-battle').classList.contains('active'); if(!inBattle && !isKicked) reconnectTimer=setTimeout(()=>{ if(myName&&myBeast) connectWS(); },2000); }; ws = localWs; }
+function connectWS(){ clearTimeout(reconnectTimer); isKicked=false; const proto=location.protocol==='https:'?'wss':'ws'; const localWs = new WebSocket(`${proto}://${location.host}`); localWs.onopen=()=>{ clearTimeout(reconnectTimer); lastMsgTime = Date.now(); localWs.send(JSON.stringify({type:'join',name:myName,beast:myBeast||'aries',wallet:myWallet,isGuest:isGuest})); }; localWs.onmessage=e=>{ lastMsgTime = Date.now(); try{handleMsg(JSON.parse(e.data));}catch(err){console.error(err);} }; localWs.onerror=()=>{}; localWs.onclose=()=>{ if(ws !== localWs) return; const inBattle=document.getElementById('s-battle').classList.contains('active'); if(!inBattle && !isKicked) reconnectTimer=setTimeout(()=>{ if(myName&&myBeast) connectWS(); },2000); }; ws = localWs; }
 
 function challengeGauntlet() {
+  if(isGuest) return alert('Debes conectar una Wallet para entrar a la Torre.'); // NUEVO
   if(!ws || ws.readyState !== 1) return alert('Conectando...');
-  if(myCurrentHP < 100) return alert('Necesitas al menos 100 HP para entrar a la Torre de Batalla.'); // NUEVO
+  if(myCurrentHP < 100) return alert('Necesitas al menos 100 HP para entrar a la Torre de Batalla.');
   if(!confirm('¿Iniciar la Torre de Batalla? (Apostarás 100 HP)')) return;
   isGauntletChallenge = true;
   teamSelectionMode = '1v1';
@@ -303,7 +337,7 @@ function executeSwitch(index) { closeSwitchMenu(); ws.send(JSON.stringify({type:
 function handleMsg(m){
   if(m.type==='joined'){ 
     myId=m.id; 
-    if(m.hp !== undefined) updateHPDisplay(m.hp); 
+    if(!isGuest && m.hp !== undefined) updateHPDisplay(m.hp); // NUEVO
     updateLobbyBadge(); 
     updateProfileUI(m.stats); 
     if(document.getElementById('s-login').classList.contains('active') && !isKicked) show('s-lobby'); 
@@ -340,37 +374,29 @@ function handleMsg(m){
   }
   if(m.type === 'team_force_switch'){ openSwitchMenu(m.reason); }
   
-  if(m.type==='hp_updated'){ updateHPDisplay(m.hp); myCurrentHP=m.hp; }
-  if(m.type==='cashout_result'){ const btn=document.getElementById('btn-cashout'); if(!m.ok){ if(btn){btn.disabled=false;btn.textContent='💰 Cashout';} alert('Error: '+m.reason); return; } if(m.status==='confirmed'){ if(btn){btn.disabled=false;btn.textContent='💰 Cashout';} updateHPDisplay(0); alert(`✓ Cashout: ${m.usdc} USDC`); } }
+  if(m.type==='hp_updated'){ if(!isGuest) updateHPDisplay(m.hp); myCurrentHP=m.hp; } // NUEVO
+  if(m.type==='cashout_result'){ if(isGuest) return; const btn=document.getElementById('btn-cashout'); if(!m.ok){ if(btn){btn.disabled=false;btn.textContent='💰 Cashout';} alert('Error: '+m.reason); return; } if(m.status==='confirmed'){ if(btn){btn.disabled=false;btn.textContent='💰 Cashout';} updateHPDisplay(0); alert(`✓ Cashout: ${m.usdc} USDC`); } }
   if(m.type==='error'){ alert('⚠ ' + m.msg); }
   
-  // ═══════════════════════════════════════════
   // SISTEMA DE DESCONEXIÓN / RECONEXIÓN PVP
-  // ═══════════════════════════════════════════
   if(m.type==='opponent_disconnected'){ 
     const turnBar = document.getElementById('turn-bar');
     if(turnBar) turnBar.innerHTML = '<span style="color:#EF9F27">⏳ Rival desconectado. Esperando reconexión (60s)...</span>';
     document.querySelectorAll('.atk-btn').forEach(btn => btn.disabled = true);
   }
-  
   if(m.type==='opponent_reconnected'){ 
     const turnBar = document.getElementById('turn-bar');
-    if(turnBar) turnBar.innerHTML = '<span>Turno del rival...</span>'; // Se actualizará con el próximo battle_state
+    if(turnBar) turnBar.innerHTML = '<span>Turno del rival...</span>';
   }
-
   if(m.type==='reconnect_battle'){
     battleId = m.battleId; 
     myRole = m.role; 
     oppName = m.opponent;
-    myId = m.id; // FIX LOBBY DUPLICADO: Actualizar nuestro ID local al nuevo del servidor
+    myId = m.id; 
     myBeast = m.myBeast;
     oppBeast = m.oppBeast;
     window._isTeamBattle = !!m.isTeamBattle;
-    
-    // Forzar entrada a la pantalla de batalla
     show('s-battle'); 
-    
-    // Mostrar mensaje de reconexión exitosa
     const turnBar = document.getElementById('turn-bar');
     if(turnBar) turnBar.innerHTML = '<span style="color:#5DCAA5">✓ ¡Reconectado con éxito! Sincronizando...</span>';
   }
@@ -384,12 +410,12 @@ function handleMsg(m){
     
     const winnerHp=m.winnerHp||0; 
     const newHp=m.newHp||0; 
-    if(m.stats) updateProfileUI(m.stats); 
+    if(!isGuest && m.stats) updateProfileUI(m.stats); // NUEVO
     show('s-result');
     
-    if(!isCpuResult && !isTrainingResult) updateHPDisplay(newHp); 
-    if(isGauntletResult) updateHPDisplay(newHp); 
-    if(isTeamResult && !isTrainingResult) updateHPDisplay(newHp);
+    if(!isCpuResult && !isTrainingResult && !isGuest) updateHPDisplay(newHp); // NUEVO
+    if(isGauntletResult && !isGuest) updateHPDisplay(newHp); // NUEVO
+    if(isTeamResult && !isTrainingResult && !isGuest) updateHPDisplay(newHp); // NUEVO
     
     let resultBody='';
     
@@ -404,7 +430,7 @@ function handleMsg(m){
         }
     } else if(isTrainingResult){
         const myXp = won ? (m.winnerXp || 0) : (m.loserXp || 0);
-        resultBody=`<div style="background:rgba(130,80,180,.08);border-radius:10px;padding:14px;margin:14px 0;text-align:center"><div style="font-size:20px">&#127891;</div><div style="font-size:13px;color:#CFA9EC">Entrenamiento 1v1</div><div style="font-size:14px;color:#5DCAA5;margin-top:8px">+${myXp} XP</div></div>`;
+        resultBody=`<div style="background:rgba(130,80,180,.08);border:0.5px solid rgba(130,80,180,.2);border-radius:10px;padding:14px;margin:14px 0;text-align:center"><div style="font-size:20px">&#127891;</div><div style="font-size:13px;color:#CFA9EC">Entrenamiento 1v1</div><div style="font-size:14px;color:#5DCAA5;margin-top:8px">+${myXp} XP</div></div>`;
     } else if(isTeamResult){
         if(won){
             resultBody=`<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:14px;margin:14px 0"><div>Combate 3v3</div><div style="color:#5DCAA5;margin-top:8px">+300 HP + ${winnerHp} HP sobrantes</div><div style="color:#fff;margin-top:8px">Total: ${newHp} HP</div></div>`;
@@ -428,15 +454,15 @@ function handleMsg(m){
 }
 function animHit(side, dmg){ const spr=document.getElementById('spr-'+side); if(!spr) return; spr.classList.remove('anim-hit','anim-attack'); void spr.offsetWidth; spr.classList.add('anim-hit'); const wrap=spr.closest('.f-sprite-wrap'); const fl=document.createElement('div'); fl.className='dmg-float'; fl.textContent='-'+dmg; fl.style.color='#F0997B'; wrap.appendChild(fl); playSfx('ataque'); setTimeout(()=>{spr.classList.remove('anim-hit');fl.remove();},800); }
 function animAttack(side){ const spr=document.getElementById('spr-'+side); if(!spr) return; spr.classList.remove('anim-attack'); void spr.offsetWidth; spr.classList.add('anim-attack'); setTimeout(()=>spr.classList.remove('anim-attack'),400); }
-function updateLobbyBadge(){ document.getElementById('lbl-myname').textContent=myName; const hpEl = document.getElementById('lbl-myhp'); if(hpEl) hpEl.textContent = myCurrentHP + ' HP'; const b=BEASTS[myBeast]; if(b) document.getElementById('badge-img').src=b.img; }
+function updateLobbyBadge(){ document.getElementById('lbl-myname').textContent=myName; const hpEl = document.getElementById('lbl-myhp'); if(hpEl) hpEl.textContent = isGuest ? 'Solo XP' : (myCurrentHP + ' HP'); const b=BEASTS[myBeast]; if(b) document.getElementById('badge-img').src=b.img; }
 let _lastLobbyPlayers=[]; function renderLobbyFromCache(){ renderLobby(_lastLobbyPlayers); }
 function renderLobby(others){ 
   _lastLobbyPlayers=others; 
   const list=document.getElementById('players-list'); 
-  const myHp=myCurrentHP; 
+  const myHp=isGuest ? 0 : myCurrentHP; // NUEVO
   const hpWarnEl=document.getElementById('low-hp-warning'); 
   if(hpWarnEl) {
-    hpWarnEl.style.display = 'block'; 
+    hpWarnEl.style.display = isGuest ? 'none' : 'block'; // NUEVO
     const warnMsg = hpWarnEl.querySelector('div:first-child');
     if (warnMsg) warnMsg.style.display = myHp < 100 ? 'block' : 'none';
   }
@@ -444,28 +470,33 @@ function renderLobby(others){
   list.innerHTML=others.map(p=>{ 
     const b=BEASTS[p.beast]||{name:p.beast,img:''}; 
     const rivalHp=p.hp||0; 
-    const canChallenge = myHp >= 100 && rivalHp >= 100; 
+    const targetIsGuest = p.isGuest || p.wallet.startsWith('guest_'); // NUEVO
+    const canChallenge = !isGuest && !targetIsGuest && myHp >= 100 && rivalHp >= 100; // NUEVO
     const hpColor=rivalHp>=100?'#5DCAA5':'#F0997B'; 
-    return `<div class="p-row"><div class="p-info"><img class="p-img" src="${b.img}"><div><div class="p-name">${p.name}</div><div class="p-beast">${b.name} · <span style="color:${hpColor};font-size:10px">${rivalHp} HP</span></div></div></div><div style="display:flex;gap:6px"><button class="btn btn-sm" style="background:rgba(130,80,180,.15);border:1px solid rgba(130,80,180,.35);color:#CFA9EC" onclick="openChallengeMenu(${p.id},'${p.name}', true)">🤝 Entrenar</button><button class="btn btn-blue btn-sm" ${canChallenge?'':'disabled'} onclick="openChallengeMenu(${p.id},'${p.name}', false)">⚔️ Retar</button></div></div>`; 
+    const trainBtn = `<button class="btn btn-sm" style="background:rgba(130,80,180,.15);border:1px solid rgba(130,80,180,.35);color:#CFA9EC" onclick="openChallengeMenu(${p.id},'${p.name}', true)">🤝 Entrenar</button>`;
+    const betBtn = `<button class="btn btn-blue btn-sm" ${canChallenge?'':'disabled'} onclick="openChallengeMenu(${p.id},'${p.name}', false)">⚔️ Retar</button>`;
+    const buttonsHtml = (isGuest || targetIsGuest) ? trainBtn : (trainBtn + betBtn); // NUEVO
+    return `<div class="p-row"><div class="p-info"><img class="p-img" src="${b.img}"><div><div class="p-name">${p.name} ${targetIsGuest ? '<span style="font-size:9px;color:#CFA9EC">(Invitado)</span>' : ''}</div><div class="p-beast">${b.name} ${targetIsGuest ? '' : '· <span style="color:${hpColor};font-size:10px">${rivalHp} HP</span>'}</div></div></div><div style="display:flex;gap:6px">${buttonsHtml}</div></div>`; 
   }).join(''); 
 }
 
-async function doCashout(){ const btn=document.getElementById('btn-cashout'); if(btn){btn.disabled=true;btn.textContent='Procesando...';} if(!ws || ws.readyState !== 1){ if(btn){btn.disabled=false;btn.textContent='💰 Cashout';} return; } ws.send(JSON.stringify({type:'cashout'})); }
+async function doCashout(){ if(isGuest) return; const btn=document.getElementById('btn-cashout'); if(btn){btn.disabled=true;btn.textContent='Procesando...';} if(!ws || ws.readyState !== 1){ if(btn){btn.disabled=false;btn.textContent='💰 Cashout';} return; } ws.send(JSON.stringify({type:'cashout'})); }
 function updateHPDisplay(hp){ 
-  myCurrentHP = hp || 0; 
-  const el=document.getElementById('pick-hp-val'); if(el){ el.textContent=hp+' HP'; el.style.color=hp>=100?'#5DCAA5':'#EF9F27'; } 
-  const loginHp=document.getElementById('wallet-hp'); if(loginHp){ loginHp.textContent=hp+' HP'; loginHp.style.color=hp>=100?'#5DCAA5':'#EF9F27'; } 
-  const profHp=document.getElementById('profile-hp'); if(profHp){ profHp.textContent=hp+' HP'; profHp.style.color=hp>=100?'#5DCAA5':'#EF9F27'; } 
-  const btn=document.getElementById('btn-cashout'); if(btn){ btn.style.display=hp>0?'inline-block':'none'; btn.disabled=false; btn.textContent='💰 Cashout'; } 
+  myCurrentHP = isGuest ? 0 : (hp || 0); // NUEVO
+  const el=document.getElementById('pick-hp-val'); if(el){ el.textContent= isGuest ? 'Solo XP' : (hp+' HP'); el.style.color= isGuest ? '#CFA9EC' : (hp>=100?'#5DCAA5':'#EF9F27'); } 
+  const loginHp=document.getElementById('wallet-hp'); if(loginHp){ loginHp.textContent= isGuest ? '' : (hp+' HP'); loginHp.style.color=hp>=100?'#5DCAA5':'#EF9F27'; } 
+  const profHp=document.getElementById('profile-hp'); if(profHp){ profHp.textContent= isGuest ? 'Solo XP' : (hp+' HP'); profHp.style.color= isGuest ? '#CFA9EC' : (hp>=100?'#5DCAA5':'#EF9F27'); } 
+  const profUsdc=document.getElementById('profile-usdc'); if(profUsdc){ profUsdc.textContent= isGuest ? '' : (parseFloat((myCurrentHP * 0.001).toFixed(6)) + ' USDC'); }
+  const btn=document.getElementById('btn-cashout'); if(btn){ btn.style.display=(!isGuest && hp>0)?'inline-block':'none'; btn.disabled=false; btn.textContent='💰 Cashout'; } 
   
-  // NUEVO: Control del botón de la Torre según el HP
+  // Control del botón de la Torre
   const btnG = document.getElementById('btn-gauntlet');
   if (btnG && GAUNTLET_HABILITADO) {
-    btnG.style.display = 'inline-block';
-    btnG.disabled = myCurrentHP < 100; // Se deshabilita si tiene menos de 100 HP
+    btnG.style.display = isGuest ? 'none' : 'inline-block'; // NUEVO: Ocultar a invitados
+    btnG.disabled = myCurrentHP < 100; 
   }
   
-  // INYECTAR WALLET DE PLATAFORMA SIEMPRE
+  // INYECTAR WALLET DE PLATAFORMA
   const lobbyWidget = document.getElementById('lobby-deposit-widget');
   if(lobbyWidget) lobbyWidget.innerHTML = depositWidgetHTML();
   const profWidget = document.getElementById('profile-deposit-widget');
