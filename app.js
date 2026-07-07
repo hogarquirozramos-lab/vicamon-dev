@@ -14,7 +14,7 @@ const STCSS = {
 let ws=null, myId=null, myName='', myBeast='', myRole='', oppName='', oppBeast='', battleId='';
 let mySt={}, oppSt={}, pendingFrom=null, pendingIsTraining=false, pendingIs3v3=false;
 let reconnectTimer=null, myWallet='', myCurrentHP=0, isKicked=false;
-let isGuest = false; // NUEVO: Flag para modo invitado
+let isGuest = false;
 let myStats = { wins: 0, losses: 0, rank: null };
 let gauntletBattleId = null, gauntletSelectedBeast = null;
 
@@ -66,7 +66,6 @@ async function fetchPlatformWallet() {
   } catch(e) { console.error("Error cargando wallet de plataforma:", e); }
 }
 
-// NUEVO: Función para jugar como invitado
 function playAsGuest() {
   myWallet = 'guest_' + Math.random().toString(36).substring(2, 8);
   isGuest = true;
@@ -88,7 +87,7 @@ async function disconnectWallet() {
   myWallet = ''; myName = ''; myBeast = ''; isGuest = false; 
   if(ws) { try { ws.close(); } catch(e){} } 
   document.getElementById('btn-phantom').style.display='flex'; 
-  document.getElementById('btn-guest').style.display='flex'; // Mostrar de nuevo
+  document.getElementById('btn-guest').style.display='flex'; 
   document.getElementById('wallet-connected').style.display='none'; 
   document.getElementById('no-phantom').style.display='none'; 
   document.getElementById('inp-name').value = ''; show('s-login'); 
@@ -102,7 +101,7 @@ function copyWallet() {
 }
 
 function depositWidgetHTML() { 
-  if (isGuest) return ''; // Los invitados no ven el widget de depósito
+  if (isGuest) return '';
   const walletAddr = platformWalletAddress || 'Cargando...';
   return `<div style="background:rgba(74,158,255,.06);border:0.5px solid rgba(74,158,255,.2);border-radius:10px;padding:10px 12px"><div style="font-size:11px;color:#85B7EB;margin-bottom:4px">💡 Deposita USDC para obtener HP</div><div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:7px">0.10 USDC = 100 HP · cualquier monto funciona</div><div style="display:flex;gap:6px;align-items:center"><div style="flex:1;background:rgba(0,0,0,.35);border-radius:6px;padding:6px 8px;font-family:monospace;font-size:9px;color:#85B7EB;word-break:break-all;cursor:pointer" onclick="copyWallet()">${walletAddr} <span style="color:rgba(255,255,255,.3)">📋</span></div><button class="btn btn-sm" style="font-size:10px;white-space:nowrap;padding:5px 10px" onclick="checkHPNow()">Verificar HP</button></div></div>`; 
 }
@@ -122,20 +121,28 @@ async function connectPhantom() {
   }
   try {
     const resp = await phantom.connect();
+    const wasGuest = isGuest; // BUG FIX 3: Saber si estamos upgradeando de invitado
     myWallet = resp.publicKey.toString();
-    isGuest = false; // Si conecta, deja de ser invitado
+    isGuest = false; 
     
     document.getElementById('btn-phantom').style.display='none';
-    document.getElementById('btn-guest').style.display='none'; // Ocultar botón invitado
+    document.getElementById('btn-guest').style.display='none'; 
     document.getElementById('wallet-connected').style.display='block';
     document.getElementById('wallet-addr').textContent = myWallet.slice(0,8)+'...'+myWallet.slice(-6);
     document.getElementById('wallet-hp').textContent = 'Verificando...';
     const sn = document.getElementById('step-name'); if(sn){ sn.style.opacity='1'; sn.style.pointerEvents='auto'; }
-    await checkHPNow(true);
-    const savedName = localStorage.getItem('vicamon_nick');
-    if (savedName) {
-      document.getElementById('inp-name').value = savedName;
-      goProfile();
+    
+    // BUG FIX 3: Si venimos de ser invitado, reconectar WS para que el servidor actualice nuestro estado y HP
+    if (wasGuest) {
+      if (ws) { try { ws.close(); } catch(e) {} }
+      connectWS(); 
+    } else {
+      await checkHPNow(true);
+      const savedName = localStorage.getItem('vicamon_nick');
+      if (savedName) {
+        document.getElementById('inp-name').value = savedName;
+        goProfile();
+      }
     }
   } catch(e) { console.error('Phantom error:', e); alert('No se pudo conectar Phantom.'); }
 }
@@ -175,7 +182,7 @@ setInterval(() => {
 }, 10000);
 
 async function checkHPNow(fromConnect=false) {
-  if (!myWallet || isGuest) return; // NUEVO: Los invitados no consultan HP a la DB
+  if (!myWallet || isGuest) return; 
   try {
     const res = await fetch('/hp?wallet='+myWallet); const data = await res.json(); const hp = data.hp || 0;
     const loginHp = document.getElementById('wallet-hp');
@@ -223,7 +230,7 @@ function goProfile(){
   buildBestiary(); 
   show('s-profile'); 
   updateHPDisplay(myCurrentHP); 
-  if (!isGuest) checkHPNow(false); // Solo chequea HP si no es invitado
+  if (!isGuest) checkHPNow(false); 
   const profWidget = document.getElementById('profile-deposit-widget'); 
   if(profWidget) profWidget.innerHTML = depositWidgetHTML();
   if (!ws || ws.readyState !== 1) {
@@ -241,7 +248,6 @@ function openChallengeMenu(targetId, name, isTrain) {
   const title = isTrain ? `Entrenar con ${name}` : `Batalla por HP con ${name}`;
   let buttonsHtml = '';
   
-  // NUEVO: Los invitados solo pueden entrenar. Si es invitado, forzamos isTrain.
   if (isGuest && !isTrain) {
       alert('Los invitados solo pueden entrenar. Conecta tu wallet para batallas por HP.');
       return;
@@ -323,7 +329,7 @@ function connectWS(){ clearTimeout(reconnectTimer); isKicked=false; const proto=
 
 function challengeGauntlet() {
   if(!ws || ws.readyState !== 1) return alert('Conectando...');
-  if(isGuest) return alert('Los invitados no pueden entrar a la Torre de Batalla. Conecta tu wallet.'); // NUEVO
+  if(isGuest) return alert('Los invitados no pueden entrar a la Torre de Batalla. Conecta tu wallet.'); 
   if(myCurrentHP < 100) return alert('Necesitas al menos 100 HP para entrar a la Torre de Batalla.'); 
   if(!confirm('¿Iniciar la Torre de Batalla? (Inviertes 100 HP)')) return;
   isGauntletChallenge = true;
@@ -338,7 +344,7 @@ function continueGauntlet() { document.getElementById('modal-gauntlet').classLis
 function selectGauntletBeast(k) { gauntletSelectedBeast = k; document.querySelectorAll('#g-beast-picker .bcard').forEach(c=>c.classList.remove('sel')); document.getElementById('gbc-'+k)?.classList.add('sel'); }
 function surrender() { if(!confirm('¿Rendirte?')) return; if(ws && ws.readyState === 1) ws.send(JSON.stringify({type:'surrender', battleId})); }
 
-function openSwitchMenu(reason = 'Elige tu siguiente Vicamon. ¡Perderás el turno!') { 
+function openSwitchMenu(reason = 'Elige tu siguiente Vicamon.') { // BUG FIX 2: Simplificado, sin cancelar
   const bench = window._myBench || []; 
   let html = `<div class="modal" style="max-width:400px"><h3>Cambiar Vicamon</h3><p style="font-size:12px;color:#F0997B;margin-bottom:15px">${reason}</p><div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">`; 
   bench.forEach((b, i) => { 
@@ -346,23 +352,23 @@ function openSwitchMenu(reason = 'Elige tu siguiente Vicamon. ¡Perderás el tur
     const beast = BEASTS[b.beast]; 
     html += `<div class="bcard" style="width:100px;cursor:pointer" onclick="executeSwitch(${i})"><img src="${beast.img}" style="width:60px;height:60px"><div class="bname">${beast.name}</div><div style="font-size:10px;color:#5DCAA5">${b.state.hp} HP</div></div>`; 
   }); 
-  html += `</div><button class="btn btn-sm btn-red" style="margin-top:15px;width:100%" onclick="closeSwitchMenu()">Cancelar</button></div>`; 
+  html += `</div></div>`; // Eliminado botón de cancelar
   let modalBg = document.getElementById('modal-switch'); 
   if(!modalBg) { modalBg = document.createElement('div'); modalBg.className = 'modal-bg'; modalBg.id = 'modal-switch'; document.body.appendChild(modalBg); } 
   modalBg.innerHTML = html; modalBg.classList.remove('hidden'); 
 }
-function closeSwitchMenu() { const m = document.getElementById('modal-switch'); if(m) m.classList.add('hidden'); }
-function executeSwitch(index) { closeSwitchMenu(); ws.send(JSON.stringify({type:'team_switch', battleId, index})); }
+// Eliminada función closeSwitchMenu
+function executeSwitch(index) { const modalBg = document.getElementById('modal-switch'); if(modalBg) modalBg.classList.add('hidden'); ws.send(JSON.stringify({type:'team_switch', battleId, index})); }
 
 function handleMsg(m){
   if(m.type==='joined'){ 
     myId=m.id; 
-    if(m.hp !== undefined && !isGuest) updateHPDisplay(m.hp); // NUEVO: Ignorar HP si es invitado
-    if(m.isGuest !== undefined) isGuest = m.isGuest; // Sincronizar estado del servidor
+    if(m.hp !== undefined && !isGuest) updateHPDisplay(m.hp); 
+    if(m.isGuest !== undefined) isGuest = m.isGuest; 
     updateLobbyBadge(); 
     updateProfileUI(m.stats); 
     if(document.getElementById('s-login').classList.contains('active') && !isKicked) show('s-lobby'); 
-    if(!isGuest) checkHPNow(false); // NUEVO
+    if(!isGuest) checkHPNow(false); 
   }
   if(m.type==='nickname_updated'){ myName = m.name; updateLobbyBadge(); }
   if(m.type==='kicked'){ isKicked=true; alert(m.msg); show('s-login'); if(ws) ws.close(); }
@@ -395,7 +401,7 @@ function handleMsg(m){
   }
   if(m.type === 'team_force_switch'){ openSwitchMenu(m.reason); }
   
-  if(m.type==='hp_updated'){ if(!isGuest) updateHPDisplay(m.hp); myCurrentHP=isGuest?0:m.hp; } // NUEVO
+  if(m.type==='hp_updated'){ if(!isGuest) updateHPDisplay(m.hp); myCurrentHP=isGuest?0:m.hp; } 
   if(m.type==='cashout_result'){ const btn=document.getElementById('btn-cashout'); if(!m.ok){ if(btn){btn.disabled=false;btn.textContent='💰 Cashout';} alert('Error: '+m.reason); return; } if(m.status==='confirmed'){ if(btn){btn.disabled=false;btn.textContent='💰 Cashout';} if(!isGuest) updateHPDisplay(0); alert(`✓ Cashout: ${m.usdc} USDC`); } }
   if(m.type==='error'){ alert('⚠ ' + m.msg); }
   
@@ -437,9 +443,9 @@ function handleMsg(m){
     if(m.stats) updateProfileUI(m.stats); 
     show('s-result');
     
-    if(!isCpuResult && !isTrainingResult && !isGuest) updateHPDisplay(newHp); // NUEVO
-    if(isGauntletResult && !isGuest) updateHPDisplay(newHp); // NUEVO
-    if(isTeamResult && !isTrainingResult && !isGuest) updateHPDisplay(newHp); // NUEVO
+    if(!isCpuResult && !isTrainingResult && !isGuest) updateHPDisplay(newHp); 
+    if(isGauntletResult && !isGuest) updateHPDisplay(newHp); 
+    if(isTeamResult && !isTrainingResult && !isGuest) updateHPDisplay(newHp); 
     
     let resultBody='';
     
@@ -478,7 +484,16 @@ function handleMsg(m){
 }
 function animHit(side, dmg){ const spr=document.getElementById('spr-'+side); if(!spr) return; spr.classList.remove('anim-hit','anim-attack'); void spr.offsetWidth; spr.classList.add('anim-hit'); const wrap=spr.closest('.f-sprite-wrap'); const fl=document.createElement('div'); fl.className='dmg-float'; fl.textContent='-'+dmg; fl.style.color='#F0997B'; wrap.appendChild(fl); playSfx('ataque'); setTimeout(()=>{spr.classList.remove('anim-hit');fl.remove();},800); }
 function animAttack(side){ const spr=document.getElementById('spr-'+side); if(!spr) return; spr.classList.remove('anim-attack'); void spr.offsetWidth; spr.classList.add('anim-attack'); setTimeout(()=>spr.classList.remove('anim-attack'),400); }
-function updateLobbyBadge(){ document.getElementById('lbl-myname').textContent=myName; const hpEl = document.getElementById('lbl-myhp'); if(hpEl) hpEl.textContent = isGuest ? 'Invitado' : (myCurrentHP + ' HP'); const b=BEASTS[myBeast]; if(b) document.getElementById('badge-img').src=b.img; document.getElementById('badge-img').style.display='block'; }
+
+function updateLobbyBadge(){ 
+  document.getElementById('lbl-myname').textContent=myName; 
+  const hpEl = document.getElementById('lbl-myhp'); 
+  if(hpEl) hpEl.textContent = isGuest ? 'Invitado' : (myCurrentHP + ' HP'); 
+  const b = BEASTS[myBeast] || BEASTS['aries']; // BUG FIX 1: Si myBeast está vacío, usar Aries por defecto
+  const badgeImg = document.getElementById('badge-img');
+  if(badgeImg) { badgeImg.src=b.img; badgeImg.style.display='block'; }
+}
+
 let _lastLobbyPlayers=[]; function renderLobbyFromCache(){ renderLobby(_lastLobbyPlayers); }
 function renderLobby(others){ 
   _lastLobbyPlayers=others; 
@@ -488,41 +503,40 @@ function renderLobby(others){
   if(hpWarnEl) {
     hpWarnEl.style.display = 'block'; 
     const warnMsg = hpWarnEl.querySelector('div:first-child');
-    if (warnMsg) warnMsg.style.display = (!isGuest && myHp < 100) ? 'block' : 'none'; // NUEVO: Solo advertencia si no es invitado
+    if (warnMsg) warnMsg.style.display = (!isGuest && myHp < 100) ? 'block' : 'none'; 
   }
   
-  // NUEVO: Banner de upgrade en lobby
   document.getElementById('guest-lobby-banner').style.display = isGuest ? 'flex' : 'none';
   
   if(!others.length){list.innerHTML='<p class="empty-lobby">No hay otros jugadores...</p>';return;} 
   list.innerHTML=others.map(p=>{ 
     const b=BEASTS[p.beast]||{name:p.beast,img:''}; 
     const rivalHp=p.hp||0; 
-    const isTargetGuest = p.isGuest || false; // NUEVO: Recibido del servidor
-    const canChallengeHP = !isGuest && !isTargetGuest && myHp >= 100 && rivalHp >= 100; // NUEVO: Ninguno puede ser invitado
+    const isTargetGuest = p.isGuest || false; 
+    const canChallengeHP = !isGuest && !isTargetGuest && myHp >= 100 && rivalHp >= 100; 
     const hpColor=rivalHp>=100?'#5DCAA5':'#F0997B'; 
-    const hpText = isTargetGuest ? 'Invitado' : `${rivalHp} HP`; // NUEVO
+    const hpText = isTargetGuest ? 'Invitado' : `${rivalHp} HP`; 
     return `<div class="p-row"><div class="p-info"><img class="p-img" src="${b.img}"><div><div class="p-name">${p.name}</div><div class="p-beast">${b.name} · <span style="color:${hpColor};font-size:10px">${hpText}</span></div></div></div><div style="display:flex;gap:6px"><button class="btn btn-sm" style="background:rgba(130,80,180,.15);border:1px solid rgba(130,80,180,.35);color:#CFA9EC" onclick="openChallengeMenu(${p.id},'${p.name}', true)">🤝 Entrenar</button><button class="btn btn-blue btn-sm" ${canChallengeHP?'':'disabled'} onclick="openChallengeMenu(${p.id},'${p.name}', false)">⚔️ Batalla HP</button></div></div>`; 
   }).join(''); 
 }
 
 async function doCashout(){ 
-  if(isGuest) return alert('Los invitados no pueden hacer cashout.'); // NUEVO
+  if(isGuest) return alert('Los invitados no pueden hacer cashout.'); 
   const btn=document.getElementById('btn-cashout'); if(btn){btn.disabled=true;btn.textContent='Procesando...';} if(!ws || ws.readyState !== 1){ if(btn){btn.disabled=false;btn.textContent='💰 Cashout';} return; } ws.send(JSON.stringify({type:'cashout'})); 
 }
 function updateHPDisplay(hp){ 
-  if(isGuest) hp = 0; // NUEVO
+  if(isGuest) hp = 0; 
   myCurrentHP = hp || 0; 
   const el=document.getElementById('pick-hp-val'); if(el){ el.textContent=hp+' HP'; el.style.color=hp>=100?'#5DCAA5':'#EF9F27'; } 
   const loginHp=document.getElementById('wallet-hp'); if(loginHp){ loginHp.textContent=hp+' HP'; loginHp.style.color=hp>=100?'#5DCAA5':'#EF9F27'; } 
   const profHp=document.getElementById('profile-hp'); if(profHp){ profHp.textContent=hp+' HP'; profHp.style.color=hp>=100?'#5DCAA5':'#EF9F27'; } 
   const profUsdc=document.getElementById('profile-usdc'); if(profUsdc){ profUsdc.textContent=(hp*0.001).toFixed(3)+' USDC'; }
-  const btn=document.getElementById('btn-cashout'); if(btn){ btn.style.display=hp>0 && !isGuest?'inline-block':'none'; btn.disabled=false; btn.textContent='💰 Cashout'; } // NUEVO
+  const btn=document.getElementById('btn-cashout'); if(btn){ btn.style.display=hp>0 && !isGuest?'inline-block':'none'; btn.disabled=false; btn.textContent='💰 Cashout'; } 
   
   const btnG = document.getElementById('btn-gauntlet');
   if (btnG && GAUNTLET_HABILITADO) {
     btnG.style.display = 'inline-block';
-    btnG.disabled = isGuest || myCurrentHP < 100; // NUEVO: Invitados no pueden
+    btnG.disabled = isGuest || myCurrentHP < 100; 
   }
   
   const lobbyWidget = document.getElementById('lobby-deposit-widget');
@@ -542,7 +556,6 @@ function acceptChallenge(){
   document.getElementById('modal-challenged').classList.add('hidden');
   stopChallengeBeep();
   if(pendingFrom===null) return;
-  // NUEVO: Si es invitado y el reto no es de entrenamiento, rechazar
   if(isGuest && !pendingIsTraining) {
     alert('Los invitados solo pueden aceptar entrenamientos. Conecta tu wallet para batallas por HP.');
     rejectChallenge();
@@ -576,6 +589,6 @@ function renderBattle(yourTurn, logs){
   if(logs&&logs.length){ const lb=document.getElementById('log-box'); lb.innerHTML=logs.map(l=>`<div class="ll lc-${l.c||'normal'}">${l.t}</div>`).join(''); lb.scrollTop=lb.scrollHeight; }
 }
 function doAttack(i){ animAttack('me'); try { const atk = BEASTS[myBeast].attacks[i]; if(atk.d === 0) playSfx('curacion'); else playSfx('ataque'); } catch(e) {} ws.send(JSON.stringify({type:'attack',battleId,index:i})); }
-function leaveLobby(){ if(ws) ws.send(JSON.stringify({type:'leave_lobby'})); isKicked = true; if(ws) { try { ws.close(); } catch(e){} } ws = null; isGuest = false; show('s-login'); } // NUEVO: Resetear isGuest al salir
+function leaveLobby(){ if(ws) ws.send(JSON.stringify({type:'leave_lobby'})); isKicked = true; if(ws) { try { ws.close(); } catch(e){} } ws = null; isGuest = false; show('s-login'); } 
 function backToLobby(){ updateLobbyBadge(); show('s-lobby'); }
 document.getElementById('inp-name').addEventListener('keydown',e=>{if(e.key==='Enter')goProfile();});
