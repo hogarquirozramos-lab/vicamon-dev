@@ -18,6 +18,7 @@ let isGuest = false;
 let myPhysicalBeasts = [];
 let myStats = { wins: 0, losses: 0, rank: null };
 let gauntletBattleId = null, gauntletSelectedBeast = null;
+let qrScanner = null; // NUEVO: Variable para el escáner
 
 let pendingChallengeTargetId = null;
 let teamSelectionMode = '1v1'; 
@@ -182,3 +183,39 @@ document.getElementById('inp-name').addEventListener('keydown',e=>{if(e.key==='E
 function redeemPhysicalCode() { const input = document.getElementById('inp-physical-code'); const code = input.value.trim(); if(!code) return; if(ws && ws.readyState === 1) ws.send(JSON.stringify({type:'redeem_physical_code', code: code})); input.value = ''; }
 function autoRedeemPhysicalCodes() { const codes = JSON.parse(localStorage.getItem('vicamon_physical_codes') || '[]'); codes.forEach(code => { if(ws && ws.readyState === 1) ws.send(JSON.stringify({type:'redeem_physical_code', code: code})); }); }
 function updatePhysicalUI() { const list = document.getElementById('physical-beasts-list'); if(!list) return; if(myPhysicalBeasts.length === 0) { list.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.3)">Ningún Vicamon físico invocado</div>'; return; } list.innerHTML = myPhysicalBeasts.map(k => { const b = BEASTS[k]; if(!b) return ''; return `<div style="background:rgba(246,226,102,.1);border:0.5px solid rgba(246,226,102,.3);border-radius:8px;padding:6px;display:flex;align-items:center;gap:6px"><img src="${b.img}" style="width:30px;height:30px;image-rendering:pixelated"><span style="font-size:12px;color:#F6E265;font-weight:600">${b.name}</span></div>`; }).join(''); }
+
+// NUEVO: FUNCIONES DEL ESCÁNER QR
+function openQRScanner() {
+    const modal = document.getElementById('modal-qr-scanner');
+    modal.classList.remove('hidden');
+    if (qrScanner) return; // Ya está abierto
+
+    qrScanner = new Html5Qrcode("qr-reader");
+    qrScanner.start(
+        { facingMode: "environment" }, // Cámara trasera
+        { fps: 10, qrbox: 250 },
+        (decodedText) => {
+            // Éxito: inyectar código y enviar
+            document.getElementById('inp-physical-code').value = decodedText;
+            redeemPhysicalCode();
+            closeQRScanner();
+        },
+        (errorMessage) => { /* Ignorar errores de escaneo continuo */ }
+    ).catch(err => {
+        alert('No se pudo acceder a la cámara. Asegúrate de dar permisos o usa el campo de texto.');
+        closeQRScanner();
+    });
+}
+
+function closeQRScanner() {
+    const modal = document.getElementById('modal-qr-scanner');
+    modal.classList.add('hidden');
+    if (qrScanner) {
+        qrScanner.stop().then(() => {
+            qrScanner.clear();
+            qrScanner = null;
+        }).catch(err => {
+            qrScanner = null; // Forzar limpieza
+        });
+    }
+}
