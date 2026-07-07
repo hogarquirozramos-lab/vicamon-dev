@@ -436,6 +436,7 @@ wss.on('connection', ws => {
       if (msg.type === 'leave_lobby') { const p = lobby.get(id); if (p && !p.inBattle) { lobby.delete(id); await pushLobby(); } }
             if (msg.type === 'redeem_physical_code') {
         const p = lobby.get(id); if (!p) return;
+                      if (p.isGuest) { send(ws, { type: 'error', msg: 'Conecta tu wallet para usar códigos físicos.' }); return; }
         const code = (msg.code || '').toUpperCase().trim();
         if (!PHYSICAL_CODES[code]) { send(ws, { type: 'error', msg: 'Código inválido. Verifica tu llavero.' }); return; }
         if (activePhysicalCodes.has(code) && activePhysicalCodes.get(code) !== p.wallet) { send(ws, { type: 'error', msg: '¡Este Vicamon ya está en uso por otro entrenador!' }); return; }
