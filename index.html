@@ -97,6 +97,15 @@
     </div>
   </div>
   <div id="profile-deposit-widget" style="margin-bottom:16px"></div>
+    <div style="background:rgba(255,255,255,.04);border:0.5px solid rgba(255,255,255,.1);border-radius:12px;padding:16px;margin-bottom:16px">
+    <h2 style="margin:0 0 10px 0;font-size:16px">🔗 Invocaciones Físicas</h2>
+    <p style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:12px">Ingresa el código de tu llavero para invocar a tu Vicamon real durante esta sesión.</p>
+    <div style="display:flex;gap:8px">
+      <input id="inp-physical-code" placeholder="Ej: IRON-001" style="flex:1;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:8px;padding:8px 12px;color:#fff;font-size:14px;outline:none;text-transform:uppercase">
+      <button class="btn btn-blue btn-sm" onclick="redeemPhysicalCode()">Invocar</button>
+    </div>
+    <div id="physical-beasts-list" style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"></div>
+  </div>
   <button class="btn btn-sm" id="btn-cashout" style="display:none;width:100%;margin-bottom:10px;background:rgba(239,159,39,.15);border-color:rgba(239,159,39,.35);color:#EF9F27" onclick="doCashout()">💰 Hacer Cashout</button>
   <button class="btn btn-blue" style="width:100%;margin-bottom:20px" onclick="enterLobby()">⚔️ Ir al Lobby →</button>
   <div class="chat-wrap" style="border-top:0.5px solid rgba(255,255,255,.1);padding-top:16px">
