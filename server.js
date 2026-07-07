@@ -12,10 +12,11 @@ const {
   isTxProcessed, markTxProcessed, adminSetHP, adminResetPlatform, adminUnlockAllHP
 } = require('./hp-balance');
 const { sendUSDC } = require('./transfer');
+const { PHYSICAL_CODES } = require('./physical-codes');
 const BEASTS = require('./beasts.js');
 const BEAST_KEYS = Object.keys(BEASTS);
 
-const { lobby, battles, walletToBattle, uid, send, broadcast, pushLobby, pushBattle, pushCpuBattle } = require('./state');
+const { lobby, battles, walletToBattle, activePhysicalCodes, uid, send, broadcast, pushLobby, pushBattle, pushCpuBattle } = require('./state');
 const { getStartState, processTurn, endBattle } = require('./battleEngine');
 const { CPU_ID, processCpuPlayerTurn, scheduleCpuTurn } = require('./cpuLogic');
 const { processGauntletPlayerTurn, endGauntlet, scheduleGauntletCpuTurn } = require('./gauntletManager');
@@ -433,6 +434,21 @@ wss.on('connection', ws => {
       if (msg.type === 'chat_message') { const p = lobby.get(id); if (!p) return; broadcast({ type: 'chat_message', name: p.name, text: (msg.text || '').slice(0, 200) }); }
       if (msg.type === 'ping') { const p = lobby.get(id); if (p) { send(ws, { type: 'hp_updated', hp: p.isGuest ? 0 : await getHP(p.wallet || '') }); await pushLobby(); } }
       if (msg.type === 'leave_lobby') { const p = lobby.get(id); if (p && !p.inBattle) { lobby.delete(id); await pushLobby(); } }
+            if (msg.type === 'redeem_physical_code') {
+        const p = lobby.get(id); if (!p) return;
+        const code = (msg.code || '').toUpperCase().trim();
+        if (!PHYSICAL_CODES[code]) { send(ws, { type: 'error', msg: 'Código inválido. Verifica tu llavero.' }); return; }
+        if (activePhysicalCodes.has(code) && activePhysicalCodes.get(code) !== p.wallet) { send(ws, { type: 'error', msg: '¡Este Vicamon ya está en uso por otro entrenador!' }); return; }
+        
+        const beastKey = PHYSICAL_CODES[code];
+        if (!p.physicalBeasts) p.physicalBeasts = [];
+        if (p.physicalBeasts.includes(beastKey)) { send(ws, { type: 'error', msg: 'Ya tienes a este Vicamon invocado.' }); return; }
+        
+        p.physicalBeasts.push(beastKey);
+        activePhysicalCodes.set(code, p.wallet); // Registramos que esta wallet tiene al perro fuera
+        send(ws, { type: 'physical_code_success', beast: beastKey, code: code });
+        await pushLobby();
+      }
     } catch(e) {
       console.error("Error procesando mensaje:", e);
       send(ws, { type: 'error', msg: 'Ocurrió un error interno en el servidor.' });
@@ -443,6 +459,13 @@ wss.on('connection', ws => {
     try {
       const p = lobby.get(id); if (!p) return;
 
+            // REGRESO DEL PERRITO: Liberar códigos físicos al desconectarse
+      if (p.wallet) {
+        for (const [code, wallet] of activePhysicalCodes) {
+          if (wallet === p.wallet) activePhysicalCodes.delete(code);
+        }
+      }
+      
       const bId = walletToBattle.get(p.wallet);
       const b = battles.get(bId);
 
