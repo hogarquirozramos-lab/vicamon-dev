@@ -85,7 +85,7 @@ const BEASTS = {
     ]},
   
   // NUEVO VICAMON FÍSICO
-  irondog:    {name:'Iron Dog',   cat:'Físico',  sub:'Can Cyborg',          img:'IronDog.png',    el:'tierra', style:'equilibrado',
+  irondog:    {name:'Iron Dog',   cat:'Físico',  sub:'Can Cyborg',          img:'IronDog.png',    el:'tierra', style:'equilibrado', stats: {atk:65, def:85, spd:75},
     attacks:[
       {n:'Mordida de Titanio',  d:20, acc:100, self:0,  fx:null,                     pp:99, desc:'Colmillos de acero que no fallan. Tu ataque básico y confiable.'},
       {n:'Sobrecarga Reactor',  d:38, acc:85,  self:8,  fx:null,       risk:true,    pp:4,  desc:'Sobrecarga el núcleo para un golpe devastador. Te inflige 8 HP por el retroceso.'},
