@@ -39,7 +39,8 @@ async function endGauntlet(bId, playerId, won, defeatedCount = 0) {
 
   // Aseguramos que el mensaje de fin de batalla SIEMPRE se envíe
   try {
-    send(pl.ws, JSON.stringify({ 
+    // CORREGIDO: Sin JSON.stringify porque la función send() de state.js ya lo hace
+    send(pl.ws, { 
       type:'battle_end', 
       won, 
       isGauntlet: true, 
@@ -49,7 +50,7 @@ async function endGauntlet(bId, playerId, won, defeatedCount = 0) {
       isGuest,
       myXp,
       stats 
-    }));
+    });
   } catch (e) {
     console.error("Error al enviar mensaje de fin de gauntlet:", e);
   }
@@ -76,7 +77,7 @@ async function checkGauntletCpuDeath(bId) {
   if (cpuSt.hp <= 0) {
     b.turnId = -2; 
     pushCpuBattle(bId); 
-    setTimeout(async () => { // <--- CORREGIDO A async
+    setTimeout(async () => {
       try {
         const bb = battles.get(bId); if (!bb) return;
         bb.gauntletIndex++;
@@ -101,7 +102,7 @@ async function checkGauntletCpuDeath(bId) {
   if (plSt.hp <= 0) {
     b.turnId = -2;
     pushCpuBattle(bId);
-    setTimeout(async () => { // <--- CORREGIDO A async
+    setTimeout(async () => {
       try { 
         const bb = battles.get(bId); 
         if (!bb) return;
