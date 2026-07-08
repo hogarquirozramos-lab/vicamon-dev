@@ -1,7 +1,7 @@
 const BEASTS = require('./beasts.js');
 const { lobby, battles, pushCpuBattle, broadcast, send, pushLobby } = require('./state');
 const { applyAtk, tickEffects, getStartState } = require('./battleEngine');
-const { settleGauntletTiered, getPlayerStats, getPlayerRank, getTopPlayers } = require('./hp-balance');
+const { settleGauntletTiered, getPlayerStats, getPlayerRank, getTopPlayers, calculateGauntletReward } = require('./hp-balance');
 const { cpuPickAttack } = require('./cpuAI');
 
 const CPU_ID = -1;
@@ -18,28 +18,27 @@ async function endGauntlet(bId, playerId, won, defeatedCount = 0) {
   let myXp = 0;
   let stats = { wins: 0, losses: 0, rank: null };
 
-  // Usamos try/catch para evitar que un error de Web3/DB cuelgue el juego
   try {
+    const finalDefeated = won ? 12 : defeatedCount;
+    reward = calculateGauntletReward(finalDefeated); // Calculamos la recompensa base
+
     if (!isGuest) {
-      const finalDefeated = won ? 12 : defeatedCount;
       const result = await settleGauntletTiered(pl.wallet, finalDefeated);
       newHp = result.newHp;
-      reward = result.reward;
+      reward = result.reward; // Confirmamos la recompensa real de la DB
       
       const dbStats = await getPlayerStats(pl.wallet);
-      if (dbStats) stats.wins = dbStats.wins, stats.losses = dbStats.losses;
+      if (dbStats) { stats.wins = dbStats.wins; stats.losses = dbStats.losses; }
       stats.rank = await getPlayerRank(pl.wallet);
     } else {
-      myXp = won ? 1200 : (defeatedCount * 100);
+      // NUEVO: El invitado gana XP equivalente a los HP que hubiera recuperado (1 HP = 10 XP)
+      myXp = reward * 10;
     }
   } catch (error) {
     console.error("Error en endGauntlet guardando datos:", error);
-    // Si hay un error, igual continuamos para no colgar al jugador
   }
 
-  // Aseguramos que el mensaje de fin de batalla SIEMPRE se envíe
   try {
-    // CORREGIDO: Sin JSON.stringify porque la función send() de state.js ya lo hace
     send(pl.ws, { 
       type:'battle_end', 
       won, 
@@ -55,7 +54,6 @@ async function endGauntlet(bId, playerId, won, defeatedCount = 0) {
     console.error("Error al enviar mensaje de fin de gauntlet:", e);
   }
   
-  // Limpiamos el estado del jugador
   if (pl) pl.inBattle = false;
   battles.delete(bId);
   await pushLobby();
