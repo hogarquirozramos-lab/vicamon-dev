@@ -14,8 +14,8 @@ const {
 const { sendUSDC } = require('./transfer');
 const BEASTS = require('./beasts.js');
 const BEAST_KEYS = Object.keys(BEASTS);
-const ZODIAC_KEYS = Object.entries(BEASTS).filter(([k, b]) => b.cat === 'Zodiaco').map(([k]) => k); // NUEVO: Solo Zodiaco para el Master
-const { PHYSICAL_CODES } = require('./physical-codes'); // NUEVO
+const ZODIAC_KEYS = Object.entries(BEASTS).filter(([k, b]) => b.cat === 'Zodiaco').map(([k]) => k);
+const { PHYSICAL_CODES } = require('./physical-codes');
 
 const { lobby, battles, walletToBattle, activePhysicalCodes, uid, send, broadcast, pushLobby, pushBattle, pushCpuBattle } = require('./state');
 const { getStartState, processTurn, endBattle } = require('./battleEngine');
@@ -66,9 +66,13 @@ const server = http.createServer(async (req, res) => {
   if (urlPath === '/ver-db-secreta') { try { const players = await getAllPlayersDebug(); res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(players, null, 2)); } catch(e) { res.writeHead(500); res.end('Error leyendo DB'); } return; }
   if (urlPath === '/platform-wallet') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ wallet: PLATFORM_WALLET })); return; }
 
-  if (urlPath === '/admin') { /* ... admin html ... */ 
-    res.writeHead(200, { 'Content-Type': 'text/html' });
-    res.end(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Admin - VICAMON</title><style>body{font-family:system-ui;background:#0a0a0f;color:#fff;padding:20px;max-width:1000px;margin:0 auto}.header{display:flex;gap:10px;margin-bottom:20px;align-items:center}input,button{background:#1a1a24;border:1px solid #333;color:#fff;padding:10px;border-radius:8px;outline:none}button{cursor:pointer;background:#4a9eff;border:none;font-weight:bold}button:disabled{opacity:.5;cursor:not-allowed}.plat-info{background:#14141e;padding:15px;border-radius:12px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center}.plat-info span{font-size:14px;color:#85B7EB}.plat-info b{font-size:18px;color:#5DCAA5}table{width:100%;border-collapse:collapse;background:#14141e;border-radius:12px;overflow:hidden}th,td{padding:12px;border-bottom:1px solid #2a2a35;text-align:left;font-size:14px}th{color:#85B7EB;text-transform:uppercase;font-size:12px}td input{width:80px;padding:5px;background:#111;border:1px solid #333;text-align:center;color:#fff;border-radius:4px}.btn-save{background:#5DCAA5;padding:8px 16px;color:#000}.admin-actions{margin-top:20px;display:flex;gap:10px;flex-wrap:wrap}.btn-withdraw{background:#F5A623;color:#000;padding:10px 20px;font-size:14px}</style></head><body><h1>Panel de Administración</h1><div class="header"><input type="password" id="pass" placeholder="Contraseña de admin"><button onclick="loadData()">Desbloquear y Cargar</button></div><div class="plat-info" id="plat-info" style="display:none"><span>HP Ganados por la Plataforma (Comisiones):</span><b id="plat-hp">-</b></div><div class="admin-actions" id="admin-btns" style="display:none"><button onclick="withdrawFunds()" id="btn-withdraw" class="btn-withdraw">💸 Retirar Ganancias a Wallet</button><button onclick="resetPlatformHP()">Resetear HP Plataforma</button><button onclick="unlockAllHP()">Desbloquear HP de todos</button></div><br><br><table id="tbl" style="display:none"><thead><tr><th>Wallet</th><th>Nickname</th><th>HP</th><th>HP Bloqueados</th><th>Acción</th></tr></thead><tbody id="data"></tbody></table><script>let globalPass='';async function loadData(){globalPass=document.getElementById('pass').value;if(!globalPass)return alert('Ingresa la contraseña');const res=await fetch('/admin-data?pass='+encodeURIComponent(globalPass));if(!res.ok){alert('Contraseña incorrecta');return}const data=await res.json();document.getElementById('plat-info').style.display='flex';document.getElementById('tbl').style.display='table';document.getElementById('admin-btns').style.display='flex';document.getElementById('plat-hp').textContent=data.platformHp+' HP ('+(data.platformHp*0.001).toFixed(3)+' USDC)';document.getElementById('data').innerHTML=data.players.map(p=>'<tr><td>'+p.wallet.slice(0,8)+'...'+p.wallet.slice(-4)+'</td><td>'+(p.last_name||'-')+'</td><td><input type="number" value="'+p.hp+'" id="hp-'+p.wallet+'"></td><td>'+(p.locked_hp||0)+'</td><td><button class="btn-save" onclick="saveHP(\''+p.wallet+'\')">Guardar</button></td></tr>').join('')}async function saveHP(wallet){const hp=document.getElementById('hp-'+wallet).value;const res=await fetch('/admin-update-hp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pass:globalPass,wallet,hp:parseInt(hp)})});const data=await res.json();if(data.ok)alert('✓ HP actualizado a '+hp);else alert('Error al aggiornare')}async function resetPlatformHP(){if(!confirm('¿Resetear los HP de la plataforma a 0?'))return;const res=await fetch('/admin-reset-platform',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pass:globalPass})});if(res.ok)alert('✓ HP de la plataforma reseteados.')}async function unlockAllHP(){if(!confirm('¿Desbloquear todos los HP de jugadores?'))return;const res=await fetch('/admin-unlock-hp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pass:globalPass})});if(res.ok)alert('✓ HP desbloqueados.')}async function withdrawFunds(){const btn=document.getElementById('btn-withdraw');if(!confirm('¿Retirar TODOS los USDC de la plataforma a tu wallet personal?'))return;btn.disabled=true;btn.textContent='Procesando retiro...';try{const res=await fetch('/admin-withdraw',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pass:globalPass})});const data=await res.json();if(data.ok){alert('✓ Retiro exitoso! Se enviaron '+data.amount+' USDC. TX: '+data.sig);location.reload()}else{alert('Error al retirar: '+(data.msg||'Desconocido'))}}catch(e){alert('Error de conexión')}btn.disabled=false;btn.textContent='💸 Retirar Ganancias a Wallet'}</script></body></html>`);
+  // MODULARIZACIÓN: Servir admin.html desde archivo estático
+  if (urlPath === '/admin') {
+    fs.readFile(path.join(__dirname, 'admin.html'), (err, data) => {
+      if (err) { res.writeHead(500); res.end('Error loading admin panel'); return; }
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(data);
+    });
     return;
   }
 
@@ -140,7 +144,7 @@ wss.on('connection', ws => {
 
       if (msg.type === 'challenge_cpu') {
         const pl = lobby.get(id); if (!pl || pl.inBattle) return; pl.inBattle = true;
-        const cpuBeast = ZODIAC_KEYS[Math.floor(Math.random() * ZODIAC_KEYS.length)]; // FIX: Solo Zodiaco
+        const cpuBeast = ZODIAC_KEYS[Math.floor(Math.random() * ZODIAC_KEYS.length)];
         const bId = `bcpu${uid()}`;
         battles.set(bId, { p1id: CPU_ID, p2id: id, st1: getStartState(cpuBeast), st2: getStartState(pl.beast), turnId: CPU_ID, logs: [{t: `¡Entrenamiento 1v1 vs Master!`, c: 'hi'}], isCpu: true, cpuIsP1: true, cpuBeast });
         send(ws, { type: 'battle_start', battleId: bId, role: 'p2', opponent: 'Zodiac Master', opponentBeast: cpuBeast, isCpu: true });
@@ -149,7 +153,7 @@ wss.on('connection', ws => {
       
       if (msg.type === 'challenge_3v3_cpu') {
         const pl = lobby.get(id); if (!pl || pl.inBattle) return; pl.inBattle = true; pl.team = msg.team;
-        const cpuTeam = [ZODIAC_KEYS[Math.floor(Math.random()*ZODIAC_KEYS.length)], ZODIAC_KEYS[Math.floor(Math.random()*ZODIAC_KEYS.length)], ZODIAC_KEYS[Math.floor(Math.random()*ZODIAC_KEYS.length)]]; // FIX: Solo Zodiaco
+        const cpuTeam = [ZODIAC_KEYS[Math.floor(Math.random()*ZODIAC_KEYS.length)], ZODIAC_KEYS[Math.floor(Math.random()*ZODIAC_KEYS.length)], ZODIAC_KEYS[Math.floor(Math.random()*ZODIAC_KEYS.length)]];
         const bId = `bteamcpu${uid()}`;
         battles.set(bId, { p1id: CPU_ID, p2id: id, team1: cpuTeam.map(k => getStartState(k)), team2: pl.team.map(k => getStartState(k)), active1: 0, active2: 0, turnId: CPU_ID, logs: [{t: `¡Entrenamiento 3v3 vs Master!`, c: 'hi'}], isTeamBattle: true, isTeamCpu: true, cpuTeam: cpuTeam });
         send(ws, { type: 'battle_start', battleId: bId, role: 'p2', opponent: 'Zodiac Master', opponentBeast: cpuTeam[0], isTeamBattle: true, isCpu: true });
