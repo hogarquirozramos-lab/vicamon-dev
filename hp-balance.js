@@ -35,28 +35,30 @@ async function unlockHP(wallet, amount = 100) { await pool.query('UPDATE players
 async function settleMatch(winnerWallet, loserWallet, winnerHp) { const client = await pool.connect(); try { await client.query('BEGIN'); const hp = Math.max(0, Math.min(100, winnerHp)); await client.query('UPDATE players SET locked_hp = GREATEST(0, locked_hp - 100), hp = hp + 100 + $1 WHERE wallet = $2', [hp, winnerWallet]); await client.query('UPDATE players SET locked_hp = GREATEST(0, locked_hp - 100) WHERE wallet = $1', [loserWallet]); await client.query('UPDATE platform SET hp = hp + (100 - $1) WHERE id = 1', [hp]); await client.query('COMMIT'); const winnerNewHp = await getHP(winnerWallet); const platformHp = await getPlatformHp(); return { winnerNewHp, platformHp, platformUsdc: parseFloat((platformHp * USDC_PER_HP).toFixed(3)) }; } catch(e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); } }
 async function settleTeamMatch(winnerWallet, loserWallet, winnerRemainingHp) { const client = await pool.connect(); try { await client.query('BEGIN'); const hp = Math.max(0, Math.min(300, winnerRemainingHp)); await client.query('UPDATE players SET locked_hp = GREATEST(0, locked_hp - 300), hp = hp + 300 + $1 WHERE wallet = $2', [hp, winnerWallet]); await client.query('UPDATE players SET locked_hp = GREATEST(0, locked_hp - 300) WHERE wallet = $1', [loserWallet]); await client.query('UPDATE platform SET hp = hp + (300 - $1) WHERE id = 1', [hp]); await client.query('COMMIT'); const winnerNewHp = await getHP(winnerWallet); return { winnerNewHp }; } catch(e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); } }
 
-// NUEVA FUNCIÓN: Recompensas escaladas por piso derrotado en la Torre
+// NUEVA FUNCIÓN: Calcula el HP a devolver según los pisos derrotados
+function calculateGauntletReward(defeatedCount) {
+  if (defeatedCount <= 5) return 0;
+  if (defeatedCount === 6) return 5;
+  if (defeatedCount === 7) return 10;
+  if (defeatedCount === 8) return 20;
+  if (defeatedCount === 9) return 30; // 100 - 30 = -70 HP de balance (como solicitaste)
+  if (defeatedCount === 10) return 50;
+  if (defeatedCount === 11) return 75;
+  if (defeatedCount >= 12) return 200; // Recupera 100 + gana 100
+  return 0;
+}
+
+// MODIFICADA: Usa la nueva función de recompensas
 async function settleGauntletTiered(wallet, defeatedCount) { 
   const client = await pool.connect(); 
   try { 
     await client.query('BEGIN'); 
     
-    let reward = 0;
-    if (defeatedCount <= 5) reward = 0;
-    else if (defeatedCount === 6) reward = 10;
-    else if (defeatedCount === 7) reward = 20;
-    else if (defeatedCount === 8) reward = 30;
-    else if (defeatedCount === 9) reward = 45;
-    else if (defeatedCount === 10) reward = 60;
-    else if (defeatedCount === 11) reward = 80;
-    else if (defeatedCount >= 12) reward = 200; // Recupera 100 + gana 100
-
+    const reward = calculateGauntletReward(defeatedCount);
     const platformProfit = 100 - reward;
 
-    // Devolver al jugador sus 100 bloqueados + la recompensa
     await client.query('UPDATE players SET locked_hp = GREATEST(0, locked_hp - 100), hp = hp + $1 WHERE wallet = $2', [reward, wallet]); 
     
-    // La plataforma se queda con lo que el jugador no recuperó (si ganó 200, plataforma pierde 100)
     if (platformProfit > 0) {
       await client.query('UPDATE platform SET hp = hp + $1 WHERE id = 1', [platformProfit]);
     } else if (platformProfit < 0) {
@@ -86,5 +88,6 @@ module.exports = {
   getAllPlayersDebug, updatePlayerName, updatePlayerStats, getTopPlayers,
   getPlayerStats, getPlayerRank,
   isTxProcessed, markTxProcessed,
-  adminSetHP, adminResetPlatform, adminUnlockAllHP
+  adminSetHP, adminResetPlatform, adminUnlockAllHP,
+  calculateGauntletReward // Exportada para usarla en gauntletManager
 };
