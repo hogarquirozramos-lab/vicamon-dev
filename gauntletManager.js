@@ -31,8 +31,8 @@ async function endGauntlet(bId, playerId, won, defeatedCount = 0) {
       if (dbStats) { stats.wins = dbStats.wins; stats.losses = dbStats.losses; }
       stats.rank = await getPlayerRank(pl.wallet);
     } else {
-      // NUEVO: El invitado gana XP equivalente a los HP que hubiera recuperado (1 HP = 10 XP)
-      myXp = reward * 10;
+      // CORREGIDO: El XP del invitado es exactamente el balance neto (pérdida o ganancia)
+      myXp = Math.abs(100 - reward);
     }
   } catch (error) {
     console.error("Error en endGauntlet guardando datos:", error);
