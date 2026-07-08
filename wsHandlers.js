@@ -35,7 +35,6 @@ function setupWebSocketServer(wss, getPlatformUSDCBalance) {
     ws.on('message', async raw => {
       let msg; try { msg = JSON.parse(raw); } catch { return; }
       try {
-        // ... [JOIN, CHANGE_BEAST, ETC CODIGO OMITIDO POR ESPACIO, SIGUE IGUAL] ...
         if (msg.type === 'join') { const wallet = msg.wallet || ''; const isGuest = msg.isGuest || wallet.startsWith('guest_'); if (!isGuest && walletToBattle.has(wallet)) { const bId = walletToBattle.get(wallet); const b = battles.get(bId); if (b) { clearTimeout(b.dcTimer); clearTimeout(b.dcTurnTimer); b.dcPlayerId = null; b.dcWallet = null; for (const [oldId, p] of lobby) { if (p.wallet === wallet && oldId !== id) { lobby.delete(oldId); try { p.ws.close(); } catch(e) {} } } const isP1 = b.p1Wallet === wallet; const oldId = isP1 ? b.p1id : b.p2id; if (isP1) b.p1id = id; else b.p2id = id; if (b.turnId === oldId) b.turnId = id; lobby.set(id, { ws, name: msg.name, beast: isP1 ? b.p1Beast : b.p2Beast, wallet, inBattle: true, id, isGuest: false, physicalBeasts: p.physicalBeasts || [] }); const oppId = isP1 ? b.p2id : b.p1id; const opp = lobby.get(oppId); if (opp) send(opp.ws, { type: 'opponent_reconnected' }); if (b.isTeamBattle) { send(ws, { type: 'reconnect_battle', battleId: bId, role: isP1 ? 'p1' : 'p2', id: id, isTeamBattle: true, opponent: opp?.name || 'Rival', yourTurn: b.turnId === id, myBeast: isP1 ? b.p1Beast : b.p2Beast, oppBeast: isP1 ? b.p2Beast : b.p1Beast }); setTimeout(() => pushTeamBattle(bId), 200); } else { send(ws, { type: 'reconnect_battle', battleId: bId, role: isP1 ? 'p1' : 'p2', id: id, isTeamBattle: false, opponent: opp?.name || 'Rival', yourTurn: b.turnId === id, myBeast: isP1 ? b.p1Beast : b.p2Beast, oppBeast: isP1 ? b.p2Beast : b.p1Beast }); setTimeout(() => pushBattle(bId), 200); } await pushLobby(); return; } else { walletToBattle.delete(wallet); } } for (const [oldId, p] of lobby) { if (p.wallet === wallet && oldId !== id) { send(p.ws, { type: 'kicked', msg: 'Tu wallet se conectó en otra pestaña.' }); if (!p.inBattle) lobby.delete(oldId); try { p.ws.close(); } catch(e) {} } } lobby.set(id, { ws, name: msg.name, beast: msg.beast, wallet, inBattle: false, id, isGuest, physicalBeasts: [] }); if (isGuest) { send(ws, { type: 'joined', id, hp: 0, isGuest: true, stats: { wins: 0, losses: 0, rank: null }, physicalBeasts: [] }); } else { await updatePlayerName(wallet, msg.name); const hp = await getHP(wallet); const stats = await getPlayerStats(wallet); const rank = await getPlayerRank(wallet); send(ws, { type: 'joined', id, hp, isGuest: false, stats: { wins: stats.wins, losses: stats.losses, rank }, physicalBeasts: [] }); const top = await getTopPlayers(3); send(ws, { type: 'leaderboard_update', top }); } await pushLobby(); }
         if (msg.type === 'change_beast') { const p = lobby.get(id); if (p && !p.inBattle) { p.beast = msg.beast; await pushLobby(); } }
         if (msg.type === 'update_nickname') { const p = lobby.get(id); if (p) { p.name = msg.name; if (!p.isGuest) await updatePlayerName(p.wallet, msg.name); await pushLobby(); send(ws, { type: 'nickname_updated', name: msg.name }); } }
@@ -56,9 +55,11 @@ function setupWebSocketServer(wss, getPlatformUSDCBalance) {
         if (msg.type === 'challenge_gauntlet') { 
           const pl = lobby.get(id); if (!pl || pl.inBattle) return; 
           
+          // FIX: Actualizar la bestia elegida SIEMPRE, sin importar si es invitado o no
+          if (msg.beast) pl.beast = msg.beast; 
+          
           // Solo bloquear HP si NO es invitado
           if (!pl.isGuest) {
-            if (msg.beast) pl.beast = msg.beast; 
             if (!await hasHP(pl.wallet, 100)) { send(ws, { type: 'error', msg: 'Necesitas 100 HP para la Torre.' }); return; } 
             await lockHP(pl.wallet, 100); 
           }
