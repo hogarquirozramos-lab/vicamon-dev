@@ -35,15 +35,15 @@ async function unlockHP(wallet, amount = 100) { await pool.query('UPDATE players
 async function settleMatch(winnerWallet, loserWallet, winnerHp) { const client = await pool.connect(); try { await client.query('BEGIN'); const hp = Math.max(0, Math.min(100, winnerHp)); await client.query('UPDATE players SET locked_hp = GREATEST(0, locked_hp - 100), hp = hp + 100 + $1 WHERE wallet = $2', [hp, winnerWallet]); await client.query('UPDATE players SET locked_hp = GREATEST(0, locked_hp - 100) WHERE wallet = $1', [loserWallet]); await client.query('UPDATE platform SET hp = hp + (100 - $1) WHERE id = 1', [hp]); await client.query('COMMIT'); const winnerNewHp = await getHP(winnerWallet); const platformHp = await getPlatformHp(); return { winnerNewHp, platformHp, platformUsdc: parseFloat((platformHp * USDC_PER_HP).toFixed(3)) }; } catch(e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); } }
 async function settleTeamMatch(winnerWallet, loserWallet, winnerRemainingHp) { const client = await pool.connect(); try { await client.query('BEGIN'); const hp = Math.max(0, Math.min(300, winnerRemainingHp)); await client.query('UPDATE players SET locked_hp = GREATEST(0, locked_hp - 300), hp = hp + 300 + $1 WHERE wallet = $2', [hp, winnerWallet]); await client.query('UPDATE players SET locked_hp = GREATEST(0, locked_hp - 300) WHERE wallet = $1', [loserWallet]); await client.query('UPDATE platform SET hp = hp + (300 - $1) WHERE id = 1', [hp]); await client.query('COMMIT'); const winnerNewHp = await getHP(winnerWallet); return { winnerNewHp }; } catch(e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); } }
 
-// NUEVA FUNCIÓN: Calcula el HP a devolver según los pisos derrotados
+// NUEVA FUNCIÓN: Calcula el HP a devolver según los pisos derrotados (Tabla actualizada)
 function calculateGauntletReward(defeatedCount) {
   if (defeatedCount <= 5) return 0;
-  if (defeatedCount === 6) return 5;
+  if (defeatedCount === 6) return 10;
   if (defeatedCount === 7) return 10;
-  if (defeatedCount === 8) return 20;
-  if (defeatedCount === 9) return 30; // 100 - 30 = -70 HP de balance (como solicitaste)
-  if (defeatedCount === 10) return 50;
-  if (defeatedCount === 11) return 75;
+  if (defeatedCount === 8) return 30;
+  if (defeatedCount === 9) return 30;
+  if (defeatedCount === 10) return 30;
+  if (defeatedCount === 11) return 40;
   if (defeatedCount >= 12) return 200; // Recupera 100 + gana 100
   return 0;
 }
