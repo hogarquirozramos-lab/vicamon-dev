@@ -27,9 +27,19 @@ async function connectPhantom() {
   await new Promise(r => setTimeout(r, 100));
   const phantom = getPhantom();
   if (!phantom || !phantom.isPhantom) {
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent); const currentUrl = window.location.href;
-    if (isMobile) { const deepLink = `https://phantom.app/ul/browse/${currentUrl}`; const noPhantomDiv = document.getElementById('no-phantom'); noPhantomDiv.style.display = 'block'; noPhantomDiv.innerHTML = `<div style="color:#F0997B; font-size:13px; line-height:1.5; text-align:left"><strong>📱 Para jugar desde tu móvil:</strong><br><br>1. Abre la app de <strong>Phantom</strong>.<br>2. Ve a <strong>"Descubrir" (🔍)</strong>.<br>3. Pega este enlace:<div style="background:rgba(0,0,0,.3); padding:8px; margin-top:8px; border-radius:6px; word-break:break-all; font-family:monospace; font-size:10px; color:#85B7EB; cursor:pointer; display:flex; justify-content:space-between; align-items:center" onclick="copyText('${currentUrl}')"><span>${currentUrl}</span><span style="margin-left:8px; white-space:nowrap">📋</span></div><br><button class="btn btn-blue btn-sm" style="width:100%; padding:10px" onclick="window.location.href='${deepLink}'">Intentar abrir automáticamente</button></div>`; document.getElementById('btn-phantom').style.display = 'none'; document.getElementById('btn-guest').style.display = 'none'; return; }
-    document.getElementById('no-phantom').style.display='block'; document.getElementById('no-phantom').innerHTML = 'Phantom no detectado. <a href="https://phantom.app" target="_blank" style="color:#F0997B;text-decoration:underline">Instalalo aqui</a>.'; document.getElementById('btn-phantom').style.display='none'; document.getElementById('btn-guest').style.display='none'; return;
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent); 
+    if (isMobile) { 
+      // NUEVO: Usar el modal universal en móvil
+      document.getElementById('mobile-url-display').textContent = window.location.href;
+      document.getElementById('modal-mobile-connect').classList.remove('hidden');
+      return; 
+    }
+    // Escritorio sin Phantom
+    document.getElementById('no-phantom').style.display='block'; 
+    document.getElementById('no-phantom').innerHTML = 'Phantom no detectado. <a href="https://phantom.app" target="_blank" style="color:#F0997B;text-decoration:underline">Instalalo aqui</a>.'; 
+    document.getElementById('btn-phantom').style.display='none'; 
+    document.getElementById('btn-guest').style.display='none'; 
+    return;
   }
   try {
     const resp = await phantom.connect(); const wasGuest = isGuest; myWallet = resp.publicKey.toString(); isGuest = false; 
@@ -37,6 +47,22 @@ async function connectPhantom() {
     if (wasGuest) { if (typeof ws !== 'undefined' && ws) { try { ws.close(); } catch(e) {} } connectWS(); } else { await checkHPNow(true); const savedName = localStorage.getItem('vicamon_nick'); if (savedName) { document.getElementById('inp-name').value = savedName; goProfile(); } }
   } catch(e) { console.error('Phantom error:', e); alert('No se pudo conectar Phantom.'); }
 }
+
+// NUEVAS: Funciones para el modal móvil
+function openPhantomApp() {
+  // Cerrar sesión de invitado para evitar duplicados en el servidor
+  if(isGuest && typeof ws !== 'undefined' && ws) { 
+    try { ws.close(); } catch(e) {} 
+  }
+  const currentUrl = window.location.href;
+  const deepLink = `https://phantom.app/ul/browse/${currentUrl}`;
+  window.location.href = deepLink;
+}
+
+function closeMobileConnectModal() {
+  document.getElementById('modal-mobile-connect').classList.add('hidden');
+}
+
 function copyText(text) { navigator.clipboard.writeText(text).then(() => alert('¡Enlace copiado!')).catch(() => alert('Copia este enlace manualmente: ' + text)); }
 
 window.addEventListener('load', async () => { 
