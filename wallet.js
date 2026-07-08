@@ -29,12 +29,10 @@ async function connectPhantom() {
   if (!phantom || !phantom.isPhantom) {
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent); 
     if (isMobile) { 
-      // NUEVO: Usar el modal universal en móvil
       document.getElementById('mobile-url-display').textContent = window.location.href;
       document.getElementById('modal-mobile-connect').classList.remove('hidden');
       return; 
     }
-    // Escritorio sin Phantom
     document.getElementById('no-phantom').style.display='block'; 
     document.getElementById('no-phantom').innerHTML = 'Phantom no detectado. <a href="https://phantom.app" target="_blank" style="color:#F0997B;text-decoration:underline">Instalalo aqui</a>.'; 
     document.getElementById('btn-phantom').style.display='none'; 
@@ -48,12 +46,8 @@ async function connectPhantom() {
   } catch(e) { console.error('Phantom error:', e); alert('No se pudo conectar Phantom.'); }
 }
 
-// NUEVAS: Funciones para el modal móvil
 function openPhantomApp() {
-  // Cerrar sesión de invitado para evitar duplicados en el servidor
-  if(isGuest && typeof ws !== 'undefined' && ws) { 
-    try { ws.close(); } catch(e) {} 
-  }
+  if(isGuest && typeof ws !== 'undefined' && ws) { try { ws.close(); } catch(e) {} }
   const currentUrl = window.location.href;
   const deepLink = `https://phantom.app/ul/browse/${currentUrl}`;
   window.location.href = deepLink;
@@ -79,6 +73,19 @@ function updateProfileUI(stats) { if (stats) myStats = stats; const nameEl = doc
 function updateHPDisplay(hp){ if(isGuest) hp = 0; myCurrentHP = hp || 0; const el=document.getElementById('pick-hp-val'); if(el){ el.textContent=hp+' HP'; el.style.color=hp>=100?'#5DCAA5':'#EF9F27'; } const loginHp=document.getElementById('wallet-hp'); if(loginHp){ loginHp.textContent=hp+' HP'; loginHp.style.color=hp>=100?'#5DCAA5':'#EF9F27'; } const profHp=document.getElementById('profile-hp'); if(profHp){ profHp.textContent=hp+' HP'; profHp.style.color=hp>=100?'#5DCAA5':'#EF9F27'; } const profUsdc=document.getElementById('profile-usdc'); if(profUsdc){ profUsdc.textContent=(hp*0.001).toFixed(3)+' USDC'; } const btn=document.getElementById('btn-cashout'); if(btn){ btn.style.display=hp>0 && !isGuest?'inline-block':'none'; btn.disabled=false; btn.textContent='💰 Cashout'; } const btnG = document.getElementById('btn-gauntlet'); if (btnG && typeof GAUNTLET_HABILITADO !== 'undefined') { btnG.style.display = 'inline-block'; btnG.disabled = isGuest || myCurrentHP < 100; } const lobbyWidget = document.getElementById('lobby-deposit-widget'); if(lobbyWidget) lobbyWidget.innerHTML = depositWidgetHTML(); const profWidget = document.getElementById('profile-deposit-widget'); if(profWidget) profWidget.innerHTML = depositWidgetHTML(); if(document.getElementById('s-lobby')?.classList.contains('active')){ renderLobbyFromCache(); updateLobbyBadge(); } }
 
 async function doCashout(){ if(isGuest) return alert('Los invitados no pueden hacer cashout.'); const btn=document.getElementById('btn-cashout'); if(btn){btn.disabled=true;btn.textContent='Procesando...';} if(!ws || ws.readyState !== 1){ if(btn){btn.disabled=false;btn.textContent='💰 Cashout';} return; } ws.send(JSON.stringify({type:'cashout'})); }
+
+// MODIFICADO: Permitir que invitados entren a la torre (solo XP)
+function challengeGauntlet() { 
+  if(!ws || ws.readyState !== 1) return alert('Conectando...'); 
+  if(!isGuest && myCurrentHP < 100) return alert('Necesitas al menos 100 HP para entrar a la Torre de Batalla.'); 
+  if(!confirm(isGuest ? '¿Iniciar la Torre de Batalla (Modo Invitado - Solo XP)?' : '¿Iniciar la Torre de Batalla? (Inviertes 100 HP)')) return; 
+  isGauntletChallenge = true; 
+  teamSelectionMode = '1v1'; 
+  document.getElementById('ts-mode-title').textContent = isGuest ? 'Torre de Batalla (Invitado)' : 'Torre de Batalla (Elige tu inicial)'; 
+  selectedTeam = []; 
+  buildTeamPickGrid(); 
+  show('s-team-select'); 
+}
 
 function redeemPhysicalCode() { const input = document.getElementById('inp-physical-code'); const code = input.value.trim(); if(!code) return; if(ws && ws.readyState === 1) ws.send(JSON.stringify({type:'redeem_physical_code', code: code})); input.value = ''; }
 function autoRedeemPhysicalCodes() { const codes = JSON.parse(localStorage.getItem('vicamon_physical_codes') || '[]'); codes.forEach(code => { if(ws && ws.readyState === 1) ws.send(JSON.stringify({type:'redeem_physical_code', code: code})); }); }
