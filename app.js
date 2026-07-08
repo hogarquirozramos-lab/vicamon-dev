@@ -78,7 +78,8 @@ function openSwitchMenu(reason = 'Elige tu siguiente Vicamon.') { const bench = 
 function executeSwitch(index) { const modalBg = document.getElementById('modal-switch'); if(modalBg) modalBg.classList.add('hidden'); ws.send(JSON.stringify({type:'team_switch', battleId, index})); }
 
 function handleMsg(m){
-  if(m.type==='joined'){ myId=m.id; if(m.hp !== undefined && !isGuest) updateHPDisplay(m.hp); if(m.isGuest !== undefined) isGuest = m.isGuest; if(m.physicalBeasts) myPhysicalBeasts = m.physicalBeasts; updateLobbyBadge(); updateProfileUI(m.stats); if(document.getElementById('s-login').classList.contains('active') && !isKicked) show('s-lobby'); if(!isGuest) checkHPNow(false); updatePhysicalUI(); }
+  // CORREGIDO: Se eliminó la restricción !isGuest para que los invitados también actualicen su interfaz (botón de torre)
+  if(m.type==='joined'){ myId=m.id; if(m.hp !== undefined) updateHPDisplay(m.hp); if(m.isGuest !== undefined) isGuest = m.isGuest; if(m.physicalBeasts) myPhysicalBeasts = m.physicalBeasts; updateLobbyBadge(); updateProfileUI(m.stats); if(document.getElementById('s-login').classList.contains('active') && !isKicked) show('s-lobby'); if(!isGuest) checkHPNow(false); updatePhysicalUI(); }
   if(m.type==='nickname_updated'){ myName = m.name; updateLobbyBadge(); }
   if(m.type==='kicked'){ isKicked=true; alert(m.msg); show('s-login'); if(ws) ws.close(); }
   if(m.type==='lobby'){ const others=m.players.filter(p=>p.id!==myId); document.getElementById('lbl-online').textContent=m.players.length; renderLobby(others); }
@@ -90,7 +91,8 @@ function handleMsg(m){
   if(m.type==='battle_start'){ battleId=m.battleId; myRole=m.role; oppName=m.opponent; oppBeast=m.opponentBeast; window._isTeamBattle = !!m.isTeamBattle; const empty={hp:100,maxHp:100,poisonDmg:0,poisonTurns:0,burnDmg:0,burnTurns:0,shield:0,shieldReflect:0,reflect50:0,stun:false,recharge:0,regen:0,regenTurns:0,blind:0,weakAtk:0,weaken:0,corrode:0,analyzed:0,lastDmgReceived:0,pp:[]}; mySt={...empty}; oppSt={...empty}; const isCpu=!!m.isCpu; const isTraining=!!m.isTraining; let startMsg = `¡Batalla por HP! ${myName} vs ${oppName}`; if(isTraining) startMsg = `¡Entrenamiento! ${myName} vs ${oppName}`; show('s-battle'); renderBattle(!isCpu,[{t:startMsg,c:'hi'}]); }
   if(m.type==='battle_state'){ const me=myRole==='p1'?m.p1:m.p2; const opp=myRole==='p1'?m.p2:m.p1; if (m.isTeamBattle) { mySt = me.activeState; oppSt = opp.activeState; myBeast = me.activeBeast; oppBeast = opp.activeBeast; window._myBench = me.bench; } else { myBeast = me.beast || myBeast; oppBeast = opp.beast || oppBeast; mySt=me.state; oppSt=opp.state; } const prevMyHp=mySt.hp, prevOppHp=oppSt.hp; if(mySt.hp<prevMyHp) animHit('me',prevMyHp-mySt.hp); if(oppSt.hp<prevOppHp) animHit('opp',prevOppHp-oppSt.hp); renderBattle(m.yourTurn,m.logs); }
   if(m.type === 'team_force_switch'){ openSwitchMenu(m.reason); }
-  if(m.type==='hp_updated'){ if(!isGuest) updateHPDisplay(m.hp); myCurrentHP=isGuest?0:m.hp; }
+  // CORREGIDO: Se eliminó la restricción !isGuest para que la UI se actualice siempre
+  if(m.type==='hp_updated'){ updateHPDisplay(m.hp); myCurrentHP=isGuest?0:m.hp; }
   if(m.type==='cashout_result'){ const btn=document.getElementById('btn-cashout'); if(!m.ok){ if(btn){btn.disabled=false;btn.textContent='💰 Cashout';} alert('Error: '+m.reason); return; } if(m.status==='confirmed'){ if(btn){btn.disabled=false;btn.textContent='💰 Cashout';} if(!isGuest) updateHPDisplay(0); alert(`✓ Cashout: ${m.usdc} USDC`); } }
   if(m.type==='physical_code_success'){ if(!myPhysicalBeasts.includes(m.beast)) myPhysicalBeasts.push(m.beast); localStorage.setItem('vicamon_physical_codes', JSON.stringify((JSON.parse(localStorage.getItem('vicamon_physical_codes')||'[]')).concat(m.code).filter((v,i,a)=>a.indexOf(v)===i))); updatePhysicalUI(); buildBestiary(); playSfx('curacion'); }
   if(m.type==='error'){ alert('⚠ ' + m.msg); }
