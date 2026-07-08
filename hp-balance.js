@@ -14,8 +14,6 @@ pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS losses INTEGER DEFAULT 
 pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS last_name VARCHAR(20);`).catch(e=>{});
 
 const USDC_PER_HP = 0.001;
-
-// UNIFICACIÓN: Tu wallet real de la plataforma.
 const PLATFORM_WALLET = process.env.PLATFORM_WALLET || 'U3jwNBDnw4kCQ5CYRp5mAf4hbr4dadyUGXDhXdyLXMv';
 
 async function getAllPlayersDebug() { const res = await pool.query('SELECT wallet, hp, locked_hp, wins, losses, last_name FROM players'); return res.rows; }
@@ -36,14 +34,53 @@ async function lockHP(wallet, amount = 100) { const client = await pool.connect(
 async function unlockHP(wallet, amount = 100) { await pool.query('UPDATE players SET hp = hp + $1, locked_hp = GREATEST(0, locked_hp - $1) WHERE wallet = $2', [amount, wallet]); }
 async function settleMatch(winnerWallet, loserWallet, winnerHp) { const client = await pool.connect(); try { await client.query('BEGIN'); const hp = Math.max(0, Math.min(100, winnerHp)); await client.query('UPDATE players SET locked_hp = GREATEST(0, locked_hp - 100), hp = hp + 100 + $1 WHERE wallet = $2', [hp, winnerWallet]); await client.query('UPDATE players SET locked_hp = GREATEST(0, locked_hp - 100) WHERE wallet = $1', [loserWallet]); await client.query('UPDATE platform SET hp = hp + (100 - $1) WHERE id = 1', [hp]); await client.query('COMMIT'); const winnerNewHp = await getHP(winnerWallet); const platformHp = await getPlatformHp(); return { winnerNewHp, platformHp, platformUsdc: parseFloat((platformHp * USDC_PER_HP).toFixed(3)) }; } catch(e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); } }
 async function settleTeamMatch(winnerWallet, loserWallet, winnerRemainingHp) { const client = await pool.connect(); try { await client.query('BEGIN'); const hp = Math.max(0, Math.min(300, winnerRemainingHp)); await client.query('UPDATE players SET locked_hp = GREATEST(0, locked_hp - 300), hp = hp + 300 + $1 WHERE wallet = $2', [hp, winnerWallet]); await client.query('UPDATE players SET locked_hp = GREATEST(0, locked_hp - 300) WHERE wallet = $1', [loserWallet]); await client.query('UPDATE platform SET hp = hp + (300 - $1) WHERE id = 1', [hp]); await client.query('COMMIT'); const winnerNewHp = await getHP(winnerWallet); return { winnerNewHp }; } catch(e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); } }
-async function settleGauntlet(wallet, won) { const client = await pool.connect(); try { await client.query('BEGIN'); await client.query('UPDATE players SET locked_hp = GREATEST(0, locked_hp - 100) WHERE wallet = $1', [wallet]); if (won) { await client.query('UPDATE players SET hp = hp + 200 WHERE wallet = $1', [wallet]); await client.query('UPDATE platform SET hp = GREATEST(0, hp - 100) WHERE id = 1'); } else { await client.query('UPDATE platform SET hp = hp + 100 WHERE id = 1'); } await client.query('COMMIT'); return await getHP(wallet); } catch(e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); } }
+
+// NUEVA FUNCIÓN: Recompensas escaladas por piso derrotado en la Torre
+async function settleGauntletTiered(wallet, defeatedCount) { 
+  const client = await pool.connect(); 
+  try { 
+    await client.query('BEGIN'); 
+    
+    let reward = 0;
+    if (defeatedCount <= 5) reward = 0;
+    else if (defeatedCount === 6) reward = 10;
+    else if (defeatedCount === 7) reward = 20;
+    else if (defeatedCount === 8) reward = 30;
+    else if (defeatedCount === 9) reward = 45;
+    else if (defeatedCount === 10) reward = 60;
+    else if (defeatedCount === 11) reward = 80;
+    else if (defeatedCount >= 12) reward = 200; // Recupera 100 + gana 100
+
+    const platformProfit = 100 - reward;
+
+    // Devolver al jugador sus 100 bloqueados + la recompensa
+    await client.query('UPDATE players SET locked_hp = GREATEST(0, locked_hp - 100), hp = hp + $1 WHERE wallet = $2', [reward, wallet]); 
+    
+    // La plataforma se queda con lo que el jugador no recuperó (si ganó 200, plataforma pierde 100)
+    if (platformProfit > 0) {
+      await client.query('UPDATE platform SET hp = hp + $1 WHERE id = 1', [platformProfit]);
+    } else if (platformProfit < 0) {
+      await client.query('UPDATE platform SET hp = GREATEST(0, hp + $1) WHERE id = 1', [platformProfit]);
+    }
+
+    await client.query('COMMIT'); 
+    const newHp = await getHP(wallet);
+    return { newHp, reward }; 
+  } catch(e) { 
+    await client.query('ROLLBACK'); 
+    throw e; 
+  } finally { 
+    client.release(); 
+  } 
+}
+
 async function cashout(wallet) { const client = await pool.connect(); try { await client.query('BEGIN'); const res = await client.query('SELECT hp FROM players WHERE wallet = $1 FOR UPDATE', [wallet]); const hp = res.rows.length > 0 ? res.rows[0].hp : 0; if (hp <= 0) { await client.query('ROLLBACK'); return { ok: false, reason: 'no_hp', hp: 0, usdc: 0 }; } await client.query('UPDATE players SET hp = 0 WHERE wallet = $1', [wallet]); await client.query('COMMIT'); return { ok: true, hp, usdc: parseFloat((hp * USDC_PER_HP).toFixed(6)) }; } catch(e) { await client.query('ROLLBACK'); return { ok: false, reason: 'db_error', hp: 0, usdc: 0 }; } finally { client.release(); } }
 async function getPlatformHp() { const res = await pool.query('SELECT hp FROM platform WHERE id = 1'); return res.rows.length > 0 ? res.rows[0].hp : 0; }
 async function getPlatformUsdc() { return parseFloat(((await getPlatformHp()) * USDC_PER_HP).toFixed(6)); }
 async function clearPlatformHp(hp) { await pool.query('UPDATE platform SET hp = GREATEST(0, hp - $1) WHERE id = 1', [hp]); }
 
 module.exports = {
-  getHP, addHP, hasHP, lockHP, unlockHP, settleMatch, settleTeamMatch, settleGauntlet, cashout,
+  getHP, addHP, hasHP, lockHP, unlockHP, settleMatch, settleTeamMatch, settleGauntletTiered, cashout,
   getPlatformHp, getPlatformUsdc, clearPlatformHp,
   PLATFORM_WALLET, PLATFORM_THRESHOLD: 1.00, USDC_PER_HP,
   getAllPlayersDebug, updatePlayerName, updatePlayerStats, getTopPlayers,
