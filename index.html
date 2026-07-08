@@ -108,12 +108,136 @@
   </div>
 
   <button class="btn btn-sm" id="btn-cashout" style="display:none;width:100%;margin-bottom:10px;background:rgba(239,159,39,.15);border-color:rgba(239,159,39,.35);color:#EF9F27" onclick="doCashout()">💰 Hacer Cashout</button>
+  
+  <!-- NUEVO: BOTÓN LABORATORIO VICAMON -->
+  <button class="btn btn-blue" style="width:100%;margin-bottom:10px;background:rgba(216,90,48,.14);border-color:rgba(216,90,48,.35);color:#F0997B" onclick="show('s-lab')">🧪 Laboratorio Vicamon →</button>
+  
   <button class="btn btn-blue" style="width:100%;margin-bottom:20px" onclick="enterLobby()">⚔️ Ir al Lobby →</button>
   <div class="chat-wrap" style="border-top:0.5px solid rgba(255,255,255,.1);padding-top:16px">
     <h2 style="margin:0 0 10px 0;font-size:16px">📖 Bestiario Vicamon</h2>
     <p style="font-size:11px;color:rgba(255,255,255,.3);margin-bottom:10px">Estudia los ataques de cada Vicamon para armar tu estrategia.</p>
     <div class="beast-grid" id="bestiary-grid"></div>
     <div class="beast-detail" id="bestiary-detail-panel"></div>
+  </div>
+</div>
+
+<!-- NUEVO: LABORATORIO VICAMON -->
+<div id="s-lab" class="screen">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <h1 style="margin:0">🧪 Laboratorio Vicamon</h1>
+    <button class="btn btn-sm" onclick="show('s-profile')">⬅ Volver</button>
+  </div>
+  
+  <div style="background:rgba(216,90,48,.1);border:0.5px solid rgba(216,90,48,.3);border-radius:8px;padding:10px;margin-bottom:16px;font-size:12px;color:#F0997B;text-align:center">
+    ⚠️ ¡Atención! Las creaciones no se guardan en borrador. Si cierras esta ventana, perderás tu progreso. Solo se bloquea permanentemente cuando la envías a revisión.
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+    
+    <!-- Columna Izquierda: Imagen e Identidad -->
+    <div>
+      <h3 style="margin-bottom:10px">1. Apariencia</h3>
+      <div style="background:rgba(255,255,255,.04);border:0.5px solid rgba(255,255,255,.1);border-radius:12px;padding:16px;text-align:center">
+        <canvas id="lab-canvas" width="100" height="100" style="width:100px;height:100px;image-rendering:pixelated;border:1px dashed rgba(255,255,255,.2);margin-bottom:10px;background:#111"></canvas>
+        <input type="file" id="lab-img-input" accept="image/*" style="font-size:11px;margin-bottom:10px;width:100%">
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:rgba(255,255,255,.5);margin-bottom:5px">
+          <span>Pixelado:</span>
+          <input type="range" id="lab-pixel-size" min="2" max="16" value="8" style="width:60%" oninput="processLabImage()">
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:rgba(255,255,255,.5);margin-bottom:10px">
+          <span>Colores:</span>
+          <input type="range" id="lab-color-palette" min="4" max="32" value="16" style="width:60%" oninput="processLabImage()">
+        </div>
+      </div>
+
+      <h3 style="margin:16px 0 10px 0">2. Identidad</h3>
+      <input id="lab-name" placeholder="Nombre del Vicamon" maxlength="15" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:8px;padding:8px 12px;color:#fff;font-size:14px;outline:none;margin-bottom:8px">
+      <input id="lab-sub" placeholder="Subtítulo (ej: Perro Cyborg)" maxlength="30" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:8px;padding:8px 12px;color:#fff;font-size:14px;outline:none;margin-bottom:8px">
+      <select id="lab-element" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:8px;padding:8px 12px;color:#fff;font-size:14px;outline:none">
+        <option value="fuego">Elemento: Fuego</option>
+        <option value="tierra">Elemento: Tierra</option>
+        <option value="aire">Elemento: Aire</option>
+        <option value="agua">Elemento: Agua</option>
+      </select>
+    </div>
+
+    <!-- Columna Derecha: Ataques y Balance -->
+    <div>
+      <h3 style="margin-bottom:10px">3. Ataques</h3>
+      <div style="background:rgba(255,255,255,.04);border:0.5px solid rgba(255,255,255,.1);border-radius:12px;padding:12px;margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px">
+          <span>Balance Total:</span>
+          <span id="lab-balance-score" style="font-weight:700;color:#5DCAA5">0 / 100 pts</span>
+        </div>
+        <div style="height:6px;background:rgba(0,0,0,.4);border-radius:99px;overflow:hidden">
+          <div id="lab-balance-bar" style="height:100%;width:0%;background:#5DCAA5;transition:width .3s"></div>
+        </div>
+      </div>
+
+      <div id="lab-attacks-container" style="display:flex;flex-direction:column;gap:10px">
+        <!-- Ataque 1 -->
+        <div style="background:rgba(0,0,0,.2);border-radius:8px;padding:10px">
+          <input type="text" placeholder="Nombre Ataque 1" class="lab-atk-name" style="width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.2);color:#fff;font-size:13px;outline:none;margin-bottom:8px">
+          <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5)">
+            <span style="width:35px">Daño:</span>
+            <input type="range" min="0" max="50" value="15" class="lab-atk-dmg" style="flex:1" oninput="calculateLabBalance()">
+            <span class="lab-atk-dmg-val" style="width:25px;text-align:right;color:#fff">15</span>
+          </div>
+          <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-top:5px">
+            <span style="width:35px">Acierto:</span>
+            <input type="range" min="50" max="100" value="90" class="lab-atk-acc" style="flex:1" oninput="calculateLabBalance()">
+            <span class="lab-atk-acc-val" style="width:25px;text-align:right;color:#fff">90%</span>
+          </div>
+        </div>
+        <!-- Ataque 2 -->
+        <div style="background:rgba(0,0,0,.2);border-radius:8px;padding:10px">
+          <input type="text" placeholder="Nombre Ataque 2" class="lab-atk-name" style="width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.2);color:#fff;font-size:13px;outline:none;margin-bottom:8px">
+          <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5)">
+            <span style="width:35px">Daño:</span>
+            <input type="range" min="0" max="50" value="15" class="lab-atk-dmg" style="flex:1" oninput="calculateLabBalance()">
+            <span class="lab-atk-dmg-val" style="width:25px;text-align:right;color:#fff">15</span>
+          </div>
+          <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-top:5px">
+            <span style="width:35px">Acierto:</span>
+            <input type="range" min="50" max="100" value="90" class="lab-atk-acc" style="flex:1" oninput="calculateLabBalance()">
+            <span class="lab-atk-acc-val" style="width:25px;text-align:right;color:#fff">90%</span>
+          </div>
+        </div>
+        <!-- Ataque 3 -->
+        <div style="background:rgba(0,0,0,.2);border-radius:8px;padding:10px">
+          <input type="text" placeholder="Nombre Ataque 3" class="lab-atk-name" style="width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.2);color:#fff;font-size:13px;outline:none;margin-bottom:8px">
+          <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5)">
+            <span style="width:35px">Daño:</span>
+            <input type="range" min="0" max="50" value="15" class="lab-atk-dmg" style="flex:1" oninput="calculateLabBalance()">
+            <span class="lab-atk-dmg-val" style="width:25px;text-align:right;color:#fff">15</span>
+          </div>
+          <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-top:5px">
+            <span style="width:35px">Acierto:</span>
+            <input type="range" min="50" max="100" value="90" class="lab-atk-acc" style="flex:1" oninput="calculateLabBalance()">
+            <span class="lab-atk-acc-val" style="width:25px;text-align:right;color:#fff">90%</span>
+          </div>
+        </div>
+        <!-- Ataque 4 -->
+        <div style="background:rgba(0,0,0,.2);border-radius:8px;padding:10px">
+          <input type="text" placeholder="Nombre Ataque 4" class="lab-atk-name" style="width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.2);color:#fff;font-size:13px;outline:none;margin-bottom:8px">
+          <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5)">
+            <span style="width:35px">Daño:</span>
+            <input type="range" min="0" max="50" value="15" class="lab-atk-dmg" style="flex:1" oninput="calculateLabBalance()">
+            <span class="lab-atk-dmg-val" style="width:25px;text-align:right;color:#fff">15</span>
+          </div>
+          <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-top:5px">
+            <span style="width:35px">Acierto:</span>
+            <input type="range" min="50" max="100" value="90" class="lab-atk-acc" style="flex:1" oninput="calculateLabBalance()">
+            <span class="lab-atk-acc-val" style="width:25px;text-align:right;color:#fff">90%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:20px;text-align:center">
+    <div id="lab-balance-msg" style="font-size:12px;color:#5DCAA5;margin-bottom:10px;height:15px"></div>
+    <button class="btn btn-blue btn-lg" id="lab-submit-btn" onclick="submitLabVicamon()" style="width:100%;background:rgba(246,226,102,.15);border-color:rgba(246,226,102,.35);color:#F6E265">🔒 Enviar a Revisión (Costo: 500 HP)</button>
   </div>
 </div>
 
@@ -239,7 +363,7 @@
 
 <div class="modal-bg hidden" id="modal-challenge-mode"></div>
 
-<!-- NUEVO: MODAL ESCÁNER QR -->
+<!-- MODAL ESCÁNER QR -->
 <div class="modal-bg hidden" id="modal-qr-scanner">
   <div class="modal" style="max-width:400px">
     <h3 style="margin-bottom:15px">📷 Escanear QR</h3>
@@ -248,7 +372,7 @@
   </div>
 </div>
 
-<!-- NUEVO: MODAL CONEXIÓN MÓVIL PHANTOM -->
+<!-- MODAL CONEXIÓN MÓVIL PHANTOM -->
 <div class="modal-bg hidden" id="modal-mobile-connect">
   <div class="modal" style="max-width:400px; text-align:left;">
     <h3 style="color:#F0997B; margin-bottom:15px; text-align:center;">📱 Jugar con Wallet en Móvil</h3>
