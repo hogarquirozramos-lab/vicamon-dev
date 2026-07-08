@@ -16,6 +16,7 @@ var mySt={}, oppSt={}, pendingFrom=null, pendingIsTraining=false, pendingIs3v3=f
 var reconnectTimer=null, isKicked=false;
 var gauntletBattleId = null, gauntletSelectedBeast = null;
 var qrScanner = null; 
+var labOriginalImg = null; // NUEVO: Imagen original para el laboratorio
 
 var pendingChallengeTargetId = null;
 var teamSelectionMode = '1v1'; 
@@ -26,7 +27,7 @@ var lastMsgTime = Date.now();
 
 setInterval(() => { if (ws && ws.readyState === 1) { if (Date.now() - lastMsgTime > 25000) { console.log("WS timeout, forzando reconexión..."); try { ws.close(); } catch(e) {} return; } ws.send(JSON.stringify({type:'ping'})); } }, 10000);
 
-function show(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); if(id === 's-login' || id === 's-pick' || id === 's-lobby' || id === 's-profile' || id === 's-team-select') playMusic('lobby'); if(id === 's-battle' || id === 's-result') playMusic('batalla'); }
+function show(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); if(id === 's-login' || id === 's-pick' || id === 's-lobby' || id === 's-profile' || id === 's-team-select' || id === 's-lab') playMusic('lobby'); if(id === 's-battle' || id === 's-result') playMusic('batalla'); }
 function hpColor(pct){return pct>50?'#5DCAA5':pct>25?'#EF9F27':'#F0997B';}
 function stTags(st,right=false){ let t=''; if(st.poisonTurns>0) t+=`<span class="stag" style="background:rgba(83,150,40,.3);color:#9ECC5A">☠×${st.poisonTurns}</span>`; if(st.burnTurns>0) t+=`<span class="stag" style="background:rgba(216,90,48,.3);color:#F0997B">🔥×${st.burnTurns}</span>`; if(st.shield>0) t+=`<span class="stag" style="background:rgba(55,138,221,.3);color:#85B7EB">🛡×${st.shield}</span>`; if(st.reflect50>0) t+=`<span class="stag" style="background:rgba(55,138,221,.2);color:#85B7EB">↩50%</span>`; if(st.stun) t+=`<span class="stag" style="background:rgba(212,83,126,.3);color:#ED93B1">💫stun</span>`; if(st.recharge>0) t+=`<span class="stag" style="background:rgba(136,135,128,.3);color:#B4B2A9">⚡×${st.recharge}</span>`; if(st.blind>0) t+=`<span class="stag" style="background:rgba(186,117,23,.3);color:#EF9F27">👁×${st.blind}</span>`; if(st.weakAtk>0) t+=`<span class="stag" style="background:rgba(15,110,86,.3);color:#5DCAA5">⬇atk×${st.weakAtk}</span>`; if(st.weaken>0) t+=`<span class="stag" style="background:rgba(15,110,86,.3);color:#5DCAA5">⬇dmg×${st.weaken}</span>`; if(st.analyzed>0) t+=`<span class="stag" style="background:rgba(130,80,180,.3);color:#CFA9EC">🔍×${st.analyzed}</span>`; return t; }
 function panelHTML(st, bKey, label, side){ const b=BEASTS[bKey]||{name:bKey,sub:'',img:'',el:'aire',style:'equilibrado'}; const pct=Math.max(0,st.hp/st.maxHp*100); const right=side==='opp'; return `<div class="f-label">${label}</div><div class="f-sprite-wrap"><img class="f-sprite" id="spr-${side}" src="${b.img}" alt="${b.name}"></div><div class="f-name">${b.name}</div><div class="f-sub">${b.sub}</div><div class="hp-lbl">HP</div><div class="hp-wrap"><div class="hp-fill" id="hpbar-${side}" style="width:${pct.toFixed(1)}%;background:${hpColor(pct)}"></div></div><div class="hp-val" id="hpval-${side}">${Math.max(0,st.hp)} / ${st.maxHp}</div><div class="stags">${stTags(st,right)}</div>`; }
@@ -162,6 +163,170 @@ function doAttack(i){ animAttack('me'); try { const atk = BEASTS[myBeast].attack
 function leaveLobby(){ if(ws) ws.send(JSON.stringify({type:'leave_lobby'})); isKicked = true; if(ws) { try { ws.close(); } catch(e){} } ws = null; isGuest = false; show('s-login'); }
 function backToLobby(){ updateLobbyBadge(); show('s-lobby'); }
 document.getElementById('inp-name').addEventListener('keydown',e=>{if(e.key==='Enter')goProfile();});
+
+// --- LABORATORIO VICAMON ---
+document.addEventListener('DOMContentLoaded', () => {
+    const imgInput = document.getElementById('lab-img-input');
+    if(imgInput) {
+        imgInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                labOriginalImg = new Image();
+                labOriginalImg.onload = () => {
+                    processLabImage();
+                };
+                labOriginalImg.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+    calculateLabBalance(); // Initial calculation
+});
+
+function processLabImage() {
+    if (!labOriginalImg) return;
+    const canvas = document.getElementById('lab-canvas');
+    if(!canvas) return;
+    const ctx = canvas.getContext('2d');
+    
+    const pixelSize = parseInt(document.getElementById('lab-pixel-size').value);
+    const paletteSize = parseInt(document.getElementById('lab-color-palette').value);
+    
+    const w = canvas.width;
+    const h = canvas.height;
+    
+    // Create temp canvas for downscaling
+    const tempCanvas = document.createElement('canvas');
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCanvas.width = Math.max(1, Math.floor(w / pixelSize));
+    tempCanvas.height = Math.max(1, Math.floor(h / pixelSize));
+    
+    // Calculate crop to square
+    const imgW = labOriginalImg.width;
+    const imgH = labOriginalImg.height;
+    const size = Math.min(imgW, imgH);
+    const sx = (imgW - size) / 2;
+    const sy = (imgH - size) / 2;
+    
+    // Draw scaled down
+    tempCtx.drawImage(labOriginalImg, sx, sy, size, size, 0, 0, tempCanvas.width, tempCanvas.height);
+    
+    // Scale up to main canvas with smoothing disabled
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, w, h);
+    ctx.drawImage(tempCanvas, 0, 0, w, h);
+    
+    // Reduce color palette
+    const imageData = ctx.getImageData(0, 0, w, h);
+    const data = imageData.data;
+    const step = 255 / (paletteSize - 1);
+    
+    for (let i = 0; i < data.length; i += 4) {
+        data[i] = Math.round(data[i] / step) * step;     // R
+        data[i+1] = Math.round(data[i+1] / step) * step; // G
+        data[i+2] = Math.round(data[i+2] / step) * step; // B
+    }
+    ctx.putImageData(imageData, 0, 0);
+}
+
+function calculateLabBalance() {
+    const dmgs = document.querySelectorAll('.lab-atk-dmg');
+    const accs = document.querySelectorAll('.lab-atk-acc');
+    const dmgVals = document.querySelectorAll('.lab-atk-dmg-val');
+    const accVals = document.querySelectorAll('.lab-atk-acc-val');
+    
+    let totalPoints = 0;
+    
+    for (let i = 0; i < dmgs.length; i++) {
+        const dmg = parseInt(dmgs[i].value);
+        const acc = parseInt(accs[i].value);
+        dmgVals[i].textContent = dmg;
+        accVals[i].textContent = acc + '%';
+        
+        // Expected damage calculation (dmg * chance to hit)
+        totalPoints += dmg * (acc / 100);
+    }
+    
+    const maxPoints = 120; // Limit to be considered "balanced"
+    const scoreEl = document.getElementById('lab-balance-score');
+    const barEl = document.getElementById('lab-balance-bar');
+    const msgEl = document.getElementById('lab-balance-msg');
+    const btn = document.getElementById('lab-submit-btn');
+    
+    const pct = Math.min(100, (totalPoints / maxPoints) * 100);
+    
+    scoreEl.textContent = Math.round(totalPoints) + ' pts';
+    barEl.style.width = pct + '%';
+    
+    if (totalPoints <= 60) {
+        scoreEl.style.color = '#5DCAA5';
+        barEl.style.background = '#5DCAA5';
+        msgEl.textContent = '✓ Balance válido. Listo para enviar.';
+        msgEl.style.color = '#5DCAA5';
+        btn.disabled = false;
+    } else if (totalPoints <= 100) {
+        scoreEl.style.color = '#EF9F27';
+        barEl.style.background = '#EF9F27';
+        msgEl.textContent = '⚠ Vicamon fuerte. Puede ser rechazado por el admin.';
+        msgEl.style.color = '#EF9F27';
+        btn.disabled = false;
+    } else {
+        scoreEl.style.color = '#F0997B';
+        barEl.style.background = '#F0997B';
+        msgEl.textContent = '✗ Vicamon desbalanceado. Reduce daño o precisión.';
+        msgEl.style.color = '#F0997B';
+        btn.disabled = true;
+    }
+}
+
+function submitLabVicamon() {
+    if (isGuest) return alert('Debes conectar tu wallet para crear un Vicamon.');
+    if (myCurrentHP < 500) return alert('Necesitas 500 HP para enviar un Vicamon a revisión.');
+    if (!labOriginalImg) return alert('Debes subir una imagen de referencia.');
+    
+    const name = document.getElementById('lab-name').value.trim();
+    const sub = document.getElementById('lab-sub').value.trim();
+    const el = document.getElementById('lab-element').value;
+    
+    if (!name || !sub) return alert('Debes ingresar nombre y subtítulo.');
+    
+    const atkNames = document.querySelectorAll('.lab-atk-name');
+    const dmgs = document.querySelectorAll('.lab-atk-dmg');
+    const accs = document.querySelectorAll('.lab-atk-acc');
+    
+    const attacks = [];
+    for(let i=0; i<4; i++) {
+        const n = atkNames[i].value.trim();
+        if(!n) return alert(`Debes nombrar el ataque ${i+1}.`);
+        attacks.push({
+            n: n,
+            d: parseInt(dmgs[i].value),
+            acc: parseInt(accs[i].value),
+            fx: null, 
+            pp: 5,
+            desc: 'Ataque creado en el Laboratorio.'
+        });
+    }
+    
+    const canvas = document.getElementById('lab-canvas');
+    const imgData = canvas.toDataURL('image/png');
+    
+    if (!confirm('¿Estás seguro? Se descontarán 500 HP de tu cuenta y la creación se enviará al admin.')) return;
+    
+    if (ws && ws.readyState === 1) {
+        ws.send(JSON.stringify({
+            type: 'submit_custom_vicamon',
+            beast: { name, sub, el, attacks },
+            image: imgData
+        }));
+        alert('✓ ¡Vicamon enviado a revisión! El admin lo evaluará pronto.');
+        show('s-profile');
+    } else {
+        alert('Error de conexión.');
+    }
+}
 
 function openQRScanner() {
     const modal = document.getElementById('modal-qr-scanner');
