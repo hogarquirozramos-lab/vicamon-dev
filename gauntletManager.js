@@ -76,13 +76,13 @@ async function checkGauntletCpuDeath(bId) {
   if (cpuSt.hp <= 0) {
     b.turnId = -2; 
     pushCpuBattle(bId); 
-    setTimeout(() => {
+    setTimeout(async () => { // <--- CORREGIDO A async
       try {
         const bb = battles.get(bId); if (!bb) return;
         bb.gauntletIndex++;
         
         if (bb.gauntletIndex >= 12 || bb.gauntletIndex >= bb.gauntletTeam.length) {
-          await endGauntlet(bId, plId, true, 12); // Agregado await
+          await endGauntlet(bId, plId, true, 12);
         } else {
           const pl = lobby.get(plId);
           if (!pl) return endGauntlet(bId, plId, false, bb.gauntletIndex);
@@ -101,11 +101,11 @@ async function checkGauntletCpuDeath(bId) {
   if (plSt.hp <= 0) {
     b.turnId = -2;
     pushCpuBattle(bId);
-    setTimeout(() => {
+    setTimeout(async () => { // <--- CORREGIDO A async
       try { 
         const bb = battles.get(bId); 
         if (!bb) return;
-        await endGauntlet(bId, plId, false, bb.gauntletIndex); // Agregado await
+        await endGauntlet(bId, plId, false, bb.gauntletIndex);
       } catch(e) { console.error("Gauntlet loss error:", e); }
     }, 1500);
     return true;
