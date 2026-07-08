@@ -111,7 +111,8 @@ function handleMsg(m){
         if (m.isGuest || isGuest) {
            const myXp = m.myXp || 0;
            const rewardHp = m.reward || 200;
-           resultBody=`<div style="background:rgba(246, 226, 102, 0.1);border-radius:10px;padding:14px;margin:14px 0;text-align:center"><div style="color:#F6E265">¡Torre Completada! (Invitado)</div><div style="color:#5DCAA5;margin-top:8px">+${myXp} XP</div><div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:4px">(Equiv. a ${rewardHp} HP que hubieras ganado)</div></div>`;
+           const balanceHp = rewardHp - 100; // 100
+           resultBody=`<div style="background:rgba(246, 226, 102, 0.1);border-radius:10px;padding:14px;margin:14px 0;text-align:center"><div style="color:#F6E265">¡Torre Completada! (Invitado)</div><div style="color:#5DCAA5;margin-top:8px">+${myXp} XP</div><div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:4px">(Equiv. a ${balanceHp} HP que hubieras ganado)</div></div>`;
         } else {
            resultBody=`<div style="background:rgba(246, 226, 102, 0.1);border-radius:10px;padding:14px;margin:14px 0;text-align:center"><div style="color:#F6E265">¡Torre Completada!</div><div style="color:#5DCAA5;margin-top:8px">+100 HP devueltos<br>+100 HP ganados</div></div>`; 
         }
@@ -119,7 +120,8 @@ function handleMsg(m){
         if (m.isGuest || isGuest) {
            const myXp = m.myXp || 0;
            const rewardHp = m.reward || 0;
-           resultBody=`<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:14px;margin:14px 0;text-align:center"><div style="color:#F0997B">Torre Fallida (Invitado)</div><div style="color:#CFA9EC;margin-top:8px">Derrotaste ${m.defeated || 0} Vicamons</div><div style="color:#5DCAA5;margin-top:8px">+${myXp} XP</div><div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:4px">(Equiv. a ${rewardHp} HP que hubieras recuperado)</div></div>`;
+           const lossHp = 100 - rewardHp; // 90
+           resultBody=`<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:14px;margin:14px 0;text-align:center"><div style="color:#F0997B">Torre Fallida (Invitado)</div><div style="color:#CFA9EC;margin-top:8px">Derrotaste ${m.defeated || 0} Vicamons</div><div style="color:#5DCAA5;margin-top:8px">+${myXp} XP</div><div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:4px">(Equiv. a ${lossHp} HP de pérdida total)</div></div>`;
         } else {
            const netHp = m.reward - 100; 
            const hpText = netHp === 0 ? "0 HP (Neutro)" : (netHp > 0 ? `+${netHp} HP` : `${netHp} HP`);
