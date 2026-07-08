@@ -16,38 +16,54 @@ async function endGauntlet(bId, playerId, won, defeatedCount = 0) {
   let newHp = 0;
   let reward = 0;
   let myXp = 0;
+  let stats = { wins: 0, losses: 0, rank: null };
 
-  if (!isGuest) {
-    const finalDefeated = won ? 12 : defeatedCount;
-    const result = await settleGauntletTiered(pl.wallet, finalDefeated);
-    newHp = result.newHp;
-    reward = result.reward;
-  } else {
-    // XP para invitados basado en pisos derrotados
-    myXp = won ? 1200 : (defeatedCount * 100);
+  // Usamos try/catch para evitar que un error de Web3/DB cuelgue el juego
+  try {
+    if (!isGuest) {
+      const finalDefeated = won ? 12 : defeatedCount;
+      const result = await settleGauntletTiered(pl.wallet, finalDefeated);
+      newHp = result.newHp;
+      reward = result.reward;
+      
+      const dbStats = await getPlayerStats(pl.wallet);
+      if (dbStats) stats.wins = dbStats.wins, stats.losses = dbStats.losses;
+      stats.rank = await getPlayerRank(pl.wallet);
+    } else {
+      myXp = won ? 1200 : (defeatedCount * 100);
+    }
+  } catch (error) {
+    console.error("Error en endGauntlet guardando datos:", error);
+    // Si hay un error, igual continuamos para no colgar al jugador
   }
 
-  const stats = isGuest ? { wins: 0, losses: 0, rank: null } : (await getPlayerStats(pl.wallet) || { wins:0, losses:0, rank:null });
-  const rank = isGuest ? null : await getPlayerRank(pl.wallet);
+  // Aseguramos que el mensaje de fin de batalla SIEMPRE se envíe
+  try {
+    send(pl.ws, JSON.stringify({ 
+      type:'battle_end', 
+      won, 
+      isGauntlet: true, 
+      newHp, 
+      reward, 
+      defeated: won ? 12 : defeatedCount, 
+      isGuest,
+      myXp,
+      stats 
+    }));
+  } catch (e) {
+    console.error("Error al enviar mensaje de fin de gauntlet:", e);
+  }
   
-  send(pl.ws, JSON.stringify({ 
-    type:'battle_end', 
-    won, 
-    isGauntlet: true, 
-    newHp, 
-    reward, // Enviar recompensa al frontend
-    defeated: won ? 12 : defeatedCount, 
-    isGuest,
-    myXp,
-    stats: { wins: stats.wins, losses: stats.losses, rank: rank } 
-  }));
-  
-  pl.inBattle = false;
+  // Limpiamos el estado del jugador
+  if (pl) pl.inBattle = false;
   battles.delete(bId);
   await pushLobby();
+  
   if (!isGuest) {
-    const top = await getTopPlayers(3);
-    broadcast({ type: 'leaderboard_update', top });
+    try {
+      const top = await getTopPlayers(3);
+      broadcast({ type: 'leaderboard_update', top });
+    } catch (e) {}
   }
 }
 
@@ -65,14 +81,13 @@ async function checkGauntletCpuDeath(bId) {
         const bb = battles.get(bId); if (!bb) return;
         bb.gauntletIndex++;
         
-        // MODIFICADO: Usar el equipo aleatorio y límite de 12
         if (bb.gauntletIndex >= 12 || bb.gauntletIndex >= bb.gauntletTeam.length) {
-          endGauntlet(bId, plId, true, 12);
+          await endGauntlet(bId, plId, true, 12); // Agregado await
         } else {
           const pl = lobby.get(plId);
           if (!pl) return endGauntlet(bId, plId, false, bb.gauntletIndex);
           
-          bb.cpuBeast = bb.gauntletTeam[bb.gauntletIndex]; // Seleccionar del mazo
+          bb.cpuBeast = bb.gauntletTeam[bb.gauntletIndex];
           bb.st1 = getStartState(bb.cpuBeast);
           bb.turnId = CPU_ID; 
           bb.logs.push({t:`¡Jefe derrotado! Prepárate para ${BEASTS[bb.cpuBeast].name} (${bb.gauntletIndex+1}/12). HP restaurado.`, c:'good'});
@@ -82,6 +97,7 @@ async function checkGauntletCpuDeath(bId) {
     }, 1500); 
     return true;
   }
+  
   if (plSt.hp <= 0) {
     b.turnId = -2;
     pushCpuBattle(bId);
@@ -89,7 +105,7 @@ async function checkGauntletCpuDeath(bId) {
       try { 
         const bb = battles.get(bId); 
         if (!bb) return;
-        endGauntlet(bId, plId, false, bb.gauntletIndex); // Pasa cuántos derrotó
+        await endGauntlet(bId, plId, false, bb.gauntletIndex); // Agregado await
       } catch(e) { console.error("Gauntlet loss error:", e); }
     }, 1500);
     return true;
