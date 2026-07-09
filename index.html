@@ -95,7 +95,7 @@
   </div>
   <div id="profile-deposit-widget" style="margin-bottom:16px"></div>
   
-  <!-- NUEVO: SECCIÓN INVOCACIONES FÍSICAS CON QR -->
+  <!-- SECCIÓN INVOCACIONES FÍSICAS CON QR -->
   <div style="background:rgba(255,255,255,.04);border:0.5px solid rgba(255,255,255,.1);border-radius:12px;padding:16px;margin-bottom:16px">
     <h2 style="margin:0 0 10px 0;font-size:16px">🔗 Invocaciones Físicas</h2>
     <p style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:12px">Escanea el QR o ingresa el código de tu llavero para invocar a tu Vicamon real durante esta sesión.</p>
@@ -109,7 +109,7 @@
 
   <button class="btn btn-sm" id="btn-cashout" style="display:none;width:100%;margin-bottom:10px;background:rgba(239,159,39,.15);border-color:rgba(239,159,39,.35);color:#EF9F27" onclick="doCashout()">💰 Hacer Cashout</button>
   
-  <!-- NUEVO: BOTÓN LABORATORIO VICAMON -->
+  <!-- BOTÓN LABORATORIO VICAMON -->
   <button class="btn btn-blue" style="width:100%;margin-bottom:10px;background:rgba(216,90,48,.14);border-color:rgba(216,90,48,.35);color:#F0997B" onclick="show('s-lab')">🧪 Laboratorio Vicamon →</button>
   
   <button class="btn btn-blue" style="width:100%;margin-bottom:20px" onclick="enterLobby()">⚔️ Ir al Lobby →</button>
@@ -121,7 +121,7 @@
   </div>
 </div>
 
-<!-- NUEVO: LABORATORIO VICAMON -->
+<!-- LABORATORIO VICAMON -->
 <div id="s-lab" class="screen">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
     <h1 style="margin:0">🧪 Laboratorio Vicamon</h1>
@@ -132,7 +132,7 @@
     ⚠️ ¡Atención! Las creaciones no se guardan en borrador. Si cierras esta ventana, perderás tu progreso. Solo se bloquea permanentemente cuando la envías a revisión.
   </div>
 
-  <!-- NUEVO: HP y Depósito en el Laboratorio -->
+  <!-- HP y Depósito en el Laboratorio -->
   <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,.3);padding:10px;border-radius:8px;margin-bottom:10px">
     <div style="font-size:12px;color:rgba(255,255,255,.5)">HP Disponibles: <span id="lab-hp-val" style="color:#5DCAA5;font-weight:700">0 HP</span></div>
   </div>
@@ -188,171 +188,19 @@
       <div id="lab-moves-container" style="display:flex;flex-direction:column;gap:10px">
         <!-- Mov 1 -->
         <div class="lab-move-box" style="background:rgba(0,0,0,.2);border-radius:8px;padding:10px">
-          <input type="text" placeholder="Nombre Movimiento 1" class="lab-mv-name" style="width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.2);color:#fff;font-size:13px;outline:none;margin-bottom:8px">
-          <select class="lab-mv-type" onchange="updateLabMoveUI(this)" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:6px;padding:5px;color:#fff;font-size:12px;outline:none;margin-bottom:8px">
-            <option value="ataque" style="background:#1a1a24;color:#fff">Tipo: Ataque</option>
-            <option value="escudo" style="background:#1a1a24;color:#fff">Tipo: Escudo</option>
-            <option value="cura" style="background:#1a1a24;color:#fff">Tipo: Curación</option>
-          </select>
-          <div class="lab-mv-dmg-group">
-            <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-bottom:5px">
-              <span style="width:45px">Daño:</span>
-              <input type="range" min="0" max="40" value="15" class="lab-mv-dmg" style="flex:1" oninput="calculateLabBalance()">
-              <span class="lab-mv-dmg-val" style="width:25px;text-align:right;color:#fff">15</span>
-            </div>
-            <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-bottom:5px">
-              <span style="width:45px">Acierto:</span>
-              <input type="range" min="50" max="100" value="90" class="lab-mv-acc" style="flex:1" oninput="calculateLabBalance()">
-              <span class="lab-mv-acc-val" style="width:25px;text-align:right;color:#fff">90%</span>
-            </div>
-          </div>
-          <div class="lab-mv-shield-group" style="display:none">
-            <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-bottom:5px">
-              <span style="width:45px">Escudo:</span>
-              <input type="range" min="10" max="40" value="20" class="lab-mv-shield" style="flex:1" oninput="calculateLabBalance()">
-              <span class="lab-mv-shield-val" style="width:25px;text-align:right;color:#fff">20</span>
-            </div>
-          </div>
-          <div class="lab-mv-heal-group" style="display:none">
-            <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-bottom:5px">
-              <span style="width:45px">Cura HP:</span>
-              <input type="range" min="10" max="40" value="20" class="lab-mv-heal" style="flex:1" oninput="calculateLabBalance()">
-              <span class="lab-mv-heal-val" style="width:25px;text-align:right;color:#fff">20</span>
-            </div>
-          </div>
-          <select class="lab-mv-effect" onchange="calculateLabBalance()" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:6px;padding:5px;color:#fff;font-size:12px;outline:none">
-            <option value="none" style="background:#1a1a24;color:#fff">Sin Efecto</option>
-            <option value="burn" style="background:#1a1a24;color:#fff">Efecto: Quemar (2t)</option>
-            <option value="poison" style="background:#1a1a24;color:#fff">Efecto: Envenenar (5t)</option>
-            <option value="stun" style="background:#1a1a24;color:#fff">Efecto: Aturdir (1t)</option>
-            <option value="blind" style="background:#1a1a24;color:#fff">Efecto: Cegar (2t)</option>
-          </select>
+          <select class="lab-mv-select" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:6px;padding:6px;color:#fff;font-size:12px;outline:none"></select>
         </div>
         <!-- Mov 2 -->
         <div class="lab-move-box" style="background:rgba(0,0,0,.2);border-radius:8px;padding:10px">
-          <input type="text" placeholder="Nombre Movimiento 2" class="lab-mv-name" style="width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.2);color:#fff;font-size:13px;outline:none;margin-bottom:8px">
-          <select class="lab-mv-type" onchange="updateLabMoveUI(this)" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:6px;padding:5px;color:#fff;font-size:12px;outline:none;margin-bottom:8px">
-            <option value="ataque" style="background:#1a1a24;color:#fff">Tipo: Ataque</option>
-            <option value="escudo" style="background:#1a1a24;color:#fff">Tipo: Escudo</option>
-            <option value="cura" style="background:#1a1a24;color:#fff">Tipo: Curación</option>
-          </select>
-          <div class="lab-mv-dmg-group">
-            <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-bottom:5px">
-              <span style="width:45px">Daño:</span>
-              <input type="range" min="0" max="40" value="15" class="lab-mv-dmg" style="flex:1" oninput="calculateLabBalance()">
-              <span class="lab-mv-dmg-val" style="width:25px;text-align:right;color:#fff">15</span>
-            </div>
-            <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-bottom:5px">
-              <span style="width:45px">Acierto:</span>
-              <input type="range" min="50" max="100" value="90" class="lab-mv-acc" style="flex:1" oninput="calculateLabBalance()">
-              <span class="lab-mv-acc-val" style="width:25px;text-align:right;color:#fff">90%</span>
-            </div>
-          </div>
-          <div class="lab-mv-shield-group" style="display:none">
-            <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-bottom:5px">
-              <span style="width:45px">Escudo:</span>
-              <input type="range" min="10" max="40" value="20" class="lab-mv-shield" style="flex:1" oninput="calculateLabBalance()">
-              <span class="lab-mv-shield-val" style="width:25px;text-align:right;color:#fff">20</span>
-            </div>
-          </div>
-          <div class="lab-mv-heal-group" style="display:none">
-            <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-bottom:5px">
-              <span style="width:45px">Cura HP:</span>
-              <input type="range" min="10" max="40" value="20" class="lab-mv-heal" style="flex:1" oninput="calculateLabBalance()">
-              <span class="lab-mv-heal-val" style="width:25px;text-align:right;color:#fff">20</span>
-            </div>
-          </div>
-          <select class="lab-mv-effect" onchange="calculateLabBalance()" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:6px;padding:5px;color:#fff;font-size:12px;outline:none">
-            <option value="none" style="background:#1a1a24;color:#fff">Sin Efecto</option>
-            <option value="burn" style="background:#1a1a24;color:#fff">Efecto: Quemar (2t)</option>
-            <option value="poison" style="background:#1a1a24;color:#fff">Efecto: Envenenar (5t)</option>
-            <option value="stun" style="background:#1a1a24;color:#fff">Efecto: Aturdir (1t)</option>
-            <option value="blind" style="background:#1a1a24;color:#fff">Efecto: Cegar (2t)</option>
-          </select>
+          <select class="lab-mv-select" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:6px;padding:6px;color:#fff;font-size:12px;outline:none"></select>
         </div>
         <!-- Mov 3 -->
         <div class="lab-move-box" style="background:rgba(0,0,0,.2);border-radius:8px;padding:10px">
-          <input type="text" placeholder="Nombre Movimiento 3" class="lab-mv-name" style="width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.2);color:#fff;font-size:13px;outline:none;margin-bottom:8px">
-          <select class="lab-mv-type" onchange="updateLabMoveUI(this)" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:6px;padding:5px;color:#fff;font-size:12px;outline:none;margin-bottom:8px">
-            <option value="ataque" style="background:#1a1a24;color:#fff">Tipo: Ataque</option>
-            <option value="escudo" style="background:#1a1a24;color:#fff">Tipo: Escudo</option>
-            <option value="cura" style="background:#1a1a24;color:#fff">Tipo: Curación</option>
-          </select>
-          <div class="lab-mv-dmg-group">
-            <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-bottom:5px">
-              <span style="width:45px">Daño:</span>
-              <input type="range" min="0" max="40" value="15" class="lab-mv-dmg" style="flex:1" oninput="calculateLabBalance()">
-              <span class="lab-mv-dmg-val" style="width:25px;text-align:right;color:#fff">15</span>
-            </div>
-            <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-bottom:5px">
-              <span style="width:45px">Acierto:</span>
-              <input type="range" min="50" max="100" value="90" class="lab-mv-acc" style="flex:1" oninput="calculateLabBalance()">
-              <span class="lab-mv-acc-val" style="width:25px;text-align:right;color:#fff">90%</span>
-            </div>
-          </div>
-          <div class="lab-mv-shield-group" style="display:none">
-            <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-bottom:5px">
-              <span style="width:45px">Escudo:</span>
-              <input type="range" min="10" max="40" value="20" class="lab-mv-shield" style="flex:1" oninput="calculateLabBalance()">
-              <span class="lab-mv-shield-val" style="width:25px;text-align:right;color:#fff">20</span>
-            </div>
-          </div>
-          <div class="lab-mv-heal-group" style="display:none">
-            <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-bottom:5px">
-              <span style="width:45px">Cura HP:</span>
-              <input type="range" min="10" max="40" value="20" class="lab-mv-heal" style="flex:1" oninput="calculateLabBalance()">
-              <span class="lab-mv-heal-val" style="width:25px;text-align:right;color:#fff">20</span>
-            </div>
-          </div>
-          <select class="lab-mv-effect" onchange="calculateLabBalance()" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:6px;padding:5px;color:#fff;font-size:12px;outline:none">
-            <option value="none" style="background:#1a1a24;color:#fff">Sin Efecto</option>
-            <option value="burn" style="background:#1a1a24;color:#fff">Efecto: Quemar (2t)</option>
-            <option value="poison" style="background:#1a1a24;color:#fff">Efecto: Envenenar (5t)</option>
-            <option value="stun" style="background:#1a1a24;color:#fff">Efecto: Aturdir (1t)</option>
-            <option value="blind" style="background:#1a1a24;color:#fff">Efecto: Cegar (2t)</option>
-          </select>
+          <select class="lab-mv-select" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:6px;padding:6px;color:#fff;font-size:12px;outline:none"></select>
         </div>
         <!-- Mov 4 -->
         <div class="lab-move-box" style="background:rgba(0,0,0,.2);border-radius:8px;padding:10px">
-          <input type="text" placeholder="Nombre Movimiento 4" class="lab-mv-name" style="width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.2);color:#fff;font-size:13px;outline:none;margin-bottom:8px">
-          <select class="lab-mv-type" onchange="updateLabMoveUI(this)" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:6px;padding:5px;color:#fff;font-size:12px;outline:none;margin-bottom:8px">
-            <option value="ataque" style="background:#1a1a24;color:#fff">Tipo: Ataque</option>
-            <option value="escudo" style="background:#1a1a24;color:#fff">Tipo: Escudo</option>
-            <option value="cura" style="background:#1a1a24;color:#fff">Tipo: Curación</option>
-          </select>
-          <div class="lab-mv-dmg-group">
-            <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-bottom:5px">
-              <span style="width:45px">Daño:</span>
-              <input type="range" min="0" max="40" value="15" class="lab-mv-dmg" style="flex:1" oninput="calculateLabBalance()">
-              <span class="lab-mv-dmg-val" style="width:25px;text-align:right;color:#fff">15</span>
-            </div>
-            <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-bottom:5px">
-              <span style="width:45px">Acierto:</span>
-              <input type="range" min="50" max="100" value="90" class="lab-mv-acc" style="flex:1" oninput="calculateLabBalance()">
-              <span class="lab-mv-acc-val" style="width:25px;text-align:right;color:#fff">90%</span>
-            </div>
-          </div>
-          <div class="lab-mv-shield-group" style="display:none">
-            <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-bottom:5px">
-              <span style="width:45px">Escudo:</span>
-              <input type="range" min="10" max="40" value="20" class="lab-mv-shield" style="flex:1" oninput="calculateLabBalance()">
-              <span class="lab-mv-shield-val" style="width:25px;text-align:right;color:#fff">20</span>
-            </div>
-          </div>
-          <div class="lab-mv-heal-group" style="display:none">
-            <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-bottom:5px">
-              <span style="width:45px">Cura HP:</span>
-              <input type="range" min="10" max="40" value="20" class="lab-mv-heal" style="flex:1" oninput="calculateLabBalance()">
-              <span class="lab-mv-heal-val" style="width:25px;text-align:right;color:#fff">20</span>
-            </div>
-          </div>
-          <select class="lab-mv-effect" onchange="calculateLabBalance()" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:6px;padding:5px;color:#fff;font-size:12px;outline:none">
-            <option value="none" style="background:#1a1a24;color:#fff">Sin Efecto</option>
-            <option value="burn" style="background:#1a1a24;color:#fff">Efecto: Quemar (2t)</option>
-            <option value="poison" style="background:#1a1a24;color:#fff">Efecto: Envenenar (5t)</option>
-            <option value="stun" style="background:#1a1a24;color:#fff">Efecto: Aturdir (1t)</option>
-            <option value="blind" style="background:#1a1a24;color:#fff">Efecto: Cegar (2t)</option>
-          </select>
+          <select class="lab-mv-select" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:6px;padding:6px;color:#fff;font-size:12px;outline:none"></select>
         </div>
       </div>
     </div>
