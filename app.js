@@ -41,7 +41,22 @@ function handleMsg(m){
   if(m.type==='gauntlet_next'){ gauntletBattleId = m.battleId; gauntletSelectedBeast = myBeast; const b = BEASTS[m.nextBeast]; document.getElementById('g-title').textContent = `¡Jefe ${m.round - 1}/12 derrotado!`; document.getElementById('g-sub').innerHTML = `El próximo rival es <strong style="color:#CFA9EC">${b.name}</strong> (${m.round}/12).`; const picker = document.getElementById('g-beast-picker'); picker.innerHTML = Object.entries(BEASTS).map(([k,b])=>`<div class="bcard" id="gbc-${k}" style="padding:5px" onclick="selectGauntletBeast('${k}')"><img src="${b.img}" style="width:50px;height:50px"><div class="bname" style="font-size:10px">${b.name}</div></div>`).join(''); document.getElementById('gbc-'+myBeast)?.classList.add('sel'); document.getElementById('modal-gauntlet').classList.remove('hidden'); return; }
   if(m.type==='challenged'){ pendingFrom=m.fromId; pendingIsTraining = !!m.isTraining; pendingIs3v3 = false; const b=BEASTS[m.fromBeast]||{name:m.fromBeast,img:''}; document.getElementById('ch-img').src=b.img; document.getElementById('ch-title').textContent=`¡Reto de ${m.fromName}!`; document.getElementById('ch-sub').textContent=pendingIsTraining ? `${m.fromName} quiere un ENTRENAMIENTO 1v1.` : `${m.fromName} quiere una BATALLA POR HP 1v1 (100 HP).`; document.getElementById('modal-challenged').classList.remove('hidden'); startChallengeBeep(); }
   if(m.type==='challenged_3v3'){ pendingFrom=m.fromId; pendingIs3v3 = true; pendingIsTraining = !!m.isTraining; document.getElementById('ch-img').src='vicamon-logo.png'; document.getElementById('ch-title').textContent=`¡Reto 3v3 de ${m.fromName}!`; document.getElementById('ch-sub').textContent=pendingIsTraining ? `${m.fromName} quiere un ENTRENAMIENTO 3v3.` : `${m.fromName} quiere una BATALLA POR HP 3v3 (300 HP).`; document.getElementById('modal-challenged').classList.remove('hidden'); startChallengeBeep(); }
-  if(m.type==='battle_start'){ battleId=m.battleId; myRole=m.role; oppName=m.opponent; oppBeast=m.opponentBeast; window._isTeamBattle = !!m.isTeamBattle; const empty={hp:100,maxHp:100,poisonDmg:0,poisonTurns:0,burnDmg:0,burnTurns:0,shield:0,shieldReflect:0,reflect50:0,stun:false,recharge:0,regen:0,regenTurns:0,blind:0,weakAtk:0,weaken:0,corrode:0,analyzed:0,lastDmgReceived:0,pp:[]}; mySt={...empty}; oppSt={...empty}; const isCpu=!!m.isCpu; const isTraining=!!m.isTraining; let startMsg = `¡Batalla por HP! ${myName} vs ${oppName}`; if(isTraining) startMsg = `¡Entrenamiento! ${myName} vs ${oppName}`; show('s-battle'); renderBattle(!isCpu,[{t:startMsg,c:'hi'}]); }
+  
+  // MODIFICADO: battle_start soporta el Vicamon del Laboratorio
+  if(m.type==='battle_start'){ 
+    battleId=m.battleId; myRole=m.role; oppName=m.opponent; oppBeast=m.opponentBeast; window._isTeamBattle = !!m.isTeamBattle; 
+    myBeast = m.myBeast || myBeast; // El servidor nos dice qué bestia usar
+    
+    // Si es simulación del laboratorio, usamos la data temporal guardada
+    if (m.isLabSimulation) { window._labBeast = window._labBeastTemp; } else { window._labBeast = null; }
+    
+    const empty={hp:100,maxHp:100,poisonDmg:0,poisonTurns:0,burnDmg:0,burnTurns:0,shield:0,shieldReflect:0,reflect50:0,stun:false,recharge:0,regen:0,regenTurns:0,blind:0,weakAtk:0,weaken:0,corrode:0,analyzed:0,lastDmgReceived:0,pp:[]}; 
+    mySt={...empty}; oppSt={...empty}; 
+    const isCpu=!!m.isCpu; const isTraining=!!m.isTraining; 
+    let startMsg = `¡Batalla por HP! ${myName} vs ${oppName}`; if(isTraining) startMsg = `¡Entrenamiento! ${myName} vs ${oppName}`; if(m.isLabSimulation) startMsg = `¡Simulación de Laboratorio! ${myName} vs ${oppName}`; 
+    show('s-battle'); renderBattle(!isCpu,[{t:startMsg,c:'hi'}]); 
+  }
+  
   if(m.type==='battle_state'){ const me=myRole==='p1'?m.p1:m.p2; const opp=myRole==='p1'?m.p2:m.p1; if (m.isTeamBattle) { mySt = me.activeState; oppSt = opp.activeState; myBeast = me.activeBeast; oppBeast = opp.activeBeast; window._myBench = me.bench; } else { myBeast = me.beast || myBeast; oppBeast = opp.beast || oppBeast; mySt=me.state; oppSt=opp.state; } const prevMyHp=mySt.hp, prevOppHp=oppSt.hp; if(mySt.hp<prevMyHp) animHit('me',prevMyHp-mySt.hp); if(oppSt.hp<prevOppHp) animHit('opp',prevOppHp-oppSt.hp); renderBattle(m.yourTurn,m.logs); }
   if(m.type === 'team_force_switch'){ openSwitchMenu(m.reason); }
   if(m.type==='hp_updated'){ updateHPDisplay(m.hp); myCurrentHP=isGuest?0:m.hp; }
@@ -52,8 +67,10 @@ function handleMsg(m){
   if(m.type==='opponent_reconnected'){ const turnBar = document.getElementById('turn-bar'); if(turnBar) turnBar.innerHTML = '<span>Turno del rival...</span>'; }
   if(m.type==='reconnect_battle'){ battleId = m.battleId; myRole = m.role; oppName = m.opponent; myId = m.id; myBeast = m.myBeast; oppBeast = m.oppBeast; window._isTeamBattle = !!m.isTeamBattle; show('s-battle'); const turnBar = document.getElementById('turn-bar'); if(turnBar) turnBar.innerHTML = '<span style="color:#5DCAA5">✓ ¡Reconectado con éxito! Sincronizando...</span>'; }
   
+  // MODIFICADO: battle_end soporta volver al laboratorio
   if(m.type==='battle_end'){ 
-    const won=m.won; const isCpuResult = m.isCpu === true; const isTrainingResult = m.isTraining === true; const isGauntletResult = m.isGauntlet === true; const isTeamResult = m.isTeamBattle === true; const winnerHp=m.winnerHp||0; const newHp=m.newHp||0; 
+    const won=m.won; const isCpuResult = m.isCpu === true; const isTrainingResult = m.isTraining === true; const isGauntletResult = m.isGauntlet === true; const isTeamResult = m.isTeamBattle === true; const isLabSim = m.isLabSimulation === true; // NUEVO
+    const winnerHp=m.winnerHp||0; const newHp=m.newHp||0; 
     if(m.stats) updateProfileUI(m.stats); show('s-result'); 
     if(!isCpuResult && !isTrainingResult && !isGuest) updateHPDisplay(newHp); 
     if(isGauntletResult && !isGuest) updateHPDisplay(newHp); 
@@ -85,15 +102,25 @@ function handleMsg(m){
         }
       } 
     }
-    else if(isTrainingResult){ const myXp = won ? (m.winnerXp || 0) : (m.loserXp || 0); resultBody=`<div style="background:rgba(130,80,180,.08);border:0.5px solid rgba(130,80,180,.2);border-radius:10px;padding:14px;margin:14px 0;text-align:center"><div style="font-size:20px">&#127891;</div><div style="font-size:13px;color:#CFA9EC">Entrenamiento 1v1</div><div style="font-size:14px;color:#5DCAA5;margin-top:8px">+${myXp} XP</div></div>`; } 
+    else if(isTrainingResult || isLabSim){ // NUEVO: Agregamos isLabSim aquí para que no descuente HP ni muestre errores
+       const myXp = won ? (m.winnerXp || 0) : (m.loserXp || 0); 
+       let title = isLabSim ? 'Simulación de Laboratorio' : (isTeamResult ? 'Entrenamiento 3v3' : 'Entrenamiento 1v1');
+       resultBody=`<div style="background:rgba(130,80,180,.08);border:0.5px solid rgba(130,80,180,.2);border-radius:10px;padding:14px;margin:14px 0;text-align:center"><div style="font-size:20px">&#127891;</div><div style="font-size:13px;color:#CFA9EC">${title}</div><div style="font-size:14px;color:#5DCAA5;margin-top:8px">${isLabSim ? 'Prueba finalizada' : `+${myXp} XP`}</div></div>`; 
+    }  
     else if(isTeamResult){ if(won){ resultBody=`<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:14px;margin:14px 0"><div>Batalla 3v3 por HP</div><div style="color:#5DCAA5;margin-top:8px">+300 HP + ${winnerHp} HP sobrantes</div><div style="color:#fff;margin-top:8px">Total: ${newHp} HP</div></div>`; } else { resultBody=`<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:14px;margin:14px 0"><div>Batalla 3v3 por HP</div><div style="color:#F0997B;margin-top:8px">-300 HP</div></div>`; } } 
     else if(isCpuResult){ const myXp = won ? (m.winnerXp || 0) : (m.loserXp || 0); resultBody=`<div style="background:rgba(93,202,165,.08);border-radius:10px;padding:14px;margin:14px 0;text-align:center"><div style="font-size:20px">&#127891;</div><div style="color:#5DCAA5">Entrenamiento vs Master</div><div style="font-size:14px;color:#5DCAA5;margin-top:8px">+${myXp} XP</div></div>`; } 
     else if(won){ resultBody=`<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:14px;margin:14px 0"><div>¡Victoria!</div><div style="color:#5DCAA5;margin-top:8px">+${100+winnerHp} HP de recompensa</div><div style="color:#fff;margin-top:8px">Total: ${newHp} HP</div></div>`; } 
     else { resultBody=`<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:14px;margin:14px 0"><div>Derrota</div><div style="color:#F0997B;margin-top:8px">-100 HP</div></div>`; } 
     
     const icon = won ? '🏆' : '💀'; const title = won ? '¡Victoria!' : 'Derrota'; 
-    document.getElementById('result-box').innerHTML=`<div class="r-icon">${icon}</div><div class="r-title">${title}</div>${resultBody}<button class="btn btn-blue" onclick="backToLobby()">Volver</button>`; 
+    // NUEVO: Botón dinámico para volver al laboratorio o al lobby
+    const backBtnHtml = isLabSim 
+        ? `<button class="btn btn-blue" onclick="show('s-lab')">Volver al Laboratorio</button>` 
+        : `<button class="btn btn-blue" onclick="backToLobby()">Volver</button>`;
+        
+    document.getElementById('result-box').innerHTML=`<div class="r-icon">${icon}</div><div class="r-title">${title}</div>${resultBody}${backBtnHtml}`; 
     window._isTeamBattle = false; 
+    window._labBeast = null; // Limpiar la data temporal
   }
 }
 
