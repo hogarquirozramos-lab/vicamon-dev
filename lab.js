@@ -1,7 +1,6 @@
 var labOriginalImg = null; 
 
 // NUEVO: Pool de movimientos predefinidos (estilo Pokémon)
-// type: 'atk' (Ataque), 'buff' (Escudo/Cura), 'debuff' (Estado negativo al rival)
 const MOVE_POOL = [
     // --- Ataques Básicos ---
     { n: 'Golpe Básico', d: 20, acc: 100, fx: null, pp: 99, desc: 'Confiable, nunca falla. PP infinito.', pts: 20, type: 'atk' },
@@ -44,7 +43,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    // Poblar los desplegables de movimientos
     populateMoveSelects();
     calculateLabBalance(); 
 });
@@ -54,10 +52,33 @@ function populateMoveSelects() {
     selects.forEach((sel, idx) => {
         let html = '<option value="" style="background:#1a1a24;color:#fff">-- Selecciona un Movimiento --</option>';
         MOVE_POOL.forEach((mv, i) => {
-            html += `<option value="${i}" style="background:#1a1a24;color:#fff">${mv.n} (${mv.type === 'atk' ? 'Ataque' : mv.type === 'buff' ? 'Defensa' : 'Soporte'})</option>`;
+            let typeIcon = mv.type === 'atk' ? '⚔️' : mv.type === 'buff' ? '🛡️' : '✨';
+            html += `<option value="${i}" style="background:#1a1a24;color:#fff">${typeIcon} ${mv.n}</option>`;
         });
         sel.innerHTML = html;
-        sel.onchange = calculateLabBalance;
+        sel.onchange = () => {
+            calculateLabBalance();
+            updateMoveDescriptions();
+        };
+    });
+}
+
+function updateMoveDescriptions() {
+    const selects = document.querySelectorAll('.lab-mv-select');
+    selects.forEach(sel => {
+        const descEl = sel.parentElement.querySelector('.lab-mv-desc');
+        if (!descEl) return;
+        
+        if (sel.value === "") {
+            descEl.innerHTML = '<span style="color:rgba(255,255,255,.3)">Selecciona un movimiento para ver su efecto.</span>';
+            return;
+        }
+        
+        const mv = MOVE_POOL[parseInt(sel.value)];
+        let typeText = mv.type === 'atk' ? '⚔️ Ataque' : mv.type === 'buff' ? '🛡️ Defensa' : '✨ Soporte';
+        let statsText = `Daño: ${mv.d} | Prec: ${mv.acc}% | PP: ${mv.pp === 99 ? '∞' : mv.pp}`;
+        
+        descEl.innerHTML = `<strong style="color:#85B7EB">${typeText}</strong> · ${mv.desc} <br><span style="font-size:9px;color:rgba(255,255,255,.4)">${statsText}</span>`;
     });
 }
 
@@ -167,90 +188,4 @@ function calculateLabBalance() {
         btn.disabled = false; 
     } else if (totalPower <= 120) {
         msgEl.textContent = '✓ Vicamon Balanceado. ¡Listo para enviar!';
-        msgEl.style.color = '#5DCAA5'; 
-        btn.disabled = false;
-    } else {
-        msgEl.textContent = '✗ Vicamon Desbalanceado. Baja el daño o efectos.';
-        msgEl.style.color = '#F0997B'; 
-        btn.disabled = true;
-    }
-}
-
-function submitLabVicamon() {
-    if (isGuest) return alert('Debes conectar tu wallet para crear un Vicamon.');
-    if (myCurrentHP < 500) return alert('Necesitas 500 HP para enviar un Vicamon a revisión.');
-    if (!labOriginalImg) return alert('Debes subir una imagen de referencia.');
-    
-    const name = document.getElementById('lab-name').value.trim();
-    const sub = document.getElementById('lab-sub').value.trim();
-    const el = document.getElementById('lab-element').value;
-    
-    if (!name || !sub) return alert('Debes ingresar nombre y subtítulo.');
-    
-    const selects = document.querySelectorAll('.lab-mv-select');
-    const attacks = [];
-    for(let i=0; i<4; i++) {
-        if (!selects[i].value) return alert(`Debes elegir el movimiento ${i+1}.`);
-        const mv = MOVE_POOL[parseInt(selects[i].value)];
-        
-        // Copiamos el movimiento del pool
-        attacks.push({
-            n: mv.n,
-            d: mv.d,
-            acc: mv.acc,
-            fx: mv.fx,
-            pp: mv.pp,
-            desc: mv.desc
-        });
-    }
-    
-    const canvas = document.getElementById('lab-canvas');
-    const imgData = canvas.toDataURL('image/png');
-    
-    if (!confirm('¿Estás seguro? Se descontarán 500 HP de tu cuenta y la creación se enviará al admin.')) return;
-    
-    if (ws && ws.readyState === 1) {
-        ws.send(JSON.stringify({
-            type: 'submit_custom_vicamon',
-            beast: { name, sub, el, attacks },
-            image: imgData
-        }));
-        alert('✓ ¡Vicamon enviado a revisión! El admin lo evaluará pronto.');
-        show('s-profile');
-    } else {
-        alert('Error de conexión.');
-    }
-}
-
-function openQRScanner() {
-    const modal = document.getElementById('modal-qr-scanner');
-    modal.classList.remove('hidden');
-    if (qrScanner) return; 
-    qrScanner = new Html5Qrcode("qr-reader");
-    qrScanner.start(
-        { facingMode: "environment" }, 
-        { fps: 10, qrbox: 250 },
-        (decodedText) => {
-            document.getElementById('inp-physical-code').value = decodedText;
-            redeemPhysicalCode();
-            closeQRScanner();
-        },
-        (errorMessage) => { /* Ignorar */ }
-    ).catch(err => {
-        alert('No se pudo acceder a la cámara. Asegúrate de dar permisos o usa el campo de texto.');
-        closeQRScanner();
-    });
-}
-
-function closeQRScanner() {
-    const modal = document.getElementById('modal-qr-scanner');
-    modal.classList.add('hidden');
-    if (qrScanner) {
-        qrScanner.stop().then(() => {
-            qrScanner.clear();
-            qrScanner = null;
-        }).catch(err => {
-            qrScanner = null; 
-        });
-    }
-}
+        msgEl.style.color = '#5DCAA5';
