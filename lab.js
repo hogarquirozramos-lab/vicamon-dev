@@ -107,26 +107,33 @@ function calculateLabBalance() {
         if (mv.type === 'buff') buffCount++;
         if (mv.type === 'atk') atkCount++;
     });
+    
     const markerEl = document.getElementById('lab-balance-marker');
     const msgEl = document.getElementById('lab-balance-msg');
     const btn = document.getElementById('lab-submit-btn');
+    
     let markerPos = Math.min(100, (totalPower / 160) * 100);
     markerEl.style.left = markerPos + '%';
-    const hasEnoughHP = myCurrentHP >= 500;
 
-    if (emptyCount > 0) { msgEl.textContent = 'Te faltan elegir movimientos.'; msgEl.style.color = '#EF9F27'; btn.disabled = true; return; }
-    if (uniqueMoves.size < 4) { msgEl.textContent = 'No puedes repetir movimientos.'; msgEl.style.color = '#F0997B'; btn.disabled = true; return; }
-    if (buffCount > 2) { msgEl.textContent = 'Máximo 2 movimientos defensivos/curas.'; msgEl.style.color = '#F0997B'; btn.disabled = true; return; }
-    if (atkCount === 0) { msgEl.textContent = 'Debes tener al menos 1 movimiento de ataque.'; msgEl.style.color = '#F0997B'; btn.disabled = true; return; }
+    // VALIDACIONES DE COMPOSICIÓN
+    if (emptyCount > 0) { msgEl.textContent = 'Te faltan elegir movimientos.'; msgEl.style.color = '#EF9F27'; btn.disabled = true; btn.textContent = '🔒 PRÓXIMAMENTE (Costo: 3000 HP)'; return; }
+    if (uniqueMoves.size < 4) { msgEl.textContent = 'No puedes repetir movimientos.'; msgEl.style.color = '#F0997B'; btn.disabled = true; btn.textContent = '🔒 PRÓXIMAMENTE (Costo: 3000 HP)'; return; }
+    if (buffCount > 2) { msgEl.textContent = 'Máximo 2 movimientos defensivos/curas.'; msgEl.style.color = '#F0997B'; btn.disabled = true; btn.textContent = '🔒 PRÓXIMAMENTE (Costo: 3000 HP)'; return; }
+    if (atkCount === 0) { msgEl.textContent = 'Debes tener al menos 1 movimiento de ataque.'; msgEl.style.color = '#F0997B'; btn.disabled = true; btn.textContent = '🔒 PRÓXIMAMENTE (Costo: 3000 HP)'; return; }
 
-    if (!hasEnoughHP) {
-        msgEl.textContent = '✗ Necesitas al menos 500 HP para enviar a revisión.'; msgEl.style.color = '#F0997B'; btn.disabled = true;
-    } else if (totalPower < 70) {
-        msgEl.textContent = '⚠ Vicamon Débil. Sube el daño o efectos.'; msgEl.style.color = '#F6E265'; btn.disabled = false; 
+    // EVALUACIÓN DE BALANCE Y BLOQUEO TEMPORAL DE ENVÍO
+    btn.disabled = true;
+    btn.textContent = '🔒 PRÓXIMAMENTE (Costo: 3000 HP)';
+    
+    if (totalPower < 70) {
+        msgEl.textContent = '⚠ Vicamon Débil. (Envíos deshabilitados temporalmente)';
+        msgEl.style.color = '#F6E265'; 
     } else if (totalPower <= 120) {
-        msgEl.textContent = '✓ Vicamon Balanceado. ¡Listo para enviar!'; msgEl.style.color = '#5DCAA5'; btn.disabled = false;
+        msgEl.textContent = '✓ Vicamon Balanceado. (Envíos deshabilitados temporalmente)';
+        msgEl.style.color = '#5DCAA5'; 
     } else {
-        msgEl.textContent = '✗ Vicamon Desbalanceado. Baja el daño o efectos.'; msgEl.style.color = '#F0997B'; btn.disabled = true;
+        msgEl.textContent = '✗ Vicamon Desbalanceado. (Envíos deshabilitados temporalmente)';
+        msgEl.style.color = '#F0997B'; 
     }
 }
 
@@ -150,39 +157,16 @@ function getLabBeastData() {
 function simulateLabVicamon() {
     const labBeast = getLabBeastData();
     if (!labBeast) return alert('Debes elegir los 4 movimientos antes de simular.');
-    
-    window._labBeastTemp = labBeast; // Guardamos en memoria para que la UI de batalla lo dibuje
-    
+    window._labBeastTemp = labBeast; 
     if (ws && ws.readyState === 1) {
-        ws.send(JSON.stringify({
-            type: 'lab_simulate',
-            beast: labBeast
-        }));
+        ws.send(JSON.stringify({ type: 'lab_simulate', beast: labBeast }));
     } else {
         alert('Error de conexión.');
     }
 }
 
 function submitLabVicamon() {
-    if (isGuest) return alert('Debes conectar tu wallet para crear un Vicamon.');
-    if (myCurrentHP < 500) return alert('Necesitas 500 HP para enviar un Vicamon a revisión.');
-    
-    const labBeast = getLabBeastData();
-    if (!labBeast) return alert('Debes elegir los 4 movimientos antes de enviar.');
-    
-    if (!confirm('¿Estás seguro? Se descontarán 500 HP de tu cuenta y la creación se enviará al admin.')) return;
-    
-    if (ws && ws.readyState === 1) {
-        ws.send(JSON.stringify({
-            type: 'submit_custom_vicamon',
-            beast: { name: labBeast.name, sub: labBeast.sub, el: labBeast.el, attacks: labBeast.attacks },
-            image: labBeast.img
-        }));
-        alert('✓ ¡Vicamon enviado a revisión! El admin lo evaluará pronto.');
-        show('s-profile');
-    } else {
-        alert('Error de conexión.');
-    }
+    alert('El envío de Vicamons está temporalmente deshabilitado mientras calibramos los ataques.');
 }
 
 function openQRScanner() {
