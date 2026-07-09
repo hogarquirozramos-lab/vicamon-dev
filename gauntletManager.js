@@ -1,7 +1,7 @@
 const BEASTS = require('./beasts.js');
 const { lobby, battles, pushCpuBattle, broadcast, send, pushLobby } = require('./state');
 const { applyAtk, tickEffects, getStartState } = require('./battleEngine');
-const { settleGauntletTiered, getPlayerStats, getPlayerRank, getTopPlayers, calculateGauntletReward } = require('./hp-balance');
+const { settleGauntletTiered, getPlayerStats, getPlayerRank, getTopPlayers, claimTowerGrandPrize, claimTowerTrainingWin, getHP } = require('./hp-balance');
 const { cpuPickAttack } = require('./cpuAI');
 
 const CPU_ID = -1;
@@ -12,30 +12,53 @@ async function endGauntlet(bId, playerId, won, defeatedCount = 0) {
   const pl = lobby.get(playerId);
   if (!pl) return;
   
-  const isGuest = pl.isGuest || false;
+  const towerMode = b?.towerMode || (pl.isGuest ? 'guest' : 'hp');
   let newHp = 0;
   let reward = 0;
-  let myXp = 0;
   let stats = { wins: 0, losses: 0, rank: null };
+  let customMsg = '';
 
   try {
-    const finalDefeated = won ? 12 : defeatedCount;
-    reward = calculateGauntletReward(finalDefeated); // Calculamos la recompensa base
-
-    if (!isGuest) {
-      const result = await settleGauntletTiered(pl.wallet, finalDefeated);
-      newHp = result.newHp;
-      reward = result.reward; // Confirmamos la recompensa real de la DB
-      
-      const dbStats = await getPlayerStats(pl.wallet);
-      if (dbStats) { stats.wins = dbStats.wins; stats.losses = dbStats.losses; }
-      stats.rank = await getPlayerRank(pl.wallet);
+    if (won) {
+      if (towerMode === 'hp') {
+        const claimed = await claimTowerGrandPrize(pl.wallet);
+        if (claimed) {
+          newHp = await getHP(pl.wallet);
+          reward = 1000;
+          customMsg = '¡FELICIDADES! Eres el ganador del premio mayor de 1000 HP de hoy.';
+          broadcast({ type: 'chat_message', name: '⚔️ VICAMON', text: `🏆 ¡${pl.name} ha conquistado la Torre de Batalla y se lleva 1000 HP!` });
+        } else {
+          reward = 100;
+          await settleGauntletTiered(pl.wallet, 12);
+          newHp = await getHP(pl.wallet);
+          customMsg = '¡Ganaste la torre! Pero alguien más se llevó el premio mayor. Se te devuelven 100 HP.';
+        }
+      } else if (towerMode === 'training') {
+        const result = await claimTowerTrainingWin(pl.wallet);
+        if (result.ok) {
+          newHp = result.newHp;
+          reward = 10;
+          customMsg = '¡Ganaste 10 HP de bono por completar la Torre de Entrenamiento!';
+        } else {
+          customMsg = '¡Ganaste la torre! Pero ya habías reclamado tu bono de 10 HP hoy.';
+        }
+      } else if (towerMode === 'guest') {
+        customMsg = '¡Ganaste la Torre! Si estuvieras jugando con tu wallet, te habrías llevado 1000 HP.';
+      }
     } else {
-      // CORREGIDO: El XP del invitado es exactamente el balance neto (pérdida o ganancia)
-      myXp = Math.abs(100 - reward);
+      if (towerMode === 'hp') {
+        const result = await settleGauntletTiered(pl.wallet, defeatedCount);
+        newHp = result.newHp;
+        reward = result.reward - 100;
+        const dbStats = await getPlayerStats(pl.wallet);
+        if (dbStats) { stats.wins = dbStats.wins; stats.losses = dbStats.losses; }
+        stats.rank = await getPlayerRank(pl.wallet);
+      } else {
+        customMsg = 'Has sido derrotado en la Torre. ¡Vuelve a intentarlo!';
+      }
     }
   } catch (error) {
-    console.error("Error en endGauntlet guardando datos:", error);
+    console.error("Error en endGauntlet:", error);
   }
 
   try {
@@ -46,19 +69,19 @@ async function endGauntlet(bId, playerId, won, defeatedCount = 0) {
       newHp, 
       reward, 
       defeated: won ? 12 : defeatedCount, 
-      isGuest,
-      myXp,
-      stats 
+      isGuest: towerMode === 'guest',
+      myXp: 0,
+      stats,
+      towerMode,
+      customMsg
     });
-  } catch (e) {
-    console.error("Error al enviar mensaje de fin de gauntlet:", e);
-  }
+  } catch (e) { console.error("Error al enviar fin de gauntlet:", e); }
   
   if (pl) pl.inBattle = false;
   battles.delete(bId);
   await pushLobby();
   
-  if (!isGuest) {
+  if (towerMode === 'hp' && won) {
     try {
       const top = await getTopPlayers(3);
       broadcast({ type: 'leaderboard_update', top });
@@ -79,13 +102,11 @@ async function checkGauntletCpuDeath(bId) {
       try {
         const bb = battles.get(bId); if (!bb) return;
         bb.gauntletIndex++;
-        
         if (bb.gauntletIndex >= 12 || bb.gauntletIndex >= bb.gauntletTeam.length) {
           await endGauntlet(bId, plId, true, 12);
         } else {
           const pl = lobby.get(plId);
           if (!pl) return endGauntlet(bId, plId, false, bb.gauntletIndex);
-          
           bb.cpuBeast = bb.gauntletTeam[bb.gauntletIndex];
           bb.st1 = getStartState(bb.cpuBeast);
           bb.turnId = CPU_ID; 
@@ -96,7 +117,6 @@ async function checkGauntletCpuDeath(bId) {
     }, 1500); 
     return true;
   }
-  
   if (plSt.hp <= 0) {
     b.turnId = -2;
     pushCpuBattle(bId);
