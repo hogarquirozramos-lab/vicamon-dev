@@ -109,8 +109,13 @@ async function claimTowerGrandPrize(wallet) {
       await client.query('ROLLBACK');
       return false; 
     }
-    await client.query('UPDATE platform SET hp = hp - 1000 WHERE id = 1');
-    await client.query('UPDATE players SET hp = hp + 1000 WHERE wallet = $1', [wallet]);
+    
+    // CORRECCIÓN MATEMÁTICA: 
+    // Se le suman 1000 HP al jugador (liberando sus 100 HP invertidos + 900 HP de ganancia neta).
+    await client.query('UPDATE players SET locked_hp = GREATEST(0, locked_hp - 100), hp = hp + 1000 WHERE wallet = $1', [wallet]);
+    // La plataforma solo pone 900 HP de su bolsillo (los otros 100 ya los tenía bloqueados del jugador).
+    await client.query('UPDATE platform SET hp = hp - 900 WHERE id = 1');
+    
     await client.query('COMMIT');
     return true;
   } catch(e) {
