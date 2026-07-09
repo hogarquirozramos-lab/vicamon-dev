@@ -1,5 +1,31 @@
 var labOriginalImg = null; 
 
+// NUEVO: Pool de movimientos predefinidos (estilo Pokémon)
+// type: 'atk' (Ataque), 'buff' (Escudo/Cura), 'debuff' (Estado negativo al rival)
+const MOVE_POOL = [
+    // --- Ataques Básicos ---
+    { n: 'Golpe Básico', d: 20, acc: 100, fx: null, pp: 99, desc: 'Confiable, nunca falla. PP infinito.', pts: 20, type: 'atk' },
+    { n: 'Súper Golpe', d: 35, acc: 80, fx: null, pp: 5, desc: 'Mucho daño, pero puede fallar.', pts: 28, type: 'atk' },
+    { n: 'Golpe Rápido', d: 15, acc: 100, fx: 'double', pp: 10, desc: 'Golpea dos veces seguidas.', pts: 24, type: 'atk' },
+    { n: 'Embestida', d: 40, acc: 75, fx: null, pp: 5, desc: 'Devastador, pero impreciso.', pts: 30, type: 'atk' },
+    { n: 'Drenaje', d: 15, acc: 100, fx: 'drain10', pp: 5, desc: 'Daña 15 HP y te cura 10 HP.', pts: 25, type: 'atk' },
+    
+    // --- Ataques con Estado (Debuffs) ---
+    { n: 'Lanzallamas', d: 18, acc: 100, fx: 'burn', pp: 5, desc: 'Daño + Quema al rival (6 HP/turno).', pts: 28, type: 'atk' },
+    { n: 'Picadura Tóxica', d: 6, acc: 100, fx: 'poison5', pp: 5, desc: 'Daño leve + Veneno grave (8 HP/turno).', pts: 26, type: 'atk' },
+    { n: 'Carga Cegadora', d: 15, acc: 85, fx: 'blind', pp: 5, desc: 'Daño + Ciega al rival (baja su precisión).', pts: 24, type: 'atk' },
+    
+    // --- Defensas y Curas ---
+    { n: 'Escudo', d: 0, acc: 100, fx: 'shield2', pp: 5, desc: 'Bloquea los próximos 2 ataques.', pts: 25, type: 'buff' },
+    { n: 'Cura Menor', d: 0, acc: 100, fx: 'heal20', pp: 5, desc: 'Restaura 20 HP.', pts: 20, type: 'buff' },
+    { n: 'Fortaleza', d: 0, acc: 100, fx: 'fortress', pp: 3, desc: 'Escudo + Cura 15 HP + Regeneración.', pts: 35, type: 'buff' },
+    { n: 'Purificar', d: 0, acc: 100, fx: 'purify', pp: 3, desc: 'Cura tus estados negativos + 15 HP.', pts: 22, type: 'buff' },
+    
+    // --- Soporte / Control ---
+    { n: 'Debilitar', d: 0, acc: 100, fx: 'weaken', pp: 3, desc: 'El rival hace 25% menos de daño (2 turnos).', pts: 20, type: 'debuff' },
+    { n: 'Onda Aturdidora', d: 0, acc: 80, fx: 'stun', pp: 3, desc: 'El rival pierde su próximo turno.', pts: 25, type: 'debuff' }
+];
+
 document.addEventListener('DOMContentLoaded', () => {
     const imgInput = document.getElementById('lab-img-input');
     if(imgInput) {
@@ -17,8 +43,23 @@ document.addEventListener('DOMContentLoaded', () => {
             reader.readAsDataURL(file);
         });
     }
+    
+    // Poblar los desplegables de movimientos
+    populateMoveSelects();
     calculateLabBalance(); 
 });
+
+function populateMoveSelects() {
+    const selects = document.querySelectorAll('.lab-mv-select');
+    selects.forEach((sel, idx) => {
+        let html = '<option value="" style="background:#1a1a24;color:#fff">-- Selecciona un Movimiento --</option>';
+        MOVE_POOL.forEach((mv, i) => {
+            html += `<option value="${i}" style="background:#1a1a24;color:#fff">${mv.n} (${mv.type === 'atk' ? 'Ataque' : mv.type === 'buff' ? 'Defensa' : 'Soporte'})</option>`;
+        });
+        sel.innerHTML = html;
+        sel.onchange = calculateLabBalance;
+    });
+}
 
 function processLabImage() {
     if (!labOriginalImg) return;
@@ -61,66 +102,70 @@ function processLabImage() {
     ctx.putImageData(imageData, 0, 0);
 }
 
-function updateLabMoveUI(selectEl) {
-    const box = selectEl.closest('.lab-move-box');
-    if(!box) return;
-    const type = selectEl.value;
-    box.querySelector('.lab-mv-dmg-group').style.display = (type === 'ataque') ? 'block' : 'none';
-    box.querySelector('.lab-mv-shield-group').style.display = (type === 'escudo') ? 'block' : 'none';
-    box.querySelector('.lab-mv-heal-group').style.display = (type === 'cura') ? 'block' : 'none';
-    box.querySelector('.lab-mv-effect-group').style.display = (type === 'ataque') ? 'block' : 'none';
-    calculateLabBalance();
-}
-
 function calculateLabBalance() {
+    const selects = document.querySelectorAll('.lab-mv-select');
     let totalPower = 0;
-    const moveBoxes = document.querySelectorAll('.lab-move-box');
-    
-    moveBoxes.forEach(box => {
-        const type = box.querySelector('.lab-mv-type').value;
-        const effectEl = box.querySelector('.lab-mv-effect');
-        const effect = effectEl ? effectEl.value : 'none';
-        
-        let movePower = 0;
-        
-        if (type === 'ataque') {
-            const dmg = parseInt(box.querySelector('.lab-mv-dmg').value);
-            const acc = parseInt(box.querySelector('.lab-mv-acc').value);
-            box.querySelector('.lab-mv-dmg-val').textContent = dmg;
-            box.querySelector('.lab-mv-acc-val').textContent = acc + '%';
-            movePower = dmg * (acc / 100);
-        } else if (type === 'escudo') {
-            const shield = parseInt(box.querySelector('.lab-mv-shield').value);
-            box.querySelector('.lab-mv-shield-val').textContent = shield;
-            movePower = shield * 0.8; 
-        } else if (type === 'cura') {
-            const heal = parseInt(box.querySelector('.lab-mv-heal').value);
-            box.querySelector('.lab-mv-heal-val').textContent = heal;
-            movePower = heal * 0.8;
+    let buffCount = 0;
+    let atkCount = 0;
+    let emptyCount = 0;
+    let uniqueMoves = new Set();
+
+    selects.forEach(sel => {
+        if (sel.value === "") {
+            emptyCount++;
+            return;
         }
+        const mv = MOVE_POOL[parseInt(sel.value)];
+        totalPower += mv.pts;
+        uniqueMoves.add(mv.n);
         
-        const effectValues = { 'none': 0, 'burn': 15, 'poison': 20, 'stun': 30, 'blind': 15 };
-        movePower += effectValues[effect] || 0;
-        
-        totalPower += movePower;
+        if (mv.type === 'buff') buffCount++;
+        if (mv.type === 'atk') atkCount++;
     });
-    
-    const targetMin = 60;
-    const targetMax = 110;
-    const absoluteMax = 160; 
-    
+
     const markerEl = document.getElementById('lab-balance-marker');
     const msgEl = document.getElementById('lab-balance-msg');
     const btn = document.getElementById('lab-submit-btn');
     
+    const absoluteMax = 160; 
     let markerPos = Math.min(100, (totalPower / absoluteMax) * 100);
     markerEl.style.left = markerPos + '%';
     
-    if (totalPower < targetMin) {
+    // Reglas de Validación
+    if (emptyCount > 0) {
+        msgEl.textContent = 'Te faltan elegir movimientos.';
+        msgEl.style.color = '#EF9F27'; 
+        btn.disabled = true;
+        return;
+    }
+    
+    if (uniqueMoves.size < 4) {
+        msgEl.textContent = 'No puedes repetir movimientos.';
+        msgEl.style.color = '#F0997B'; 
+        btn.disabled = true;
+        return;
+    }
+    
+    if (buffCount > 2) {
+        msgEl.textContent = 'Máximo 2 movimientos defensivos/curas.';
+        msgEl.style.color = '#F0997B'; 
+        btn.disabled = true;
+        return;
+    }
+    
+    if (atkCount === 0) {
+        msgEl.textContent = 'Debes tener al menos 1 movimiento de ataque.';
+        msgEl.style.color = '#F0997B'; 
+        btn.disabled = true;
+        return;
+    }
+
+    // Evaluación de Puntos
+    if (totalPower < 70) {
         msgEl.textContent = '⚠ Vicamon Débil. Sube el daño o efectos.';
         msgEl.style.color = '#F6E265'; 
         btn.disabled = false; 
-    } else if (totalPower <= targetMax) {
+    } else if (totalPower <= 120) {
         msgEl.textContent = '✓ Vicamon Balanceado. ¡Listo para enviar!';
         msgEl.style.color = '#5DCAA5'; 
         btn.disabled = false;
@@ -142,31 +187,20 @@ function submitLabVicamon() {
     
     if (!name || !sub) return alert('Debes ingresar nombre y subtítulo.');
     
-    const atkNames = document.querySelectorAll('.lab-mv-name');
-    const types = document.querySelectorAll('.lab-mv-type');
-    const dmgs = document.querySelectorAll('.lab-mv-dmg');
-    const accs = document.querySelectorAll('.lab-mv-acc');
-    const shields = document.querySelectorAll('.lab-mv-shield');
-    const heals = document.querySelectorAll('.lab-mv-heal');
-    const effects = document.querySelectorAll('.lab-mv-effect');
-    
+    const selects = document.querySelectorAll('.lab-mv-select');
     const attacks = [];
     for(let i=0; i<4; i++) {
-        const n = atkNames[i].value.trim();
-        if(!n) return alert(`Debes nombrar el movimiento ${i+1}.`);
-        const type = types[i].value;
-        const fx = effects[i] ? effects[i].value : 'none';
+        if (!selects[i].value) return alert(`Debes elegir el movimiento ${i+1}.`);
+        const mv = MOVE_POOL[parseInt(selects[i].value)];
         
+        // Copiamos el movimiento del pool
         attacks.push({
-            n: n,
-            type: type,
-            d: type === 'ataque' ? parseInt(dmgs[i].value) : 0,
-            acc: type === 'ataque' ? parseInt(accs[i].value) : 100,
-            shield: type === 'escudo' ? parseInt(shields[i].value) : 0,
-            heal: type === 'cura' ? parseInt(heals[i].value) : 0,
-            fx: fx,
-            pp: 5,
-            desc: 'Movimiento creado en el Laboratorio.'
+            n: mv.n,
+            d: mv.d,
+            acc: mv.acc,
+            fx: mv.fx,
+            pp: mv.pp,
+            desc: mv.desc
         });
     }
     
