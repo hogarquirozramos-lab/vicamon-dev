@@ -1,7 +1,7 @@
 const BEASTS = require('./beasts.js');
 const { lobby, battles, pushCpuBattle, broadcast, send, pushLobby } = require('./state');
 const { applyAtk, tickEffects, getStartState } = require('./battleEngine');
-const { settleGauntletTiered, getPlayerStats, getPlayerRank, getTopPlayers, claimTowerGrandPrize, claimTowerTrainingWin, getHP } = require('./hp-balance');
+const { settleGauntletTiered, getPlayerStats, getPlayerRank, getTopPlayers, claimTowerGrandPrize, claimTowerTrainingWin, getHP, unlockHP } = require('./hp-balance');
 const { cpuPickAttack } = require('./cpuAI');
 
 const CPU_ID = -1;
@@ -17,22 +17,25 @@ async function endGauntlet(bId, playerId, won, defeatedCount = 0) {
   let reward = 0;
   let stats = { wins: 0, losses: 0, rank: null };
   let customMsg = '';
+  let myXp = 0;
 
   try {
     if (won) {
       if (towerMode === 'hp') {
+        // Devolvemos los 100 HP invertidos al inicio
+        await unlockHP(pl.wallet, 100);
+        
         const claimed = await claimTowerGrandPrize(pl.wallet);
         if (claimed) {
           newHp = await getHP(pl.wallet);
-          reward = 1000;
+          reward = 1000; // Premio neto
           customMsg = '¡FELICIDADES! Eres el ganador del premio mayor de 1000 HP de hoy.';
           broadcast({ type: 'chat_message', name: '⚔️ VICAMON', text: `🏆 ¡${pl.name} ha conquistado la Torre de Batalla y se lleva 1000 HP!` });
         } else {
-          // Si alguien más se lo ganó, le devolvemos sus 100 HP (reward 100)
-          await settleGauntletTiered(pl.wallet, 12);
+          // Si el excedente ya no daba, le devolvemos sus 100 HP (ya hecho arriba) y un balance 0.
           newHp = await getHP(pl.wallet);
-          reward = 0; // Balance 0
-          customMsg = '¡Ganaste la torre! Pero alguien más se llevó el premio mayor. Se te devuelven 100 HP.';
+          reward = 0; 
+          customMsg = '¡Ganaste la torre! Pero el premio mayor ya no estaba disponible. Se te devuelven 100 HP.';
         }
       } else if (towerMode === 'training') {
         const result = await claimTowerTrainingWin(pl.wallet);
@@ -41,9 +44,10 @@ async function endGauntlet(bId, playerId, won, defeatedCount = 0) {
           reward = 10;
           customMsg = '¡Ganaste 10 HP de bono por completar la Torre de Entrenamiento!';
         } else {
-          customMsg = '¡Ganaste la torre! Pero ya habías reclamado tu bono de 10 HP hoy.';
+          customMsg = '¡Ganaste la torre! Pero el bono de entrenamiento ya no estaba disponible.';
         }
       } else if (towerMode === 'guest') {
+        myXp = 100; // XP visual para invitados
         customMsg = '¡Ganaste la Torre! Si estuvieras jugando con tu wallet, te habrías llevado 1000 HP.';
       }
     } else {
@@ -72,7 +76,7 @@ async function endGauntlet(bId, playerId, won, defeatedCount = 0) {
       reward, 
       defeated: won ? 12 : defeatedCount, 
       isGuest: towerMode === 'guest',
-      myXp: 0,
+      myXp: myXp,
       stats,
       towerMode,
       customMsg
