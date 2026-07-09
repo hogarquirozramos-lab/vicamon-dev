@@ -28,9 +28,10 @@ async function endGauntlet(bId, playerId, won, defeatedCount = 0) {
           customMsg = '¡FELICIDADES! Eres el ganador del premio mayor de 1000 HP de hoy.';
           broadcast({ type: 'chat_message', name: '⚔️ VICAMON', text: `🏆 ¡${pl.name} ha conquistado la Torre de Batalla y se lleva 1000 HP!` });
         } else {
-          reward = 100;
+          // Si alguien más se lo ganó, le devolvemos sus 100 HP (reward 100)
           await settleGauntletTiered(pl.wallet, 12);
           newHp = await getHP(pl.wallet);
+          reward = 0; // Balance 0
           customMsg = '¡Ganaste la torre! Pero alguien más se llevó el premio mayor. Se te devuelven 100 HP.';
         }
       } else if (towerMode === 'training') {
@@ -46,10 +47,11 @@ async function endGauntlet(bId, playerId, won, defeatedCount = 0) {
         customMsg = '¡Ganaste la Torre! Si estuvieras jugando con tu wallet, te habrías llevado 1000 HP.';
       }
     } else {
+      // Si pierde
       if (towerMode === 'hp') {
         const result = await settleGauntletTiered(pl.wallet, defeatedCount);
         newHp = result.newHp;
-        reward = result.reward - 100;
+        reward = result.reward - 100; // Balance neto (ej: 10 - 100 = -90)
         const dbStats = await getPlayerStats(pl.wallet);
         if (dbStats) { stats.wins = dbStats.wins; stats.losses = dbStats.losses; }
         stats.rank = await getPlayerRank(pl.wallet);
