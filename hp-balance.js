@@ -99,7 +99,6 @@ async function claimTowerGrandPrize(wallet) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    // Bloqueamos la fila de la plataforma para evitar condiciones de carrera
     const platRes = await client.query('SELECT hp FROM platform WHERE id = 1 FOR UPDATE');
     const playersRes = await client.query('SELECT COALESCE(SUM(hp), 0) as total_hp, COALESCE(SUM(locked_hp), 0) as total_locked FROM players');
     const playersHp = parseInt(playersRes.rows[0].total_hp, 10) + parseInt(playersRes.rows[0].total_locked, 10);
@@ -110,10 +109,7 @@ async function claimTowerGrandPrize(wallet) {
       return false; 
     }
     
-    // CORRECCIÓN MATEMÁTICA: 
-    // Se le suman 1000 HP al jugador (liberando sus 100 HP invertidos + 900 HP de ganancia neta).
     await client.query('UPDATE players SET locked_hp = GREATEST(0, locked_hp - 100), hp = hp + 1000 WHERE wallet = $1', [wallet]);
-    // La plataforma solo pone 900 HP de su bolsillo (los otros 100 ya los tenía bloqueados del jugador).
     await client.query('UPDATE platform SET hp = hp - 900 WHERE id = 1');
     
     await client.query('COMMIT');
@@ -173,13 +169,17 @@ async function claimTowerTrainingWin(wallet) {
   }
 }
 
-// FUNCIÓN PARA SABER SI TOCA RETIRAR 1 USDC AL OWNER
 async function checkOwnerWithdrawal() {
   const excedente = await getExcedente();
   if (excedente >= 4000) {
     return { shouldWithdraw: true, amountUsdc: 1.0, hpToClear: 1000 };
   }
   return { shouldWithdraw: false };
+}
+
+// NUEVO: Sincronizar el HP de la plataforma con el balance real de la wallet
+async function setPlatformHp(hp) { 
+  await pool.query('UPDATE platform SET hp = $1 WHERE id = 1', [hp]); 
 }
 
 async function cashout(wallet) { const client = await pool.connect(); try { await client.query('BEGIN'); const res = await client.query('SELECT hp FROM players WHERE wallet = $1 FOR UPDATE', [wallet]); const hp = res.rows.length > 0 ? res.rows[0].hp : 0; if (hp <= 0) { await client.query('ROLLBACK'); return { ok: false, reason: 'no_hp', hp: 0, usdc: 0 }; } await client.query('UPDATE players SET hp = 0 WHERE wallet = $1', [wallet]); await client.query('COMMIT'); return { ok: true, hp, usdc: parseFloat((hp * USDC_PER_HP).toFixed(6)) }; } catch(e) { await client.query('ROLLBACK'); return { ok: false, reason: 'db_error', hp: 0, usdc: 0 }; } finally { client.release(); } }
@@ -189,7 +189,7 @@ async function clearPlatformHp(hp) { await pool.query('UPDATE platform SET hp = 
 
 module.exports = {
   getHP, addHP, hasHP, lockHP, unlockHP, settleMatch, settleTeamMatch, settleGauntletTiered, cashout,
-  getPlatformHp, getPlatformUsdc, clearPlatformHp,
+  getPlatformHp, getPlatformUsdc, clearPlatformHp, setPlatformHp,
   PLATFORM_WALLET, PLATFORM_THRESHOLD: 1.00, USDC_PER_HP,
   getAllPlayersDebug, updatePlayerName, updatePlayerStats, getTopPlayers,
   getPlayerStats, getPlayerRank,
