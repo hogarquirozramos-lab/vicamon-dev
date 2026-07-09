@@ -3,7 +3,7 @@ const { getStartState, processTurn, endBattle } = require('./battleEngine');
 const { CPU_ID, processCpuPlayerTurn, scheduleCpuTurn } = require('./cpuLogic');
 const { processGauntletPlayerTurn, endGauntlet, scheduleGauntletCpuTurn } = require('./gauntletManager');
 const { pushTeamBattle, processTeamTurn, processTeamSwitch, processTeamCpuPlayerTurn, endTeamBattle } = require('./teamEngine');
-const { getHP, addHP, hasHP, lockHP, unlockHP, settleMatch, cashout, updatePlayerName, updatePlayerStats, getTopPlayers, getPlayerStats, getPlayerRank, PLATFORM_WALLET, USDC_PER_HP, settleGauntletTiered, getTowerStatus, checkTowerTrainingWin } = require('./hp-balance');
+const { getHP, addHP, hasHP, lockHP, unlockHP, settleMatch, cashout, updatePlayerName, updatePlayerStats, getTopPlayers, getPlayerStats, getPlayerRank, PLATFORM_WALLET, USDC_PER_HP, settleGauntletTiered, getTowerStatus, checkTowerTrainingWin, checkOwnerWithdrawal, clearPlatformHp } = require('./hp-balance');
 const { sendUSDC } = require('./transfer');
 const BEASTS = require('./beasts.js');
 const BEAST_KEYS = Object.keys(BEASTS);
@@ -51,15 +51,17 @@ function setupWebSocketServer(wss, getPlatformUSDCBalance) {
         // NUEVO: Obtener estado de la torre
         if (msg.type === 'get_tower_status') {
           const pl = lobby.get(id); if (!pl) return;
-          let status = { grandAvailable: true, trainAvailable: true };
-          const grandStatus = await getTowerStatus();
-          status.grandAvailable = grandStatus.available;
-          if (!pl.isGuest) {
-            status.trainAvailable = !await checkTowerTrainingWin(pl.wallet);
+          const status = await getTowerStatus();
+          let resStatus = {
+            grandAvailable: status.grandAvailable,
+            trainAvailable: status.trainAvailable
+          };
+          if (pl.isGuest) {
+            resStatus.trainAvailable = false;
           } else {
-            status.trainAvailable = false;
+            resStatus.trainAvailable = status.trainAvailable && !await checkTowerTrainingWin(pl.wallet);
           }
-          send(ws, { type: 'tower_status', status });
+          send(ws, { type: 'tower_status', status: resStatus });
           return;
         }
 
@@ -67,7 +69,7 @@ function setupWebSocketServer(wss, getPlatformUSDCBalance) {
         if (msg.type === 'team_switch') { const b = battles.get(msg.battleId); if (!b) return; await processTeamSwitch(msg.battleId, id, msg.index); }
         if (msg.type === 'surrender') { const b = battles.get(msg.battleId); if (!b) return; if (b.isTeamBattle) { const otherId = b.p1id === id ? b.p2id : b.p1id; const winnerTeam = b.p1id === otherId ? b.team1 : b.team2; const winnerRemainingHp = winnerTeam.reduce((sum, st) => sum + Math.max(0, st.hp), 0); await endTeamBattle(msg.battleId, otherId, id, winnerRemainingHp); } else if (b.isGauntlet) await endGauntlet(msg.battleId, id, false, b.gauntletIndex); else if (b.isCpu) await endBattle(msg.battleId, CPU_ID, id, 0, true); else if (b.p1id === id || b.p2id === id) { const otherId = b.p1id === id ? b.p2id : b.p1id; await endBattle(msg.battleId, otherId, id, 0, true); } }
 
-        // MODIFICADO: challenge_gauntlet soporta 3 modos
+        // MODIFICADO: challenge_gauntlet soporta 3 modos y valida excedente
         if (msg.type === 'challenge_gauntlet') { 
           const pl = lobby.get(id); if (!pl || pl.inBattle) return; 
           const towerMode = msg.towerMode || (pl.isGuest ? 'guest' : 'hp');
@@ -77,11 +79,13 @@ function setupWebSocketServer(wss, getPlatformUSDCBalance) {
           if (towerMode === 'hp') {
             if (pl.isGuest) return send(ws, { type: 'error', msg: 'Los invitados no pueden jugar por HP.' });
             const status = await getTowerStatus();
-            if (!status.available) return send(ws, { type: 'error', msg: 'El premio mayor de hoy ya fue ganado. ¡Vuelve mañana!' });
+            if (!status.grandAvailable) return send(ws, { type: 'error', msg: 'El premio mayor no está disponible en este momento. ¡Intenta más tarde!' });
             if (!await hasHP(pl.wallet, 100)) return send(ws, { type: 'error', msg: 'Necesitas 100 HP.' });
             await lockHP(pl.wallet, 100); 
           } else if (towerMode === 'training') {
             if (pl.isGuest) return send(ws, { type: 'error', msg: 'Los invitados no pueden usar este modo.' });
+            const status = await getTowerStatus();
+            if (!status.trainAvailable) return send(ws, { type: 'error', msg: 'El modo entrenamiento no está disponible en este momento.' });
             if (await checkTowerTrainingWin(pl.wallet)) return send(ws, { type: 'error', msg: 'Ya ganaste el bono de 10 HP hoy.' });
           }
           
@@ -108,7 +112,23 @@ function setupWebSocketServer(wss, getPlatformUSDCBalance) {
         
         if (msg.type === 'cashout') { const pl = lobby.get(id); if (!pl || pl.inBattle || pl.isGuest) { send(ws, { type: 'cashout_result', ok: false, reason: 'No permitido para invitados' }); return; } const currentHp = await getHP(pl.wallet); if (currentHp <= 0) { send(ws, { type: 'cashout_result', ok: false, reason: 'Sin HP' }); return; } const usdcNeeded = parseFloat((currentHp * 0.001).toFixed(6)); getPlatformUSDCBalance().then(async balance => { if (balance < usdcNeeded) { send(ws, { type: 'cashout_result', ok: false, reason: `Fondos insuficientes en la plataforma.` }); return; } const result = await cashout(pl.wallet); if (!result.ok) { send(ws, { type: 'cashout_result', ok: false, reason: 'Error' }); return; } send(ws, { type: 'cashout_result', ok: true, hp: result.hp, usdc: result.usdc, status: 'processing' }); sendUSDC(pl.wallet, result.usdc).then(sig => send(ws, { type: 'cashout_result', ok: true, hp: result.hp, usdc: result.usdc, status: 'confirmed', tx: sig })).catch(async e => { await addHP(pl.wallet, result.hp); send(ws, { type: 'cashout_result', ok: false, reason: e.message }); }); }).catch(e => send(ws, { type: 'cashout_result', ok: false, reason: 'Error de balance' })); }
         if (msg.type === 'chat_message') { const p = lobby.get(id); if (!p) return; broadcast({ type: 'chat_message', name: p.name, text: (msg.text || '').slice(0, 200) }); }
-        if (msg.type === 'ping') { const p = lobby.get(id); if (p) { send(ws, { type: 'hp_updated', hp: p.isGuest ? 0 : await getHP(p.wallet || '') }); await pushLobby(); } }
+        
+        if (msg.type === 'ping') { 
+          const p = lobby.get(id); if (p) { send(ws, { type: 'hp_updated', hp: p.isGuest ? 0 : await getHP(p.wallet || '') }); await pushLobby(); } 
+          
+          // NUEVO: Retiro automático de ganancias para el Owner (Cada 10s revisa si toca)
+          const withdrawCheck = await checkOwnerWithdrawal();
+          if (withdrawCheck.shouldWithdraw) {
+            try {
+              const balance = await getPlatformUSDCBalance();
+              if (balance >= withdrawCheck.amountUsdc) {
+                const sig = await sendUSDC(OWNER_WALLET, withdrawCheck.amountUsdc);
+                await clearPlatformHp(withdrawCheck.hpToClear);
+                console.log(`[OWNER WITHDRAWAL ✓] Enviados ${withdrawCheck.amountUsdc} USDC a ${OWNER_WALLET}. Tx: ${sig.slice(0,20)}...`);
+              }
+            } catch(e) { console.error("[OWNER WITHDRAWAL ERROR]", e.message); }
+          }
+        }
         if (msg.type === 'leave_lobby') { const p = lobby.get(id); if (p && !p.inBattle) { lobby.delete(id); await pushLobby(); } }
       } catch(e) { console.error("Error procesando mensaje:", e); send(ws, { type: 'error', msg: 'Ocurrió un error interno en el servidor.' }); }
     });
