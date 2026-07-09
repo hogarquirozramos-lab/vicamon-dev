@@ -16,7 +16,7 @@ var mySt={}, oppSt={}, pendingFrom=null, pendingIsTraining=false, pendingIs3v3=f
 var reconnectTimer=null, isKicked=false;
 var gauntletBattleId = null, gauntletSelectedBeast = null;
 var qrScanner = null; 
-var labOriginalImg = null; // NUEVO: Imagen original para el laboratorio
+var labOriginalImg = null; 
 
 var pendingChallengeTargetId = null;
 var teamSelectionMode = '1v1'; 
@@ -156,7 +156,7 @@ function rejectChallenge(){ document.getElementById('modal-challenged').classLis
 function escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
 function sendChatMessage(){ const input = document.getElementById('chat-input'); const msg = input.value.trim(); if(msg && ws && ws.readyState === 1){ ws.send(JSON.stringify({type:'chat_message', text:msg})); input.value = ''; } }
 function handleChatMessage(m){ const chatBox = document.getElementById('chat-box'); if(chatBox.querySelector('.chat-empty')) chatBox.innerHTML = ''; const msgDiv = document.createElement('div'); msgDiv.className = 'chat-msg'; msgDiv.innerHTML = `<span class="chat-name">${escapeHtml(m.name)}:</span> <span style="color:rgba(255,255,255,.8)">${escapeHtml(m.text)}</span>`; chatBox.appendChild(msgDiv); chatBox.scrollTop = chatBox.scrollHeight; }
-function renderLeaderboard(top) { const podium = document.getElementById('leaderboard-podium'); if (!top || top.length === 0) { podium.innerHTML = '<div style="flex:1;color:rgba(255,255,255,.3);text-align:center;font-size:11px;padding:20px 0">Gana batallas por HP para aparecer aquí</div>'; return; } podium.innerHTML = top.map((p, i) => { const medals = ['🥇', '🥈', '🥉']; const colors = ['#F5A623', '#C0C0C0', '#CD7F32']; return `<div style="flex:1;background:rgba(255,255,255,.04);border:0.5px solid ${colors[i]};border-radius:10px;padding:10px 6px;text-align:center"><div style="font-size:20px">${medals[i]}</div><div style="font-size:12px;font-weight:700">${p.last_name || 'Anónimo'}</div><div style="font-size:9px;color:rgba(255,255,255,.5)">${p.wins}V · ${p.losses}D</div></div>`; }).join(''); }
+function renderLeaderboard(top) { const podium = document.getElementById('leaderboard-podium'); if (!top || top.length === 0) { podium.innerHTML = '<div style="flex:1;color:rgba(255,255,255,.3);text-align:center;font-size:11px;padding:20px 0">Gana batallas reales para aparecer aquí</div>'; return; } podium.innerHTML = top.map((p, i) => { const medals = ['🥇', '🥈', '🥉']; const colors = ['#F5A623', '#C0C0C0', '#CD7F32']; return `<div style="flex:1;background:rgba(255,255,255,.04);border:0.5px solid ${colors[i]};border-radius:10px;padding:10px 6px;text-align:center"><div style="font-size:20px">${medals[i]}</div><div style="font-size:12px;font-weight:700">${p.last_name || 'Anónimo'}</div><div style="font-size:9px;color:rgba(255,255,255,.5)">${p.wins}V · ${p.losses}D</div></div>`; }).join(''); }
 
 function renderBattle(yourTurn, logs){ document.getElementById('f-me').innerHTML=panelHTML(mySt,myBeast,myName+' (tú)','me'); document.getElementById('f-opp').innerHTML=panelHTML(oppSt,oppBeast,oppName,'opp'); if (window._isTeamBattle && window._myBench) { let benchHtml = '<div style="display:flex;gap:4px;margin-top:8px;justify-content:center;">'; window._myBench.forEach(b => { const beast = BEASTS[b.beast]; const opacity = b.isDead ? 0.3 : 1; const border = b.isActive ? '2px solid #4a9eff' : '0.5px solid rgba(255,255,255,.1)'; benchHtml += `<img src="${beast.img}" style="width:30px;height:30px;border:${border};border-radius:4px;opacity:${opacity}">`; }); benchHtml += '</div>'; document.getElementById('f-me').innerHTML += benchHtml; } const orb=document.getElementById('turn-orb'); if(orb) orb.style.display=yourTurn?'block':'none'; const locked=!yourTurn||mySt.stun||mySt.recharge>0; let tb = yourTurn ? '<span>Tu turno</span>' : 'Turno del rival...'; document.getElementById('turn-bar').innerHTML=tb; const b=BEASTS[myBeast]; let switchBtnHtml = ''; if (window._isTeamBattle && yourTurn && !locked) { const hasLivingBench = window._myBench.some(b => !b.isDead && !b.isActive); if (hasLivingBench) { switchBtnHtml = `<div style="grid-column:1/-1; margin-bottom:8px;"><button class="btn btn-sm" style="width:100%;background:rgba(130,80,180,.15);color:#CFA9EC" onclick="openSwitchMenu()">🔄 Cambiar Vicamon (Pierde turno)</button></div>`; } } document.getElementById('atk-grid').innerHTML= switchBtnHtml + b.attacks.map((a,i)=>{ const tags=[]; if(a.pierce) tags.push('<span class="atk-tag tag-pierce">Ignora escudo</span>'); if(a.fx==='double') tags.push('<span class="atk-tag tag-nobreak">Doble golpe</span>'); if(a.fx==='triple') tags.push('<span class="atk-tag tag-nobreak">Triple golpe</span>'); if(a.risk||a.self>0) tags.push(`<span class="atk-tag tag-risk">Riesgo${a.self>0?' -'+a.self+' HP':''}</span>`); if(a.buff) tags.push('<span class="atk-tag tag-buff">Buff</span>'); if(a.dot) tags.push('<span class="atk-tag tag-dot">Daño/turno</span>'); if(a.debuff) tags.push('<span class="atk-tag tag-debuff">Debuff</span>'); const currentPp = mySt.pp ? mySt.pp[i] : undefined; const maxPp = a.pp === undefined ? 99 : a.pp; const ppLeft = currentPp === undefined ? maxPp : currentPp; const isDisabled = locked || ppLeft <= 0; const ppText = maxPp === 99 ? '∞' : `${ppLeft}/${maxPp}`; return `<button class="atk-btn" ${isDisabled?'disabled':''} onclick="doAttack(${i})"><div class="atk-top"><div class="atk-name">${a.n}</div><div class="atk-dmg ${dmgClass(a)}">${dmgLabel(a)}</div></div><div class="atk-tags">${tags.join('')}</div><div class="atk-desc">${a.desc}</div><div style="display:flex;justify-content:space-between"><div class="atk-acc">${a.acc}% prec</div><div class="atk-acc">PP: ${ppText}</div></div></button>`; }).join(''); if(logs&&logs.length){ const lb=document.getElementById('log-box'); lb.innerHTML=logs.map(l=>`<div class="ll lc-${l.c||'normal'}">${l.t}</div>`).join(''); lb.scrollTop=lb.scrollHeight; } }
 function doAttack(i){ animAttack('me'); try { const atk = BEASTS[myBeast].attacks[i]; if(atk.d === 0) playSfx('curacion'); else playSfx('ataque'); } catch(e) {} ws.send(JSON.stringify({type:'attack',battleId,index:i})); }
@@ -231,52 +231,73 @@ function processLabImage() {
     ctx.putImageData(imageData, 0, 0);
 }
 
+function updateLabMoveUI(selectEl) {
+    const box = selectEl.closest('.lab-move-box');
+    if(!box) return;
+    const type = selectEl.value;
+    box.querySelector('.lab-mv-dmg-group').style.display = (type === 'ataque') ? 'block' : 'none';
+    box.querySelector('.lab-mv-shield-group').style.display = (type === 'escudo') ? 'block' : 'none';
+    box.querySelector('.lab-mv-heal-group').style.display = (type === 'cura') ? 'block' : 'none';
+    box.querySelector('.lab-mv-effect-group').style.display = (type === 'ataque') ? 'block' : 'none';
+    calculateLabBalance();
+}
+
 function calculateLabBalance() {
-    const dmgs = document.querySelectorAll('.lab-atk-dmg');
-    const accs = document.querySelectorAll('.lab-atk-acc');
-    const dmgVals = document.querySelectorAll('.lab-atk-dmg-val');
-    const accVals = document.querySelectorAll('.lab-atk-acc-val');
+    let totalPower = 0;
+    const moveBoxes = document.querySelectorAll('.lab-move-box');
     
-    let totalPoints = 0;
-    
-    for (let i = 0; i < dmgs.length; i++) {
-        const dmg = parseInt(dmgs[i].value);
-        const acc = parseInt(accs[i].value);
-        dmgVals[i].textContent = dmg;
-        accVals[i].textContent = acc + '%';
+    moveBoxes.forEach(box => {
+        const type = box.querySelector('.lab-mv-type').value;
+        const effectEl = box.querySelector('.lab-mv-effect');
+        const effect = effectEl ? effectEl.value : 'none';
         
-        // Expected damage calculation (dmg * chance to hit)
-        totalPoints += dmg * (acc / 100);
-    }
+        let movePower = 0;
+        
+        if (type === 'ataque') {
+            const dmg = parseInt(box.querySelector('.lab-mv-dmg').value);
+            const acc = parseInt(box.querySelector('.lab-mv-acc').value);
+            box.querySelector('.lab-mv-dmg-val').textContent = dmg;
+            box.querySelector('.lab-mv-acc-val').textContent = acc + '%';
+            movePower = dmg * (acc / 100);
+        } else if (type === 'escudo') {
+            const shield = parseInt(box.querySelector('.lab-mv-shield').value);
+            box.querySelector('.lab-mv-shield-val').textContent = shield;
+            movePower = shield * 0.8; // Shield is valued slightly less than raw damage
+        } else if (type === 'cura') {
+            const heal = parseInt(box.querySelector('.lab-mv-heal').value);
+            box.querySelector('.lab-mv-heal-val').textContent = heal;
+            movePower = heal * 0.8;
+        }
+        
+        // Effect Power Values
+        const effectValues = { 'none': 0, 'burn': 15, 'poison': 20, 'stun': 30, 'blind': 15 };
+        movePower += effectValues[effect] || 0;
+        
+        totalPower += movePower;
+    });
     
-    const maxPoints = 120; // Limit to be considered "balanced"
-    const scoreEl = document.getElementById('lab-balance-score');
-    const barEl = document.getElementById('lab-balance-bar');
+    const targetMin = 60;
+    const targetMax = 110;
+    const absoluteMax = 160; // For positioning the marker
+    
+    const markerEl = document.getElementById('lab-balance-marker');
     const msgEl = document.getElementById('lab-balance-msg');
     const btn = document.getElementById('lab-submit-btn');
     
-    const pct = Math.min(100, (totalPoints / maxPoints) * 100);
+    let markerPos = Math.min(100, (totalPower / absoluteMax) * 100);
+    markerEl.style.left = markerPos + '%';
     
-    scoreEl.textContent = Math.round(totalPoints) + ' pts';
-    barEl.style.width = pct + '%';
-    
-    if (totalPoints <= 60) {
-        scoreEl.style.color = '#5DCAA5';
-        barEl.style.background = '#5DCAA5';
-        msgEl.textContent = '✓ Balance válido. Listo para enviar.';
-        msgEl.style.color = '#5DCAA5';
-        btn.disabled = false;
-    } else if (totalPoints <= 100) {
-        scoreEl.style.color = '#EF9F27';
-        barEl.style.background = '#EF9F27';
-        msgEl.textContent = '⚠ Vicamon fuerte. Puede ser rechazado por el admin.';
-        msgEl.style.color = '#EF9F27';
+    if (totalPower < targetMin) {
+        msgEl.textContent = '⚠ Vicamon Débil. Sube el daño o efectos.';
+        msgEl.style.color = '#F6E265'; // Yellow
+        btn.disabled = false; // Allow weak vicamons, they just aren't optimal
+    } else if (totalPower <= targetMax) {
+        msgEl.textContent = '✓ Vicamon Balanceado. ¡Listo para enviar!';
+        msgEl.style.color = '#5DCAA5'; // Green
         btn.disabled = false;
     } else {
-        scoreEl.style.color = '#F0997B';
-        barEl.style.background = '#F0997B';
-        msgEl.textContent = '✗ Vicamon desbalanceado. Reduce daño o precisión.';
-        msgEl.style.color = '#F0997B';
+        msgEl.textContent = '✗ Vicamon Desbalanceado. Baja el daño o efectos.';
+        msgEl.style.color = '#F0997B'; // Red
         btn.disabled = true;
     }
 }
@@ -292,21 +313,31 @@ function submitLabVicamon() {
     
     if (!name || !sub) return alert('Debes ingresar nombre y subtítulo.');
     
-    const atkNames = document.querySelectorAll('.lab-atk-name');
-    const dmgs = document.querySelectorAll('.lab-atk-dmg');
-    const accs = document.querySelectorAll('.lab-atk-acc');
+    const atkNames = document.querySelectorAll('.lab-mv-name');
+    const types = document.querySelectorAll('.lab-mv-type');
+    const dmgs = document.querySelectorAll('.lab-mv-dmg');
+    const accs = document.querySelectorAll('.lab-mv-acc');
+    const shields = document.querySelectorAll('.lab-mv-shield');
+    const heals = document.querySelectorAll('.lab-mv-heal');
+    const effects = document.querySelectorAll('.lab-mv-effect');
     
     const attacks = [];
     for(let i=0; i<4; i++) {
         const n = atkNames[i].value.trim();
-        if(!n) return alert(`Debes nombrar el ataque ${i+1}.`);
+        if(!n) return alert(`Debes nombrar el movimiento ${i+1}.`);
+        const type = types[i].value;
+        const fx = effects[i] ? effects[i].value : 'none';
+        
         attacks.push({
             n: n,
-            d: parseInt(dmgs[i].value),
-            acc: parseInt(accs[i].value),
-            fx: null, 
+            type: type,
+            d: type === 'ataque' ? parseInt(dmgs[i].value) : 0,
+            acc: type === 'ataque' ? parseInt(accs[i].value) : 100,
+            shield: type === 'escudo' ? parseInt(shields[i].value) : 0,
+            heal: type === 'cura' ? parseInt(heals[i].value) : 0,
+            fx: fx,
             pp: 5,
-            desc: 'Ataque creado en el Laboratorio.'
+            desc: 'Movimiento creado en el Laboratorio.'
         });
     }
     
