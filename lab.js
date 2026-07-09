@@ -10,19 +10,19 @@ const MOVE_POOL = [
     { n: 'Drenaje', d: 15, acc: 100, fx: 'drain10', pp: 5, desc: 'Daña 15 HP y te cura 10 HP.', pts: 25, type: 'atk' },
     
     // --- Ataques con Estado (Debuffs) ---
-    { n: 'Lanzallamas', d: 18, acc: 100, fx: 'burn', pp: 5, desc: 'Daño + Quema al rival (6 HP/turno).', pts: 28, type: 'atk' },
-    { n: 'Picadura Tóxica', d: 6, acc: 100, fx: 'poison5', pp: 5, desc: 'Daño leve + Veneno grave (8 HP/turno).', pts: 26, type: 'atk' },
-    { n: 'Carga Cegadora', d: 15, acc: 85, fx: 'blind', pp: 5, desc: 'Daño + Ciega al rival (baja su precisión).', pts: 24, type: 'atk' },
+    { n: 'Lanzallamas', d: 18, acc: 100, fx: 'burn', pp: 5, desc: 'Daño + Quema al rival (6 HP/turno por 2 turnos).', pts: 28, type: 'atk' },
+    { n: 'Picadura Tóxica', d: 6, acc: 100, fx: 'poison5', pp: 5, desc: 'Daño leve + Veneno grave (8 HP/turno por 5 turnos).', pts: 26, type: 'atk' },
+    { n: 'Carga Cegadora', d: 15, acc: 85, fx: 'blind', pp: 5, desc: 'Daño + Ciega al rival (-30% precisión por 2 turnos).', pts: 24, type: 'atk' },
     
     // --- Defensas y Curas ---
     { n: 'Escudo', d: 0, acc: 100, fx: 'shield2', pp: 5, desc: 'Bloquea los próximos 2 ataques.', pts: 25, type: 'buff' },
     { n: 'Cura Menor', d: 0, acc: 100, fx: 'heal20', pp: 5, desc: 'Restaura 20 HP.', pts: 20, type: 'buff' },
-    { n: 'Fortaleza', d: 0, acc: 100, fx: 'fortress', pp: 3, desc: 'Escudo + Cura 15 HP + Regeneración.', pts: 35, type: 'buff' },
+    { n: 'Fortaleza', d: 0, acc: 100, fx: 'fortress', pp: 3, desc: 'Escudo + Cura 15 HP + Regeneración (6 HP/turno por 2 turnos).', pts: 35, type: 'buff' },
     { n: 'Purificar', d: 0, acc: 100, fx: 'purify', pp: 3, desc: 'Cura tus estados negativos + 15 HP.', pts: 22, type: 'buff' },
     
     // --- Soporte / Control ---
-    { n: 'Debilitar', d: 0, acc: 100, fx: 'weaken', pp: 3, desc: 'El rival hace 25% menos de daño (2 turnos).', pts: 20, type: 'debuff' },
-    { n: 'Onda Aturdidora', d: 0, acc: 80, fx: 'stun', pp: 3, desc: 'El rival pierde su próximo turno.', pts: 25, type: 'debuff' }
+    { n: 'Debilitar', d: 0, acc: 100, fx: 'weaken', pp: 3, desc: 'El rival hace 25% menos de daño (por 2 turnos).', pts: 20, type: 'debuff' },
+    { n: 'Onda Aturdidora', d: 0, acc: 80, fx: 'stun', pp: 3, desc: 'El rival pierde su próximo turno (1 turno).', pts: 25, type: 'debuff' }
 ];
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -152,6 +152,9 @@ function calculateLabBalance() {
     let markerPos = Math.min(100, (totalPower / absoluteMax) * 100);
     markerEl.style.left = markerPos + '%';
     
+    // Validación de HP (NUEVO)
+    const hasEnoughHP = myCurrentHP >= 500;
+    
     // Reglas de Validación
     if (emptyCount > 0) {
         msgEl.textContent = 'Te faltan elegir movimientos.';
@@ -181,8 +184,12 @@ function calculateLabBalance() {
         return;
     }
 
-    // Evaluación de Puntos
-    if (totalPower < 70) {
+    // Evaluación de Puntos y HP
+    if (!hasEnoughHP) {
+        msgEl.textContent = '✗ Necesitas al menos 500 HP para enviar a revisión.';
+        msgEl.style.color = '#F0997B'; 
+        btn.disabled = true;
+    } else if (totalPower < 70) {
         msgEl.textContent = '⚠ Vicamon Débil. Sube el daño o efectos.';
         msgEl.style.color = '#F6E265'; 
         btn.disabled = false; 
