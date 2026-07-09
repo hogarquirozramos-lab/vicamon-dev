@@ -13,10 +13,7 @@ pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS wins INTEGER DEFAULT 0;
 pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS losses INTEGER DEFAULT 0;`).catch(e=>{});
 pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS last_name VARCHAR(20);`).catch(e=>{});
 
-// NUEVAS COLUMNAS Y TABLA PARA LA TORRE
 pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS tower_train_date VARCHAR(10);`).catch(e=>{});
-pool.query(`CREATE TABLE IF NOT EXISTS tower_prizes (id INTEGER PRIMARY KEY DEFAULT 1, grand_date VARCHAR(10), grand_wallet VARCHAR(50));`).catch(e=>{});
-pool.query(`INSERT INTO tower_prizes (id, grand_date) VALUES (1, '1990-01-01') ON CONFLICT DO NOTHING;`).catch(e=>{});
 
 const USDC_PER_HP = 0.001;
 const PLATFORM_WALLET = process.env.PLATFORM_WALLET || 'U3jwNBDnw4kCQ5CYRp5mAf4hbr4dadyUGXDhXdyLXMv';
@@ -75,27 +72,44 @@ async function settleGauntletTiered(wallet, defeatedCount) {
   } 
 }
 
-// NUEVAS FUNCIONES DE LA TORRE
+// NUEVAS FUNCIONES DE TESORERÍA AUTOMATIZADA
+async function getTotalPlayersHP() {
+  const res = await pool.query('SELECT COALESCE(SUM(hp), 0) as total_hp, COALESCE(SUM(locked_hp), 0) as total_locked FROM players');
+  const totalHp = res.rows.length > 0 ? parseInt(res.rows[0].total_hp, 10) : 0;
+  const totalLocked = res.rows.length > 0 ? parseInt(res.rows[0].total_locked, 10) : 0;
+  return totalHp + totalLocked;
+}
+
+async function getExcedente() {
+  const platformHp = await getPlatformHp();
+  const playersHp = await getTotalPlayersHP();
+  return platformHp - playersHp;
+}
+
 async function getTowerStatus() {
-  const today = new Date().toISOString().split('T')[0];
-  const res = await pool.query('SELECT grand_date, grand_wallet FROM tower_prizes WHERE id = 1');
-  if (res.rows.length > 0 && res.rows[0].grand_date === today) {
-    return { available: false, winner: res.rows[0].grand_wallet };
-  }
-  return { available: true, winner: null };
+  const excedente = await getExcedente();
+  return {
+    grandAvailable: excedente >= 2000,
+    trainAvailable: excedente >= 10,
+    excedente: excedente
+  };
 }
 
 async function claimTowerGrandPrize(wallet) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const res = await client.query('SELECT grand_date FROM tower_prizes WHERE id = 1 FOR UPDATE');
-    const today = new Date().toISOString().split('T')[0];
-    if (res.rows.length > 0 && res.rows[0].grand_date === today) {
+    // Bloqueamos la fila de la plataforma para evitar condiciones de carrera
+    const platRes = await client.query('SELECT hp FROM platform WHERE id = 1 FOR UPDATE');
+    const playersRes = await client.query('SELECT COALESCE(SUM(hp), 0) as total_hp, COALESCE(SUM(locked_hp), 0) as total_locked FROM players');
+    const playersHp = parseInt(playersRes.rows[0].total_hp, 10) + parseInt(playersRes.rows[0].total_locked, 10);
+    const excedente = platRes.rows[0].hp - playersHp;
+
+    if (excedente < 2000) {
       await client.query('ROLLBACK');
       return false; 
     }
-    await client.query('UPDATE tower_prizes SET grand_date = $1, grand_wallet = $2 WHERE id = 1', [today, wallet]);
+    await client.query('UPDATE platform SET hp = hp - 1000 WHERE id = 1');
     await client.query('UPDATE players SET hp = hp + 1000 WHERE wallet = $1', [wallet]);
     await client.query('COMMIT');
     return true;
@@ -130,7 +144,19 @@ async function claimTowerTrainingWin(wallet) {
       await client.query('ROLLBACK');
       return false;
     }
+    
+    const platRes = await client.query('SELECT hp FROM platform WHERE id = 1 FOR UPDATE');
+    const playersRes = await client.query('SELECT COALESCE(SUM(hp), 0) as total_hp, COALESCE(SUM(locked_hp), 0) as total_locked FROM players');
+    const playersHp = parseInt(playersRes.rows[0].total_hp, 10) + parseInt(playersRes.rows[0].total_locked, 10);
+    const excedente = platRes.rows[0].hp - playersHp;
+
+    if (excedente < 10) {
+      await client.query('ROLLBACK');
+      return false;
+    }
+
     await client.query('UPDATE players SET hp = hp + 10, tower_train_date = $1 WHERE wallet = $2', [today, wallet]);
+    await client.query('UPDATE platform SET hp = hp - 10 WHERE id = 1');
     await client.query('COMMIT');
     const newHp = res.rows[0].hp + 10;
     return { ok: true, newHp };
@@ -140,6 +166,15 @@ async function claimTowerTrainingWin(wallet) {
   } finally {
     client.release();
   }
+}
+
+// FUNCIÓN PARA SABER SI TOCA RETIRAR 1 USDC AL OWNER
+async function checkOwnerWithdrawal() {
+  const excedente = await getExcedente();
+  if (excedente >= 4000) {
+    return { shouldWithdraw: true, amountUsdc: 1.0, hpToClear: 1000 };
+  }
+  return { shouldWithdraw: false };
 }
 
 async function cashout(wallet) { const client = await pool.connect(); try { await client.query('BEGIN'); const res = await client.query('SELECT hp FROM players WHERE wallet = $1 FOR UPDATE', [wallet]); const hp = res.rows.length > 0 ? res.rows[0].hp : 0; if (hp <= 0) { await client.query('ROLLBACK'); return { ok: false, reason: 'no_hp', hp: 0, usdc: 0 }; } await client.query('UPDATE players SET hp = 0 WHERE wallet = $1', [wallet]); await client.query('COMMIT'); return { ok: true, hp, usdc: parseFloat((hp * USDC_PER_HP).toFixed(6)) }; } catch(e) { await client.query('ROLLBACK'); return { ok: false, reason: 'db_error', hp: 0, usdc: 0 }; } finally { client.release(); } }
@@ -156,5 +191,6 @@ module.exports = {
   isTxProcessed, markTxProcessed,
   adminSetHP, adminResetPlatform, adminUnlockAllHP,
   calculateGauntletReward,
-  getTowerStatus, claimTowerGrandPrize, checkTowerTrainingWin, claimTowerTrainingWin
+  getTowerStatus, claimTowerGrandPrize, checkTowerTrainingWin, claimTowerTrainingWin,
+  getExcedente, getTotalPlayersHP, checkOwnerWithdrawal
 };
