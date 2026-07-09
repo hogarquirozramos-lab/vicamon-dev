@@ -132,6 +132,12 @@
     ⚠️ ¡Atención! Las creaciones no se guardan en borrador. Si cierras esta ventana, perderás tu progreso. Solo se bloquea permanentemente cuando la envías a revisión.
   </div>
 
+  <!-- NUEVO: HP y Depósito en el Laboratorio -->
+  <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,.3);padding:10px;border-radius:8px;margin-bottom:10px">
+    <div style="font-size:12px;color:rgba(255,255,255,.5)">HP Disponibles: <span id="lab-hp-val" style="color:#5DCAA5;font-weight:700">0 HP</span></div>
+  </div>
+  <div id="lab-deposit-widget" style="margin-bottom:16px"></div>
+
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
     
     <!-- Columna Izquierda: Imagen e Identidad -->
@@ -140,9 +146,10 @@
       <div style="background:rgba(255,255,255,.04);border:0.5px solid rgba(255,255,255,.1);border-radius:12px;padding:16px;text-align:center">
         <canvas id="lab-canvas" width="100" height="100" style="width:100px;height:100px;image-rendering:pixelated;border:1px dashed rgba(255,255,255,.2);margin-bottom:10px;background:#111"></canvas>
         <input type="file" id="lab-img-input" accept="image/*" style="font-size:11px;margin-bottom:10px;width:100%">
+        <p style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:10px">💡 Usa imágenes PNG con fondo transparente para un resultado más orgánico.</p>
         <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:rgba(255,255,255,.5);margin-bottom:5px">
           <span>Pixelado:</span>
-          <input type="range" id="lab-pixel-size" min="2" max="16" value="8" style="width:60%" oninput="processLabImage()">
+          <input type="range" id="lab-pixel-size" min="1" max="4" value="2" style="width:60%" oninput="processLabImage()">
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:rgba(255,255,255,.5);margin-bottom:10px">
           <span>Colores:</span>
@@ -154,89 +161,204 @@
       <input id="lab-name" placeholder="Nombre del Vicamon" maxlength="15" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:8px;padding:8px 12px;color:#fff;font-size:14px;outline:none;margin-bottom:8px">
       <input id="lab-sub" placeholder="Subtítulo (ej: Perro Cyborg)" maxlength="30" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:8px;padding:8px 12px;color:#fff;font-size:14px;outline:none;margin-bottom:8px">
       <select id="lab-element" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:8px;padding:8px 12px;color:#fff;font-size:14px;outline:none">
-        <option value="fuego">Elemento: Fuego</option>
-        <option value="tierra">Elemento: Tierra</option>
-        <option value="aire">Elemento: Aire</option>
-        <option value="agua">Elemento: Agua</option>
+        <option value="fuego" style="background:#1a1a24;color:#fff">Elemento: Fuego</option>
+        <option value="tierra" style="background:#1a1a24;color:#fff">Elemento: Tierra</option>
+        <option value="aire" style="background:#1a1a24;color:#fff">Elemento: Aire</option>
+        <option value="agua" style="background:#1a1a24;color:#fff">Elemento: Agua</option>
       </select>
     </div>
 
-    <!-- Columna Derecha: Ataques y Balance -->
+    <!-- Columna Derecha: Movimientos y Balance -->
     <div>
-      <h3 style="margin-bottom:10px">3. Ataques</h3>
+      <h3 style="margin-bottom:10px">3. Movimientos</h3>
+      
+      <!-- Balance Bar -->
       <div style="background:rgba(255,255,255,.04);border:0.5px solid rgba(255,255,255,.1);border-radius:12px;padding:12px;margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px">
-          <span>Balance Total:</span>
-          <span id="lab-balance-score" style="font-weight:700;color:#5DCAA5">0 / 100 pts</span>
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:8px">
+          <span style="color:#F6E265">Débil</span>
+          <span style="color:#5DCAA5">Balance</span>
+          <span style="color:#F0997B">Roto</span>
         </div>
-        <div style="height:6px;background:rgba(0,0,0,.4);border-radius:99px;overflow:hidden">
-          <div id="lab-balance-bar" style="height:100%;width:0%;background:#5DCAA5;transition:width .3s"></div>
+        <div style="position:relative;height:8px;background:linear-gradient(90deg, #F6E265 0%, #5DCAA5 50%, #F0997B 100%);border-radius:99px;overflow:hidden">
+          <div id="lab-balance-marker" style="position:absolute;top:-2px;left:50%;width:4px;height:12px;background:#fff;border-radius:99px;transform:translateX(-50%);transition:left .3s;box-shadow:0 0 4px rgba(0,0,0,.8)"></div>
         </div>
+        <div id="lab-balance-msg" style="font-size:11px;color:#5DCAA5;margin-top:8px;text-align:center;height:15px"></div>
       </div>
 
-      <div id="lab-attacks-container" style="display:flex;flex-direction:column;gap:10px">
-        <!-- Ataque 1 -->
-        <div style="background:rgba(0,0,0,.2);border-radius:8px;padding:10px">
-          <input type="text" placeholder="Nombre Ataque 1" class="lab-atk-name" style="width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.2);color:#fff;font-size:13px;outline:none;margin-bottom:8px">
-          <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5)">
-            <span style="width:35px">Daño:</span>
-            <input type="range" min="0" max="50" value="15" class="lab-atk-dmg" style="flex:1" oninput="calculateLabBalance()">
-            <span class="lab-atk-dmg-val" style="width:25px;text-align:right;color:#fff">15</span>
+      <div id="lab-moves-container" style="display:flex;flex-direction:column;gap:10px">
+        <!-- Mov 1 -->
+        <div class="lab-move-box" style="background:rgba(0,0,0,.2);border-radius:8px;padding:10px">
+          <input type="text" placeholder="Nombre Movimiento 1" class="lab-mv-name" style="width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.2);color:#fff;font-size:13px;outline:none;margin-bottom:8px">
+          <select class="lab-mv-type" onchange="updateLabMoveUI(this)" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:6px;padding:5px;color:#fff;font-size:12px;outline:none;margin-bottom:8px">
+            <option value="ataque" style="background:#1a1a24;color:#fff">Tipo: Ataque</option>
+            <option value="escudo" style="background:#1a1a24;color:#fff">Tipo: Escudo</option>
+            <option value="cura" style="background:#1a1a24;color:#fff">Tipo: Curación</option>
+          </select>
+          <div class="lab-mv-dmg-group">
+            <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-bottom:5px">
+              <span style="width:45px">Daño:</span>
+              <input type="range" min="0" max="40" value="15" class="lab-mv-dmg" style="flex:1" oninput="calculateLabBalance()">
+              <span class="lab-mv-dmg-val" style="width:25px;text-align:right;color:#fff">15</span>
+            </div>
+            <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-bottom:5px">
+              <span style="width:45px">Acierto:</span>
+              <input type="range" min="50" max="100" value="90" class="lab-mv-acc" style="flex:1" oninput="calculateLabBalance()">
+              <span class="lab-mv-acc-val" style="width:25px;text-align:right;color:#fff">90%</span>
+            </div>
           </div>
-          <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-top:5px">
-            <span style="width:35px">Acierto:</span>
-            <input type="range" min="50" max="100" value="90" class="lab-atk-acc" style="flex:1" oninput="calculateLabBalance()">
-            <span class="lab-atk-acc-val" style="width:25px;text-align:right;color:#fff">90%</span>
+          <div class="lab-mv-shield-group" style="display:none">
+            <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-bottom:5px">
+              <span style="width:45px">Escudo:</span>
+              <input type="range" min="10" max="40" value="20" class="lab-mv-shield" style="flex:1" oninput="calculateLabBalance()">
+              <span class="lab-mv-shield-val" style="width:25px;text-align:right;color:#fff">20</span>
+            </div>
           </div>
+          <div class="lab-mv-heal-group" style="display:none">
+            <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-bottom:5px">
+              <span style="width:45px">Cura HP:</span>
+              <input type="range" min="10" max="40" value="20" class="lab-mv-heal" style="flex:1" oninput="calculateLabBalance()">
+              <span class="lab-mv-heal-val" style="width:25px;text-align:right;color:#fff">20</span>
+            </div>
+          </div>
+          <select class="lab-mv-effect" onchange="calculateLabBalance()" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:6px;padding:5px;color:#fff;font-size:12px;outline:none">
+            <option value="none" style="background:#1a1a24;color:#fff">Sin Efecto</option>
+            <option value="burn" style="background:#1a1a24;color:#fff">Efecto: Quemar (2t)</option>
+            <option value="poison" style="background:#1a1a24;color:#fff">Efecto: Envenenar (5t)</option>
+            <option value="stun" style="background:#1a1a24;color:#fff">Efecto: Aturdir (1t)</option>
+            <option value="blind" style="background:#1a1a24;color:#fff">Efecto: Cegar (2t)</option>
+          </select>
         </div>
-        <!-- Ataque 2 -->
-        <div style="background:rgba(0,0,0,.2);border-radius:8px;padding:10px">
-          <input type="text" placeholder="Nombre Ataque 2" class="lab-atk-name" style="width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.2);color:#fff;font-size:13px;outline:none;margin-bottom:8px">
-          <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5)">
-            <span style="width:35px">Daño:</span>
-            <input type="range" min="0" max="50" value="15" class="lab-atk-dmg" style="flex:1" oninput="calculateLabBalance()">
-            <span class="lab-atk-dmg-val" style="width:25px;text-align:right;color:#fff">15</span>
+        <!-- Mov 2 -->
+        <div class="lab-move-box" style="background:rgba(0,0,0,.2);border-radius:8px;padding:10px">
+          <input type="text" placeholder="Nombre Movimiento 2" class="lab-mv-name" style="width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.2);color:#fff;font-size:13px;outline:none;margin-bottom:8px">
+          <select class="lab-mv-type" onchange="updateLabMoveUI(this)" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:6px;padding:5px;color:#fff;font-size:12px;outline:none;margin-bottom:8px">
+            <option value="ataque" style="background:#1a1a24;color:#fff">Tipo: Ataque</option>
+            <option value="escudo" style="background:#1a1a24;color:#fff">Tipo: Escudo</option>
+            <option value="cura" style="background:#1a1a24;color:#fff">Tipo: Curación</option>
+          </select>
+          <div class="lab-mv-dmg-group">
+            <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-bottom:5px">
+              <span style="width:45px">Daño:</span>
+              <input type="range" min="0" max="40" value="15" class="lab-mv-dmg" style="flex:1" oninput="calculateLabBalance()">
+              <span class="lab-mv-dmg-val" style="width:25px;text-align:right;color:#fff">15</span>
+            </div>
+            <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-bottom:5px">
+              <span style="width:45px">Acierto:</span>
+              <input type="range" min="50" max="100" value="90" class="lab-mv-acc" style="flex:1" oninput="calculateLabBalance()">
+              <span class="lab-mv-acc-val" style="width:25px;text-align:right;color:#fff">90%</span>
+            </div>
           </div>
-          <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-top:5px">
-            <span style="width:35px">Acierto:</span>
-            <input type="range" min="50" max="100" value="90" class="lab-atk-acc" style="flex:1" oninput="calculateLabBalance()">
-            <span class="lab-atk-acc-val" style="width:25px;text-align:right;color:#fff">90%</span>
+          <div class="lab-mv-shield-group" style="display:none">
+            <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-bottom:5px">
+              <span style="width:45px">Escudo:</span>
+              <input type="range" min="10" max="40" value="20" class="lab-mv-shield" style="flex:1" oninput="calculateLabBalance()">
+              <span class="lab-mv-shield-val" style="width:25px;text-align:right;color:#fff">20</span>
+            </div>
           </div>
+          <div class="lab-mv-heal-group" style="display:none">
+            <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-bottom:5px">
+              <span style="width:45px">Cura HP:</span>
+              <input type="range" min="10" max="40" value="20" class="lab-mv-heal" style="flex:1" oninput="calculateLabBalance()">
+              <span class="lab-mv-heal-val" style="width:25px;text-align:right;color:#fff">20</span>
+            </div>
+          </div>
+          <select class="lab-mv-effect" onchange="calculateLabBalance()" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:6px;padding:5px;color:#fff;font-size:12px;outline:none">
+            <option value="none" style="background:#1a1a24;color:#fff">Sin Efecto</option>
+            <option value="burn" style="background:#1a1a24;color:#fff">Efecto: Quemar (2t)</option>
+            <option value="poison" style="background:#1a1a24;color:#fff">Efecto: Envenenar (5t)</option>
+            <option value="stun" style="background:#1a1a24;color:#fff">Efecto: Aturdir (1t)</option>
+            <option value="blind" style="background:#1a1a24;color:#fff">Efecto: Cegar (2t)</option>
+          </select>
         </div>
-        <!-- Ataque 3 -->
-        <div style="background:rgba(0,0,0,.2);border-radius:8px;padding:10px">
-          <input type="text" placeholder="Nombre Ataque 3" class="lab-atk-name" style="width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.2);color:#fff;font-size:13px;outline:none;margin-bottom:8px">
-          <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5)">
-            <span style="width:35px">Daño:</span>
-            <input type="range" min="0" max="50" value="15" class="lab-atk-dmg" style="flex:1" oninput="calculateLabBalance()">
-            <span class="lab-atk-dmg-val" style="width:25px;text-align:right;color:#fff">15</span>
+        <!-- Mov 3 -->
+        <div class="lab-move-box" style="background:rgba(0,0,0,.2);border-radius:8px;padding:10px">
+          <input type="text" placeholder="Nombre Movimiento 3" class="lab-mv-name" style="width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.2);color:#fff;font-size:13px;outline:none;margin-bottom:8px">
+          <select class="lab-mv-type" onchange="updateLabMoveUI(this)" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:6px;padding:5px;color:#fff;font-size:12px;outline:none;margin-bottom:8px">
+            <option value="ataque" style="background:#1a1a24;color:#fff">Tipo: Ataque</option>
+            <option value="escudo" style="background:#1a1a24;color:#fff">Tipo: Escudo</option>
+            <option value="cura" style="background:#1a1a24;color:#fff">Tipo: Curación</option>
+          </select>
+          <div class="lab-mv-dmg-group">
+            <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-bottom:5px">
+              <span style="width:45px">Daño:</span>
+              <input type="range" min="0" max="40" value="15" class="lab-mv-dmg" style="flex:1" oninput="calculateLabBalance()">
+              <span class="lab-mv-dmg-val" style="width:25px;text-align:right;color:#fff">15</span>
+            </div>
+            <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-bottom:5px">
+              <span style="width:45px">Acierto:</span>
+              <input type="range" min="50" max="100" value="90" class="lab-mv-acc" style="flex:1" oninput="calculateLabBalance()">
+              <span class="lab-mv-acc-val" style="width:25px;text-align:right;color:#fff">90%</span>
+            </div>
           </div>
-          <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-top:5px">
-            <span style="width:35px">Acierto:</span>
-            <input type="range" min="50" max="100" value="90" class="lab-atk-acc" style="flex:1" oninput="calculateLabBalance()">
-            <span class="lab-atk-acc-val" style="width:25px;text-align:right;color:#fff">90%</span>
+          <div class="lab-mv-shield-group" style="display:none">
+            <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-bottom:5px">
+              <span style="width:45px">Escudo:</span>
+              <input type="range" min="10" max="40" value="20" class="lab-mv-shield" style="flex:1" oninput="calculateLabBalance()">
+              <span class="lab-mv-shield-val" style="width:25px;text-align:right;color:#fff">20</span>
+            </div>
           </div>
+          <div class="lab-mv-heal-group" style="display:none">
+            <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-bottom:5px">
+              <span style="width:45px">Cura HP:</span>
+              <input type="range" min="10" max="40" value="20" class="lab-mv-heal" style="flex:1" oninput="calculateLabBalance()">
+              <span class="lab-mv-heal-val" style="width:25px;text-align:right;color:#fff">20</span>
+            </div>
+          </div>
+          <select class="lab-mv-effect" onchange="calculateLabBalance()" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:6px;padding:5px;color:#fff;font-size:12px;outline:none">
+            <option value="none" style="background:#1a1a24;color:#fff">Sin Efecto</option>
+            <option value="burn" style="background:#1a1a24;color:#fff">Efecto: Quemar (2t)</option>
+            <option value="poison" style="background:#1a1a24;color:#fff">Efecto: Envenenar (5t)</option>
+            <option value="stun" style="background:#1a1a24;color:#fff">Efecto: Aturdir (1t)</option>
+            <option value="blind" style="background:#1a1a24;color:#fff">Efecto: Cegar (2t)</option>
+          </select>
         </div>
-        <!-- Ataque 4 -->
-        <div style="background:rgba(0,0,0,.2);border-radius:8px;padding:10px">
-          <input type="text" placeholder="Nombre Ataque 4" class="lab-atk-name" style="width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.2);color:#fff;font-size:13px;outline:none;margin-bottom:8px">
-          <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5)">
-            <span style="width:35px">Daño:</span>
-            <input type="range" min="0" max="50" value="15" class="lab-atk-dmg" style="flex:1" oninput="calculateLabBalance()">
-            <span class="lab-atk-dmg-val" style="width:25px;text-align:right;color:#fff">15</span>
+        <!-- Mov 4 -->
+        <div class="lab-move-box" style="background:rgba(0,0,0,.2);border-radius:8px;padding:10px">
+          <input type="text" placeholder="Nombre Movimiento 4" class="lab-mv-name" style="width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.2);color:#fff;font-size:13px;outline:none;margin-bottom:8px">
+          <select class="lab-mv-type" onchange="updateLabMoveUI(this)" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:6px;padding:5px;color:#fff;font-size:12px;outline:none;margin-bottom:8px">
+            <option value="ataque" style="background:#1a1a24;color:#fff">Tipo: Ataque</option>
+            <option value="escudo" style="background:#1a1a24;color:#fff">Tipo: Escudo</option>
+            <option value="cura" style="background:#1a1a24;color:#fff">Tipo: Curación</option>
+          </select>
+          <div class="lab-mv-dmg-group">
+            <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-bottom:5px">
+              <span style="width:45px">Daño:</span>
+              <input type="range" min="0" max="40" value="15" class="lab-mv-dmg" style="flex:1" oninput="calculateLabBalance()">
+              <span class="lab-mv-dmg-val" style="width:25px;text-align:right;color:#fff">15</span>
+            </div>
+            <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-bottom:5px">
+              <span style="width:45px">Acierto:</span>
+              <input type="range" min="50" max="100" value="90" class="lab-mv-acc" style="flex:1" oninput="calculateLabBalance()">
+              <span class="lab-mv-acc-val" style="width:25px;text-align:right;color:#fff">90%</span>
+            </div>
           </div>
-          <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-top:5px">
-            <span style="width:35px">Acierto:</span>
-            <input type="range" min="50" max="100" value="90" class="lab-atk-acc" style="flex:1" oninput="calculateLabBalance()">
-            <span class="lab-atk-acc-val" style="width:25px;text-align:right;color:#fff">90%</span>
+          <div class="lab-mv-shield-group" style="display:none">
+            <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-bottom:5px">
+              <span style="width:45px">Escudo:</span>
+              <input type="range" min="10" max="40" value="20" class="lab-mv-shield" style="flex:1" oninput="calculateLabBalance()">
+              <span class="lab-mv-shield-val" style="width:25px;text-align:right;color:#fff">20</span>
+            </div>
           </div>
+          <div class="lab-mv-heal-group" style="display:none">
+            <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:rgba(255,255,255,.5);margin-bottom:5px">
+              <span style="width:45px">Cura HP:</span>
+              <input type="range" min="10" max="40" value="20" class="lab-mv-heal" style="flex:1" oninput="calculateLabBalance()">
+              <span class="lab-mv-heal-val" style="width:25px;text-align:right;color:#fff">20</span>
+            </div>
+          </div>
+          <select class="lab-mv-effect" onchange="calculateLabBalance()" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:6px;padding:5px;color:#fff;font-size:12px;outline:none">
+            <option value="none" style="background:#1a1a24;color:#fff">Sin Efecto</option>
+            <option value="burn" style="background:#1a1a24;color:#fff">Efecto: Quemar (2t)</option>
+            <option value="poison" style="background:#1a1a24;color:#fff">Efecto: Envenenar (5t)</option>
+            <option value="stun" style="background:#1a1a24;color:#fff">Efecto: Aturdir (1t)</option>
+            <option value="blind" style="background:#1a1a24;color:#fff">Efecto: Cegar (2t)</option>
+          </select>
         </div>
       </div>
     </div>
   </div>
 
   <div style="margin-top:20px;text-align:center">
-    <div id="lab-balance-msg" style="font-size:12px;color:#5DCAA5;margin-bottom:10px;height:15px"></div>
     <button class="btn btn-blue btn-lg" id="lab-submit-btn" onclick="submitLabVicamon()" style="width:100%;background:rgba(246,226,102,.15);border-color:rgba(246,226,102,.35);color:#F6E265">🔒 Enviar a Revisión (Costo: 500 HP)</button>
   </div>
 </div>
