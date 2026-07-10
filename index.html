@@ -52,7 +52,10 @@
 <div id="s-profile" class="screen">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
     <h1 style="margin:0">Perfil del Entrenador</h1>
-    <button class="btn btn-sm btn-red" onclick="disconnectWallet()">🚪 Desconectar Wallet</button>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-sm" id="btn-cashout" style="display:none;background:rgba(239,159,39,.15);border-color:rgba(239,159,39,.35);color:#EF9F27" onclick="doCashout()">💰 Cashout</button>
+      <button class="btn btn-sm btn-red" onclick="disconnectWallet()">🚪 Desconectar Wallet</button>
+    </div>
   </div>
   <div id="guest-upgrade-banner" style="display:none;background:linear-gradient(135deg,rgba(246,226,102,.15),rgba(245,166,35,.15));border:0.5px solid rgba(246,226,102,.4);border-radius:12px;padding:16px;margin-bottom:16px;text-align:center">
     <div style="font-size:18px;margin-bottom:8px">🔥</div>
@@ -92,7 +95,6 @@
       <div style="font-size:11px;color:rgba(255,255,255,.4)">Rango</div>
       <div style="font-size:14px;font-weight:600;color:#CFA9EC">🔒 Próximamente</div>
     </div>
-    <button class="btn btn-sm" id="btn-cashout" style="display:none;width:100%;margin-bottom:16px;background:rgba(239,159,39,.15);border-color:rgba(239,159,39,.35);color:#EF9F27" onclick="doCashout()">💰 Hacer Cashout</button>
   </div>
   
   <div id="profile-deposit-widget" style="margin-bottom:16px"></div>
@@ -177,10 +179,10 @@
       <h2 style="margin:0">Sala de espera</h2>
       <p style="font-size:11px;color:rgba(255,255,255,.3);margin-top:2px"><span class="online-dot"></span><span id="lbl-online">0</span> jugadores en línea</p>
     </div>
-    <div class="my-badge" style="flex-wrap:wrap;justify-content:flex-end">
+    <div class="my-badge" style="display:flex;align-items:center;gap:8px">
+      <button class="btn btn-sm" id="btn-cashout-lobby" style="display:none;background:rgba(239,159,39,.15);border-color:rgba(239,159,39,.35);color:#EF9F27" onclick="doCashout()">💰</button>
       <img id="badge-img" src="" alt="" style="display:none">
       <div><div style="font-size:10px;color:rgba(255,255,255,.4)">Jugando como</div><span id="lbl-myname"></span> · <span id="lbl-myhp" style="color:#5DCAA5;font-weight:600;font-size:11px"></span></div>
-      <button class="btn btn-sm" id="btn-cashout-lobby" style="display:none;background:rgba(239,159,39,.15);border-color:rgba(239,159,39,.35);color:#EF9F27;margin-left:5px" onclick="doCashout()">💰</button>
     </div>
   </div>
   <div style="margin-bottom:16px">
