@@ -46,22 +46,22 @@ function handleMsg(m){
     if(hpBtn) {
       if(status.grandAvailable) {
         hpBtn.disabled = myCurrentHP < 100;
-        hpBtn.textContent = myCurrentHP < 100 ? '🏰 Torre HP (Requiere 100 HP)' : '🏆 Torre por HP (Premio: 1000 HP)';
-        hpBtn.style.opacity = '1';
+        hpBtn.textContent = '🏆 Torre (Premio: 1000 HP)';
+        hpBtn.style.opacity = myCurrentHP < 100 ? '0.5' : '1';
       } else {
         hpBtn.disabled = true;
-        hpBtn.textContent = '🔒 Premio Mayor no disponible hoy';
+        hpBtn.textContent = '🔒 Torre (Premio no disponible)';
         hpBtn.style.opacity = '0.5';
       }
     }
     if(trainBtn) {
       if(status.trainAvailable) {
         trainBtn.disabled = false;
-        trainBtn.textContent = '🤝 Torre Entrenamiento (Premio: 10 HP)';
+        trainBtn.textContent = '🤝 Torre (Premio: 10 HP)';
         trainBtn.style.opacity = '1';
       } else {
         trainBtn.disabled = true;
-        trainBtn.textContent = '🔒 Bono ya reclamado o no disponible';
+        trainBtn.textContent = '🔒 Torre (Bono no disponible)';
         trainBtn.style.opacity = '0.5';
       }
     }
