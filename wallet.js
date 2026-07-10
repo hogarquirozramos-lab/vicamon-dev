@@ -91,8 +91,8 @@ function updateHPDisplay(hp){
   const btnG = document.getElementById('btn-gauntlet'); 
   if (btnG && typeof GAUNTLET_HABILITADO !== 'undefined') { 
     btnG.style.display = 'inline-block'; 
-    if (isGuest) { btnG.disabled = false; btnG.textContent = '🏰 Torre (XP)'; } 
-    else { btnG.disabled = myCurrentHP < 100; btnG.textContent = '🏰 Torre (100 HP)'; } 
+    btnG.disabled = false; // El botón del lobby siempre está habilitado
+    btnG.textContent = '🏰 Torre'; 
   } 
   
   // Widgets de depósito
