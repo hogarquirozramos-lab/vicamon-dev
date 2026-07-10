@@ -114,7 +114,7 @@ async function doCashout(){
   if(btnLobby){btnLobby.disabled=true;btnLobby.textContent='...';} 
   if(!ws || ws.readyState !== 1){ 
     if(btnProf){btnProf.disabled=false;btnProf.textContent='💰 Cashout';} 
-    if(btnLobby){btnLobby.disabled=false;btnLobby.textContent='💰';} 
+    if(btnLobby){btnLobby.disabled=false;btnLobby.textContent='💰 Cashout';} 
     return; 
   } 
   ws.send(JSON.stringify({type:'cashout'})); 
