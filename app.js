@@ -46,7 +46,7 @@ function handleMsg(m){
     if(hpBtn) {
       if(status.grandAvailable) {
         hpBtn.disabled = myCurrentHP < 100;
-        hpBtn.textContent = '🏆 Torre (Premio: 1000 HP)';
+        hpBtn.textContent = '🏆 Torre (Inversión: 100 HP // Premio: 1000 HP)';
         hpBtn.style.opacity = myCurrentHP < 100 ? '0.5' : '1';
       } else {
         hpBtn.disabled = true;
