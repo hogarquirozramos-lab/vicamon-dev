@@ -265,6 +265,22 @@
   </div>
 </div>
 
+<!-- BOARD MODE (TABLERO) -->
+<div id="s-board" class="screen">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:0 10px">
+    <button class="btn btn-sm btn-red" onclick="show('s-lobby')">⬅ Salir</button>
+    <div id="board-turn-info" style="font-size:14px;font-weight:700;color:#5DCAA5">Tu Turno</div>
+  </div>
+  
+  <div style="display:flex;justify-content:center;align-items:center;background:rgba(0,0,0,.3);border-radius:12px;padding:10px;margin-bottom:15px">
+    <div id="board-grid" style="display:grid;grid-template-columns:repeat(5, 1fr);gap:4px;width:300px;height:300px;background:rgba(255,255,255,.05);padding:4px;border-radius:8px"></div>
+  </div>
+
+  <div style="background:rgba(0,0,0,.3);border-radius:8px;padding:10px;text-align:center">
+    <div id="board-log" style="font-size:12px;color:rgba(255,255,255,.6);min-height:20px">Selecciona un Vicamon para mover.</div>
+  </div>
+</div>  
+  
 <!-- RESULT -->
 <div id="s-result" class="screen">
   <div style="position:relative;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px">
