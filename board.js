@@ -75,7 +75,7 @@ function handleCellClick(r, c) {
     // 1. Si hay una ficha mía, la selecciono
     if (cellVal !== 0 && cellVal.startsWith('me')) {
         selectedPiece = { r, c, id: cellVal };
-        document.getElementById('board-log').textContent = `${boardState.pieces[cellVal].name} seleccionado. Mueve hasta 2 casillas.`;
+        document.getElementById('board-log').textContent = `${boardState.pieces[cellVal].name} seleccionado. Mueve 1 casilla en cualquier dirección.`;
         renderBoard();
         return;
     }
@@ -105,7 +105,7 @@ function movePiece(fromR, fromC, toR, toC) {
     boardState.grid[fromR][fromC] = 0;
     boardState.grid[toR][toC] = pieceId;
     
-    document.getElementById('board-log').textContent = `${boardState.pieces[cellVal].name} seleccionado. Mueve 1 casilla en cualquier dirección.`;
+    document.getElementById('board-log').textContent = `${boardState.pieces[pieceId].name} se ha movido.`;
     
     selectedPiece = null;
     renderBoard();
