@@ -93,10 +93,8 @@ function isValidMove(fromR, fromC, toR, toC) {
     const dr = Math.abs(toR - fromR);
     const dc = Math.abs(toC - fromC);
     
-    // Máximo 2 casillas en cualquier dirección (recto o diagonal)
-    if (dr === 0 && dc > 2) return false;
-    if (dc === 0 && dr > 2) return false;
-    if (dr > 2 || dc > 2) return false;
+    // REGLA NUEVA: Máximo 1 casilla en cualquier dirección (como el Rey de ajedrez)
+    if (dr > 1 || dc > 1) return false;
     if (dr === 0 && dc === 0) return false;
 
     return true;
@@ -107,7 +105,7 @@ function movePiece(fromR, fromC, toR, toC) {
     boardState.grid[fromR][fromC] = 0;
     boardState.grid[toR][toC] = pieceId;
     
-    document.getElementById('board-log').textContent = `${boardState.pieces[pieceId].name} se ha movido.`;
+    document.getElementById('board-log').textContent = `${boardState.pieces[cellVal].name} seleccionado. Mueve 1 casilla en cualquier dirección.`;
     
     selectedPiece = null;
     renderBoard();
