@@ -36,7 +36,9 @@ function renderBoard() {
         for (let c = 0; c < 5; c++) {
             const cellVal = boardState.grid[r][c];
             const cell = document.createElement('div');
-            cell.style.cssText = `background:rgba(255,255,255,.03);border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;border:1px solid rgba(255,255,255,.1)`;
+            
+            // FIX: Agregado box-sizing: border-box y overflow: hidden para que los bordes no deformen la celda
+            cell.style.cssText = `background:rgba(255,255,255,.03);border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;border:2px solid rgba(255,255,255,.1);box-sizing:border-box;overflow:hidden;`;
             cell.dataset.r = r;
             cell.dataset.c = c;
             
@@ -45,13 +47,15 @@ function renderBoard() {
             if (cellVal !== 0) {
                 const piece = boardState.pieces[cellVal];
                 const isMine = cellVal.startsWith('me');
-                cell.innerHTML = `<img src="${piece.img}" style="width:80%;height:80%;image-rendering:pixelated;${isMine ? '' : 'transform:scaleX(-1);'}"><div style="position:absolute;bottom:0;font-size:8px;background:rgba(0,0,0,.7);padding:1px 3px;border-radius:2px">${piece.hp}</div>`;
+                // FIX: object-fit: contain asegura que la imagen nunca se deforme
+                cell.innerHTML = `<img src="${piece.img}" style="width:80%;height:80%;object-fit:contain;image-rendering:pixelated;${isMine ? '' : 'transform:scaleX(-1);'}"><div style="position:absolute;bottom:2px;font-size:9px;background:rgba(0,0,0,.8);padding:1px 4px;border-radius:4px;color:#fff">${piece.hp}</div>`;
                 cell.style.borderColor = isMine ? '#5DCAA5' : '#F0997B';
             }
 
             // Resaltar casilla seleccionada
             if (selectedPiece && selectedPiece.r === r && selectedPiece.c === c) {
                 cell.style.boxShadow = 'inset 0 0 0 2px #4a9eff';
+                cell.style.borderColor = '#4a9eff';
             }
 
             // Resaltar movimientos válidos
@@ -94,9 +98,6 @@ function isValidMove(fromR, fromC, toR, toC) {
     if (dc === 0 && dr > 2) return false;
     if (dr > 2 || dc > 2) return false;
     if (dr === 0 && dc === 0) return false;
-
-    // Lógica simple para no "saltar" fichas (opcional, se puede quitar)
-    // Por ahora lo dejamos simple para la prueba visual
 
     return true;
 }
