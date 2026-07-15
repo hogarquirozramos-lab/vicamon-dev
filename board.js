@@ -37,8 +37,8 @@ function renderBoard() {
             const cellVal = boardState.grid[r][c];
             const cell = document.createElement('div');
             
-            // FIX: Agregado box-sizing: border-box y overflow: hidden para que los bordes no deformen la celda
-            cell.style.cssText = `background:rgba(255,255,255,.03);border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;border:2px solid rgba(255,255,255,.1);box-sizing:border-box;overflow:hidden;`;
+            // FIX: Agregado min-width y min-height para evitar que la imagen deforme la celda
+            cell.style.cssText = `background:rgba(255,255,255,.03);border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;border:2px solid rgba(255,255,255,.1);box-sizing:border-box;overflow:hidden;min-width:0;min-height:0;`;
             cell.dataset.r = r;
             cell.dataset.c = c;
             
