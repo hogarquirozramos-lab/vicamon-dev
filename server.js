@@ -46,7 +46,7 @@ async function syncPlatformBalance() {
   }
 }
 syncPlatformBalance(); // Sincronizar al iniciar
-setInterval(syncPlatformBalance, 300000); // Sincronizar cada 5 minutos
+// setInterval(syncPlatformBalance, 300000); // Puedes borrar esta línea para no saturar Solana
 
 const MIME = { '.html':'text/html', '.js':'application/javascript', '.css':'text/css', '.png':'image/png', '.jpg':'image/jpeg', '.gif':'image/gif', '.svg':'image/svg+xml', '.ico':'image/x-icon' };
 
