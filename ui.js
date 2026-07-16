@@ -26,7 +26,7 @@ function openChallengeMenu(targetId, name, isTrain) {
   pendingChallengeTargetId = targetId; 
   pendingIsTraining = isTrain; 
   isGauntletChallenge = false; 
-  isBoardChallenge = false; // Reset
+  isBoardChallenge = false; 
   const title = isTrain ? `Entrenar con ${name}` : `Batalla por HP con ${name}`; 
   let buttonsHtml = ''; 
   if (isGuest && !isTrain) { alert('Los invitados solo pueden entrenar. Conecta tu wallet para batallas por HP.'); return; } 
@@ -53,7 +53,7 @@ function openMasterMenu() {
     boardBtn.onclick = () => {
       document.getElementById('modal-master-menu').classList.add('hidden');
       isGauntletChallenge = false;
-      isBoardChallenge = true; // Activamos bandera
+      isBoardChallenge = true; 
       teamSelectionMode = '3v3'; 
       pendingChallengeTargetId = null;
       pendingIsTraining = true;
@@ -70,7 +70,7 @@ function openMasterMenu() {
 function selectChallengeMode(mode) { 
   document.getElementById('modal-challenge-mode').classList.add('hidden'); 
   document.getElementById('modal-master-menu').classList.add('hidden'); 
-  isBoardChallenge = false; // Reset
+  isBoardChallenge = false; 
   teamSelectionMode = (mode === '3v3' || mode === 'train3v3') ? '3v3' : '1v1'; 
   pendingIsTraining = (mode === 'train' || mode === 'train3v3'); 
   selectedTeam = []; 
@@ -93,14 +93,14 @@ function confirmTeam() {
     ws.send(JSON.stringify({type:'challenge_gauntlet', beast: myBeast, towerMode: window._pendingTowerMode || 'hp'})); 
     isGauntletChallenge = false; 
     window._pendingTowerMode = null;
-    show('s-lobby'); 
+    // FIX: No vamos al lobby, esperamos la respuesta del servidor (battle_start o error)
     return; 
   } 
-  if (isBoardChallenge) { // NUEVA CONDICIÓN
+  if (isBoardChallenge) { 
     myTeam = selectedTeam.slice();
     ws.send(JSON.stringify({type:'challenge_board_cpu', team: myTeam}));
     isBoardChallenge = false;
-    show('s-lobby');
+    show('s-lobby'); 
     return;
   }
   let isTraining; 
