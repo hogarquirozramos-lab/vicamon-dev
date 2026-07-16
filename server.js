@@ -108,7 +108,12 @@ const server = http.createServer(async (req, res) => {
     return; 
   }
   
-  if (urlPath === '/payment' && req.method === 'POST') { const secret = req.headers['x-internal-secret']; if (secret !== (process.env.INTERNAL_SECRET || 'dev-secret')) { res.writeHead(403); res.end(JSON.stringify({ error: 'Forbidden' })); return; } let body = ''; req.on('data', c => body += c); req.on('end', async () => { try { const { wallet, amount, signature, memo } = JSON.parse(body); if (await isTxProcessed(signature)) { res.writeHead(200); res.end(JSON.stringify({ ok: false, reason: 'duplicate' })); return; } const hp = Math.round((amount / 100_000) * 100); const { broadcast, lobby, send } = require('./state'); const newBalance = await addHP(wallet, hp); lobby.forEach(p => { if (p.wallet === wallet) send(p.ws, { type: 'hp_updated', hp: newBalance }); }); await markTxProcessed(signature); res.writeHead(200); res.end(JSON.stringify({ ok: true, wallet, hp, newBalance })); syncPlatformBalance(); } catch (e) { res.writeHead(400); res.end(JSON.stringify({ error: e.message })); } }); return; }
+  if (urlPath === '/payment' && req.method === 'POST') { const secret = req.headers['x-internal-secret']; if (secret !== (process.env.INTERNAL_SECRET || 'dev-secret')) { res.writeHead(403); res.end(JSON.stringify({ error: 'Forbidden' })); return; } let body = ''; req.on('data', c => body += c); req.on('end', async () => { try { const { wallet, amount, signature, memo } = JSON.parse(body); if (await isTxProcessed(signature)) { res.writeHead(200); res.end(JSON.stringify({ ok: false, reason: 'duplicate' })); return; }         const hp = Math.round((amount / 100_000) * 100); 
+        const { broadcast, lobby, send } = require('./state'); 
+        const newBalance = await addHP(wallet, hp); 
+        await addPlatformHp(hp); // FIX: Sumamos el HP depositado a la plataforma para que la torre se habilite
+        lobby.forEach(p => { if (p.wallet === wallet) send(p.ws, { type: 'hp_updated', hp: newBalance }); }); 
+        await markTxProcessed(signature);  res.writeHead(200); res.end(JSON.stringify({ ok: true, wallet, hp, newBalance })); syncPlatformBalance(); } catch (e) { res.writeHead(400); res.end(JSON.stringify({ error: e.message })); } }); return; }
   
   const file = urlPath === '/' ? '/index.html' : urlPath;
   const fp = path.join(__dirname, file);
