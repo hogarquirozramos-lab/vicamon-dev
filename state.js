@@ -5,7 +5,7 @@ const lobby = new Map();
 const battles = new Map();    
 const processedTx = new Set();
 const walletToBattle = new Map(); 
-const activePhysicalCodes = new Map(); // NUEVO: codigo -> id del jugador que lo tiene activo
+const activePhysicalCodes = new Map(); 
 let nextId = 1;
 
 function uid() { return nextId++; }
@@ -61,7 +61,33 @@ function pushCpuBattle(bId) {
   });
 }
 
+// NUEVO: Enviar estado del tablero a los jugadores
+function pushBoardState(bId) {
+  const b = battles.get(bId); if (!b || !b.board) return;
+  const p1 = lobby.get(b.p1id), p2 = lobby.get(b.p2id);
+  if (!p1) return;
+  
+  // Limpiamos el estado para no enviar datos sensibles de más
+  const cleanPieces = {};
+  for(const id in b.board.pieces) {
+    const p = b.board.pieces[id];
+    cleanPieces[id] = { beast: p.beast, hp: p.st.hp, isDead: p.isDead };
+  }
+  
+  const base = {
+    type: 'board_state',
+    battleId: bId,
+    grid: b.board.grid,
+    pieces: cleanPieces,
+    yourTurn: b.board.turn === b.p1id,
+    logs: b.logs.slice(-10)
+  };
+  
+  send(p1.ws, base);
+  if (p2 && !b.isCpu) send(p2.ws, { ...base, yourTurn: b.board.turn === b.p2id });
+}
+
 module.exports = {
   lobby, battles, processedTx, walletToBattle, activePhysicalCodes, uid,
-  send, broadcast, pushLobby, pushBattle, pushCpuBattle
+  send, broadcast, pushLobby, pushBattle, pushCpuBattle, pushBoardState
 };
