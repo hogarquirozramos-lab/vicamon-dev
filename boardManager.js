@@ -100,7 +100,11 @@ function handleBoardAttack(bId, playerId, fromR, fromC, toR, toC) {
   if (p2 && !b.isCpu) send(p2.ws, { type: 'board_battle_start', battleId: bId, myBeast: b.p2Beast, oppBeast: b.p1Beast, isP1: b.turnId === b.p2id });
   
   // Forzar actualización de UI de batalla
-  b.turnId === b.p1id ? require('./state').pushBattle(bId) : require('./state').pushCpuBattle(bId);
+  if (b.isCpu) {
+      require('./state').pushCpuBattle(bId);
+  } else {
+      require('./state').pushBattle(bId);
+  }
   
   if (b.turnId === CPU_ID) {
       setTimeout(() => doCpuBoardAttack(bId), 1000);
