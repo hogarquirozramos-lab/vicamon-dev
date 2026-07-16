@@ -68,8 +68,8 @@ function setupWebSocketServer(wss, getPlatformUSDCBalance) {
             isTeamBattle: true, isTeamTraining: msg.isTraining, isCpu: false, 
             p1Wallet: p1.wallet, p2Wallet: p2.wallet 
           }); 
-          send(p1.ws, { type: 'board_start', battleId: bId, opponent: p2.name, isTraining: msg.isTraining }); 
-          send(p2.ws, { type: 'board_start', battleId: bId, opponent: p1.name, isTraining: msg.isTraining }); 
+          send(p1.ws, { type: 'board_start', battleId: bId, opponent: p2.name, isTraining: msg.isTraining, role: 'p1' }); 
+          send(p2.ws, { type: 'board_start', battleId: bId, opponent: p1.name, isTraining: msg.isTraining, role: 'p2' });
           if (!msg.isTraining) { walletToBattle.set(p1.wallet, bId); walletToBattle.set(p2.wallet, bId); } 
           await pushLobby(); 
           pushBoardState(bId);
@@ -88,7 +88,7 @@ function setupWebSocketServer(wss, getPlatformUSDCBalance) {
             logs: [{t: `¡Combate de Tablero vs Master!`, c: 'hi'}], 
             isTeamBattle: true, isTeamCpu: true, isCpu: true, isTraining: true 
           }); 
-          send(ws, { type: 'board_start', battleId: bId, opponent: 'Zodiac Master', isTraining: true }); 
+          send(ws, { type: 'board_start', battleId: bId, opponent: 'Zodiac Master', isTraining: true, role: 'p1' }); 
           await pushLobby(); 
           pushBoardState(bId);
         }
