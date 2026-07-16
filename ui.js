@@ -42,7 +42,37 @@ function openChallengeMenu(targetId, name, isTrain) {
 }
 
 function openMasterMenu() {
-  document.getElementById('modal-master-menu').classList.remove('hidden');
+  const modal = document.getElementById('modal-master-menu');
+  // Agregamos temporalmente el botón de tablero si no existe
+  if (!document.getElementById('btn-test-board')) {
+    const boardBtn = document.createElement('button');
+    boardBtn.id = 'btn-test-board';
+    boardBtn.className = 'btn btn-blue';
+    boardBtn.style.width = '100%';
+    boardBtn.textContent = '♟️ Probar Modo Tablero (CPU)';
+    boardBtn.onclick = () => {
+      document.getElementById('modal-master-menu').classList.add('hidden');
+      isGauntletChallenge = false;
+      teamSelectionMode = '3v3'; // El tablero usa 3 Vicamons
+      pendingChallengeTargetId = null;
+      pendingIsTraining = true;
+      selectedTeam = [];
+      document.getElementById('ts-mode-title').textContent = 'Modo Tablero (Elige 3)';
+      buildTeamPickGrid();
+      show('s-team-select');
+      
+      // Interceptamos el botón de confirmar para enviar el mensaje correcto
+      const confirmBtn = document.getElementById('btn-confirm-team');
+      confirmBtn.onclick = () => {
+        if (selectedTeam.length !== 3) return alert('Elige 3 Vicamons.');
+        myTeam = selectedTeam.slice();
+        ws.send(JSON.stringify({type:'challenge_board_cpu', team: myTeam}));
+        show('s-lobby');
+      };
+    };
+    modal.querySelector('.modal').insertBefore(boardBtn, modal.querySelector('.btn-red'));
+  }
+  modal.classList.remove('hidden');
 }
 
 function selectChallengeMode(mode) { 
