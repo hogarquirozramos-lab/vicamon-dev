@@ -1,4 +1,4 @@
-// --- MODO TABLERO 5x5 (FASE 2.5: INTERACTIVOS) ---
+// --- MODO TABLERO 7x7 (FASE 2.5: INTERACTIVOS) ---
 let boardState = null;
 let selectedPiece = null;
 let boardBattleData = null;
@@ -8,11 +8,13 @@ function initBoardTest() {
     boardState = {
         // 0: vacío, 'rock': roca, 'tree': cura, 'chest': sorpresa
         grid: [
-            [0, 'en1', 'en2', 'en3', 0],
-            ['rock', 'tree', 0, 'chest', 'rock'],
-            [0, 0, 0, 0, 0],
-            ['rock', 'chest', 0, 'tree', 'rock'],
-            [0, 'me1', 'me2', 'me3', 0]
+            [0, 'en1', 0, 'en2', 0, 'en3', 0], // Fila 0 (Base Rival)
+            [0, 0, 'rock', 0, 'rock', 0, 0],
+            ['tree', 0, 0, 'chest', 0, 0, 'tree'],
+            [0, 'rock', 0, 0, 0, 'rock', 0],   // Fila Central
+            ['tree', 0, 0, 'chest', 0, 0, 'tree'],
+            [0, 0, 'rock', 0, 'rock', 0, 0],
+            [0, 'me1', 0, 'me2', 0, 'me3', 0]  // Fila 6 (Base Tú)
         ],
         turn: 'me',
         pieces: {
@@ -27,18 +29,18 @@ function initBoardTest() {
     selectedPiece = null;
     renderBoard();
     document.getElementById('board-turn-info').textContent = 'Tu Turno (Prueba)';
-    document.getElementById('board-log').textContent = 'Selecciona un Vicamon. ¡Cuidado con los cofres!';
+    document.getElementById('board-log').textContent = 'Selecciona un Vicamon. ¡Conquista el tablero!';
 }
 
 function renderBoard() {
     const gridEl = document.getElementById('board-grid');
     gridEl.innerHTML = '';
     
-    for (let r = 0; r < 5; r++) {
-        for (let c = 0; c < 5; c++) {
+    for (let r = 0; r < 7; r++) { // Cambiado a 7
+        for (let c = 0; c < 7; c++) { // Cambiado a 7
             const cellVal = boardState.grid[r][c];
             const cell = document.createElement('div');
-            cell.style.cssText = `background:rgba(0,0,0,.4);border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;border:2px solid rgba(255,255,255,.1);box-sizing:border-box;overflow:hidden;min-width:0;min-height:0;`;
+            cell.style.cssText = `background:rgba(0,0,0,.4);border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;border:1px solid rgba(255,255,255,.1);box-sizing:border-box;overflow:hidden;min-width:0;min-height:0;`;
             cell.dataset.r = r;
             cell.dataset.c = c;
             cell.onclick = () => handleCellClick(r, c);
@@ -60,7 +62,7 @@ function renderBoard() {
             if (typeof cellVal === 'string' && (cellVal.startsWith('me') || cellVal.startsWith('en'))) {
                 const piece = boardState.pieces[cellVal];
                 const isMine = cellVal.startsWith('me');
-                cell.innerHTML = `<img src="${piece.img}" style="width:80%;height:80%;object-fit:contain;image-rendering:pixelated;${isMine ? '' : 'transform:scaleX(-1);'}"><div style="position:absolute;bottom:2px;font-size:9px;background:rgba(0,0,0,.8);padding:1px 4px;border-radius:4px;color:#fff">${piece.hp}</div>`;
+                cell.innerHTML = `<img src="${piece.img}" style="width:80%;height:80%;object-fit:contain;image-rendering:pixelated;${isMine ? '' : 'transform:scaleX(-1);'}"><div style="position:absolute;bottom:0;font-size:8px;background:rgba(0,0,0,.8);padding:1px 3px;border-radius:4px;color:#fff">${piece.hp}</div>`;
                 cell.style.borderColor = isMine ? '#5DCAA5' : '#F0997B';
             }
 
@@ -126,7 +128,7 @@ function isValidMove(fromR, fromC, toR, toC) {
     const dr = Math.abs(toR - fromR);
     const dc = Math.abs(toC - fromC);
     
-    if (dr > 1 || dc > 1) return false;
+    if (dr > 1 || dc > 1) return false; // Máximo 1 casilla
     if (dr === 0 && dc === 0) return false;
 
     return true;
