@@ -93,7 +93,7 @@ function confirmTeam() {
     ws.send(JSON.stringify({type:'challenge_gauntlet', beast: myBeast, towerMode: window._pendingTowerMode || 'hp'})); 
     isGauntletChallenge = false; 
     window._pendingTowerMode = null;
-    show('s-lobby'); // FIX: Restaurado para que el servidor pueda validar y avisar si hay error
+    // FIX: No vamos al lobby, esperamos la respuesta del servidor (battle_start o error)
     return; 
   } 
   if (isBoardChallenge) { 
