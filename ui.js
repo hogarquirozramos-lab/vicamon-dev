@@ -26,6 +26,7 @@ function openChallengeMenu(targetId, name, isTrain) {
   pendingChallengeTargetId = targetId; 
   pendingIsTraining = isTrain; 
   isGauntletChallenge = false; 
+  isBoardChallenge = false; // Reset
   const title = isTrain ? `Entrenar con ${name}` : `Batalla por HP con ${name}`; 
   let buttonsHtml = ''; 
   if (isGuest && !isTrain) { alert('Los invitados solo pueden entrenar. Conecta tu wallet para batallas por HP.'); return; } 
@@ -43,7 +44,6 @@ function openChallengeMenu(targetId, name, isTrain) {
 
 function openMasterMenu() {
   const modal = document.getElementById('modal-master-menu');
-  // Agregamos temporalmente el botón de tablero si no existe
   if (!document.getElementById('btn-test-board')) {
     const boardBtn = document.createElement('button');
     boardBtn.id = 'btn-test-board';
@@ -53,22 +53,14 @@ function openMasterMenu() {
     boardBtn.onclick = () => {
       document.getElementById('modal-master-menu').classList.add('hidden');
       isGauntletChallenge = false;
-      teamSelectionMode = '3v3'; // El tablero usa 3 Vicamons
+      isBoardChallenge = true; // Activamos bandera
+      teamSelectionMode = '3v3'; 
       pendingChallengeTargetId = null;
       pendingIsTraining = true;
       selectedTeam = [];
       document.getElementById('ts-mode-title').textContent = 'Modo Tablero (Elige 3)';
       buildTeamPickGrid();
       show('s-team-select');
-      
-      // Interceptamos el botón de confirmar para enviar el mensaje correcto
-      const confirmBtn = document.getElementById('btn-confirm-team');
-      confirmBtn.onclick = () => {
-        if (selectedTeam.length !== 3) return alert('Elige 3 Vicamons.');
-        myTeam = selectedTeam.slice();
-        ws.send(JSON.stringify({type:'challenge_board_cpu', team: myTeam}));
-        show('s-lobby');
-      };
     };
     modal.querySelector('.modal').insertBefore(boardBtn, modal.querySelector('.btn-red'));
   }
@@ -77,7 +69,8 @@ function openMasterMenu() {
 
 function selectChallengeMode(mode) { 
   document.getElementById('modal-challenge-mode').classList.add('hidden'); 
-  document.getElementById('modal-master-menu').classList.add('hidden'); // Cerrar menú master si venía de ahí
+  document.getElementById('modal-master-menu').classList.add('hidden'); 
+  isBoardChallenge = false; // Reset
   teamSelectionMode = (mode === '3v3' || mode === 'train3v3') ? '3v3' : '1v1'; 
   pendingIsTraining = (mode === 'train' || mode === 'train3v3'); 
   selectedTeam = []; 
@@ -92,7 +85,7 @@ function selectChallengeMode(mode) {
 function buildTeamPickGrid() { const allKeys=Object.entries(BEASTS); const keys=allKeys.filter(([k,b])=>b.cat!=='Físico'||myPhysicalBeasts.includes(k)); let html=''; keys.forEach(([k,b])=>{ html+=`<div class="bcard" id="tpc-${k}" onclick="toggleTeamBeast('${k}')"><img src="${b.img}" alt="${b.name}"><div class="bname">${b.name}</div><div class="bsub">${b.sub}</div><span class="bstyle" style="${STCSS[b.style]}">${b.style}</span><div class="elbar" style="background:${EL[b.el]}"></div></div>`; }); html+=`<div class="beast-detail" id="team-detail-panel"></div>`; document.getElementById('team-pick-grid').innerHTML=html; updateTeamSelectionUI(); }
 function toggleTeamBeast(k) { const maxPicks = teamSelectionMode === '3v3' ? 3 : 1; const idx = selectedTeam.indexOf(k); if(idx > -1) { selectedTeam.splice(idx, 1); } else { if(selectedTeam.length >= maxPicks) { alert(`Ya elegiste ${maxPicks} Vicamons.`); return; } selectedTeam.push(k); } updateTeamSelectionUI(); }
 function updateTeamSelectionUI() { const maxPicks = teamSelectionMode === '3v3' ? 3 : 1; document.querySelectorAll('#team-pick-grid .bcard').forEach(c => c.classList.remove('sel')); selectedTeam.forEach((k, i) => { const card = document.getElementById('tpc-'+k); if(card) { card.classList.add('sel'); let badge = card.querySelector('.team-badge'); if(!badge) { badge = document.createElement('div'); badge.className = 'team-badge'; badge.style.cssText = 'position:absolute;top:2px;right:2px;background:#4a9eff;color:#fff;width:16px;height:16px;border-radius:50%;font-size:10px;display:flex;align-items:center;justify-content:center;font-weight:bold'; card.appendChild(badge); } badge.textContent = i + 1; } }); document.querySelectorAll('#team-pick-grid .bcard').forEach(c => { if(!c.classList.contains('sel')) { const badge = c.querySelector('.team-badge'); if(badge) badge.remove(); } }); document.getElementById('btn-confirm-team').disabled = selectedTeam.length !== maxPicks; }
-function cancelTeamSelection() { if(pendingFrom !== null) { ws.send(JSON.stringify({type:'reject_challenge'})); pendingFrom = null; } isGauntletChallenge = false; show('s-lobby'); }
+function cancelTeamSelection() { if(pendingFrom !== null) { ws.send(JSON.stringify({type:'reject_challenge'})); pendingFrom = null; } isGauntletChallenge = false; isBoardChallenge = false; show('s-lobby'); }
 
 function confirmTeam() { 
   if (isGauntletChallenge) { 
@@ -103,6 +96,13 @@ function confirmTeam() {
     show('s-lobby'); 
     return; 
   } 
+  if (isBoardChallenge) { // NUEVA CONDICIÓN
+    myTeam = selectedTeam.slice();
+    ws.send(JSON.stringify({type:'challenge_board_cpu', team: myTeam}));
+    isBoardChallenge = false;
+    show('s-lobby');
+    return;
+  }
   let isTraining; 
   if (pendingFrom !== null) { isTraining = pendingIsTraining; } else { isTraining = pendingIsTraining || pendingChallengeTargetId === null; } 
   const mode3v3 = teamSelectionMode === '3v3'; 
@@ -140,7 +140,7 @@ function openTowerMenu() {
 
 function challengeGauntlet(towerMode) { 
   document.getElementById('modal-tower-menu').classList.add('hidden');
-  document.getElementById('modal-master-menu').classList.add('hidden'); // Cerrar menú master si venía de ahí
+  document.getElementById('modal-master-menu').classList.add('hidden');
   if(!ws || ws.readyState !== 1) return alert('Conectando...'); 
   if(towerMode === 'hp' && myCurrentHP < 100) return alert('Necesitas al menos 100 HP.');
   
@@ -151,6 +151,7 @@ function challengeGauntlet(towerMode) {
   
   if(!confirm(msgText)) return; 
   isGauntletChallenge = true; 
+  isBoardChallenge = false;
   teamSelectionMode = '1v1'; 
   document.getElementById('ts-mode-title').textContent = 'Torre de Batalla (Elige tu inicial)'; 
   selectedTeam = []; 
@@ -177,8 +178,6 @@ function updateLobbyBadge(){
   const b = BEASTS[myBeast] || BEASTS['aries']; 
   const badgeImg = document.getElementById('badge-img'); 
   if(badgeImg) { badgeImg.src=b.img; badgeImg.style.display='block'; } 
-  
-  // NUEVO: Mostrar/Ocultar Cashout rápido en el lobby
   const cashoutBtnLobby = document.getElementById('btn-cashout-lobby');
   if(cashoutBtnLobby) {
     cashoutBtnLobby.style.display = (myCurrentHP > 0 && !isGuest) ? 'inline-block' : 'none';
