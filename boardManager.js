@@ -86,11 +86,8 @@ function handleBoardAttack(bId, playerId, fromR, fromC, toR, toC) {
   b.p1Beast = b.board.pieces[atkId].beast;
   b.p2Beast = b.board.pieces[defId].beast;
   
-  // FIX: Configurar variables para que pushCpuBattle/pushBattle funcione
   b.turnId = b.board.pieces[atkId].owner; 
-  b.cpuIsP1 = (b.turnId === CPU_ID);
-  b.cpuBeast = b.cpuIsP1 ? b.p1Beast : b.p2Beast;
-  b.isCpu = true; // Aseguramos que use la lógica de CPU si lo ataca el master
+  b.isCpu = true; 
   
   b.logs.push({t: `¡${BEASTS[b.p1Beast].name} ataca a ${BEASTS[b.p2Beast].name}!`, c:'hi'});
   
@@ -99,16 +96,29 @@ function handleBoardAttack(bId, playerId, fromR, fromC, toR, toC) {
   send(p1.ws, { type: 'board_battle_start', battleId: bId, myBeast: b.p1Beast, oppBeast: b.p2Beast, isP1: b.turnId === b.p1id });
   if (p2 && !b.isCpu) send(p2.ws, { type: 'board_battle_start', battleId: bId, myBeast: b.p2Beast, oppBeast: b.p1Beast, isP1: b.turnId === b.p2id });
   
-  // Forzar actualización de UI de batalla
-  if (b.isCpu) {
-      require('./state').pushCpuBattle(bId);
-  } else {
-      require('./state').pushBattle(bId);
-  }
+  // FIX: Usar función local para enviar el estado de batalla sin romper el servidor
+  sendBoardBattleState(bId);
   
   if (b.turnId === CPU_ID) {
       setTimeout(() => doCpuBoardAttack(bId), 1000);
   }
+}
+
+function sendBoardBattleState(bId) {
+  const b = battles.get(bId); if(!b || !b.activeBattle) return;
+  const p1 = lobby.get(b.p1id);
+  if(!p1) return;
+  
+  const payload = {
+    type: 'battle_state',
+    battleId: bId,
+    p1: { name: 'Atacante', beast: b.p1Beast, state: b.st1 },
+    p2: { name: 'Defensor', beast: b.p2Beast, state: b.st2 },
+    logs: b.logs.slice(-14),
+    yourTurn: b.turnId === b.p1id
+  };
+  
+  send(p1.ws, payload);
 }
 
 // Lógica de la CPU en el tablero (Mejorada para no atascarse)
