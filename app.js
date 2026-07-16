@@ -22,7 +22,7 @@ var selectedTeam = [];
 var myTeam = [];
 var isGauntletChallenge = false;
 var lastMsgTime = Date.now(); 
-var window._boardRole = 'p1'; // NUEVO: Para saber si soy P1 o P2 en el tablero
+window._boardRole = 'p1'; // NUEVO: Para saber si soy P1 o P2 en el tablero
 
 setInterval(() => { if (ws && ws.readyState === 1) { if (Date.now() - lastMsgTime > 25000) { console.log("WS timeout, forzando reconexión..."); try { ws.close(); } catch(e) {} return; } ws.send(JSON.stringify({type:'ping'})); } }, 10000);
 
