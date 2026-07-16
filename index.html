@@ -265,22 +265,6 @@
   </div>
 </div>
 
-<!-- BOARD MODE (TABLERO) -->
-<div id="s-board" class="screen">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:0 10px">
-    <button class="btn btn-sm btn-red" onclick="show('s-lobby')">⬅ Salir</button>
-    <div id="board-turn-info" style="font-size:14px;font-weight:700;color:#5DCAA5">Tu Turno</div>
-  </div>
-  
-  <div style="display:flex;justify-content:center;align-items:center;background:rgba(0,0,0,.3);border-radius:12px;padding:10px;margin-bottom:15px">
-  <div id="board-grid" style="display:grid;grid-template-columns:repeat(7, minmax(0, 1fr));grid-template-rows:repeat(7, minmax(0, 1fr));gap:4px;width:350px;height:350px;max-width:90vw;max-height:90vw;background-image:url('tablero-fondo.png');background-size:cover;background-position:center;background-color:rgba(0,0,0,.5);padding:4px;border-radius:8px"></div>
-  </div>
-
-  <div style="background:rgba(0,0,0,.3);border-radius:8px;padding:10px;text-align:center">
-    <div id="board-log" style="font-size:12px;color:rgba(255,255,255,.6);min-height:20px">Selecciona un Vicamon para mover.</div>
-  </div>
-</div>  
-  
 <!-- RESULT -->
 <div id="s-result" class="screen">
   <div style="position:relative;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px">
@@ -350,20 +334,6 @@
   </div>
 </div>
 
-<!-- MODAL CONEXIÓN MÓVIL PHANTOM -->
-<div class="modal-bg hidden" id="modal-mobile-connect">
-  <div class="modal" style="max-width:400px; text-align:left;">
-    <h3 style="color:#F0997B; margin-bottom:15px; text-align:center;">📱 Jugar con Wallet en Móvil</h3>
-    <p style="font-size:13px; color:rgba(255,255,255,.6); margin-bottom:10px;">Para conectar tu wallet desde el móvil, necesitas abrir este juego dentro de la app de Phantom.</p>
-    <p style="font-size:13px; color:rgba(255,255,255,.6); margin-bottom:15px;"><strong>Pasos:</strong><br>1. Copia el enlace de abajo.<br>2. Abre la app de <strong>Phantom</strong>.<br>3. Ve a <strong>"Descubrir" (🔍)</strong> y pega el enlace.</p>
-    <div style="background:rgba(0,0,0,.3); padding:10px; margin-bottom:20px; border-radius:8px; word-break:break-all; font-family:monospace; font-size:11px; color:#85B7EB; cursor:pointer; display:flex; justify-content:space-between; align-items:center" onclick="copyText(window.location.href)">
-      <span id="mobile-url-display"></span> <span style="margin-left:8px; white-space:nowrap; font-size:14px">📋</span>
-    </div>
-    <button class="btn btn-blue" style="width:100%; margin-bottom:10px; padding:12px" onclick="openPhantomApp()">🚀 Intentar abrir en Phantom automáticamente</button>
-    <button class="btn btn-sm btn-red" style="width:100%" onclick="closeMobileConnectModal()">Cancelar</button>
-  </div>
-</div>
-  
 <!-- SCRIPTS -->
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="beasts.js"></script>
@@ -372,6 +342,5 @@
 <script src="ui.js"></script>
 <script src="lab.js"></script>
 <script src="app.js"></script>
-<script src="board.js"></script>
 </body>
 </html>

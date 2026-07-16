@@ -132,14 +132,6 @@ function tickEffects(st, name) {
 
 async function endBattle(bId, winnerId, loserId, winnerHp, forfeit=false) {
   const b = battles.get(bId);
-  
-  // NUEVO: Si es una batalla de tablero, redirigir a boardManager
-  if (b && b.activeBattle) {
-    const { resolveBoardBattle } = require('./boardManager');
-    await resolveBoardBattle(bId, winnerId, loserId, winnerHp);
-    return;
-  }
-
   const isCpu = b?.isCpu || false;
   const isTraining = b?.isTraining || false;
   const isLabSimulation = b?.isLabSimulation || false; 
