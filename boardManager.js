@@ -136,11 +136,9 @@ function doCpuBoardMove(bId) {
     return;
   }
   
-  // Buscar el mejor movimiento posible
-  let bestMove = null;
-  let bestDist = minDist;
+  // Buscar cualquier movimiento válido
+  let validMoves = [];
   const directions = [[-1,-1], [-1,0], [-1,1], [0,-1], [0,1], [1,-1], [1,0], [1,1]];
-  
   for(const [dr, dc] of directions) {
     const newR = cpu.r + dr;
     const newC = cpu.c + dc;
@@ -148,18 +146,19 @@ function doCpuBoardMove(bId) {
       const val = b.board.grid[newR][newC];
       if(val === 0 || val === 'heart' || val === 'chest') {
         const dist = Math.abs(newR - target.r) + Math.abs(newC - target.c);
-        if(dist < bestDist) {
-          bestDist = dist;
-          bestMove = {r: newR, c: newC};
-        }
+        validMoves.push({r: newR, c: newC, dist: dist});
       }
     }
   }
   
-  if(bestMove) {
+  if(validMoves.length > 0) {
+    // Ordenar por la menor distancia al objetivo
+    validMoves.sort((a, b) => a.dist - b.dist);
+    // Tomar el mejor movimiento (o el primero si hay empate)
+    const bestMove = validMoves[0];
     handleBoardMove(bId, CPU_ID, cpu.r, cpu.c, bestMove.r, bestMove.c);
   } else {
-    // Si no hay mejor movimiento, pasa el turno
+    // Si no hay movimientos válidos, pasa el turno
     b.logs.push({t: `${BEASTS[b.board.pieces[cpu.id].beast].name} no puede moverse.`, c:'special'});
     b.board.turn = b.p1id; 
     pushBoardState(bId);
