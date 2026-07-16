@@ -21,8 +21,9 @@ var teamSelectionMode = '1v1';
 var selectedTeam = []; 
 var myTeam = [];
 var isGauntletChallenge = false;
+var isBoardChallenge = false; // NUEVO: Bandera para el modo tablero
 var lastMsgTime = Date.now(); 
-window._boardRole = 'p1'; // NUEVO: Para saber si soy P1 o P2 en el tablero
+window._boardRole = 'p1';
 
 setInterval(() => { if (ws && ws.readyState === 1) { if (Date.now() - lastMsgTime > 25000) { console.log("WS timeout, forzando reconexión..."); try { ws.close(); } catch(e) {} return; } ws.send(JSON.stringify({type:'ping'})); } }, 10000);
 
@@ -67,9 +68,9 @@ function handleMsg(m){
     }
   }
 
-  // --- MENSAJES DEL TABLERO ---
   if(m.type === 'board_start') {
     window._boardRole = m.role || 'p1';
+    battleId = m.battleId; // FIX: Guardamos el battleId para poder enviar movimientos
     show('s-board');
   }
   if(m.type === 'board_state') {
@@ -81,7 +82,6 @@ function handleMsg(m){
     myBeast = m.myBeast;
     oppBeast = m.oppBeast;
     oppName = m.oppName || 'Rival';
-    // La pantalla de batalla se dibujará cuando llegue 'battle_state'
   }
   if(m.type === 'board_resume') {
     show('s-board');
