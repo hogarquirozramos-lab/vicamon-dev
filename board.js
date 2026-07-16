@@ -6,13 +6,13 @@ let originalSurrenderBtn = null;
 
 function initBoardTest() {
     boardState = {
-        // 0: vacío, 'rock': roca, 'tree': cura, 'chest': sorpresa
+        // 0: vacío, 'rock': roca, 'heart': cura, 'chest': sorpresa
         grid: [
             [0, 'en1', 0, 'en2', 0, 'en3', 0], // Fila 0 (Base Rival)
             [0, 0, 'rock', 0, 'rock', 0, 0],
-            ['tree', 0, 0, 'chest', 0, 0, 'tree'],
+            ['heart', 0, 0, 'chest', 0, 0, 'heart'],
             [0, 'rock', 0, 0, 0, 'rock', 0],   // Fila Central
-            ['tree', 0, 0, 'chest', 0, 0, 'tree'],
+            ['heart', 0, 0, 'chest', 0, 0, 'heart'],
             [0, 0, 'rock', 0, 'rock', 0, 0],
             [0, 'me1', 0, 'me2', 0, 'me3', 0]  // Fila 6 (Base Tú)
         ],
@@ -36,8 +36,8 @@ function renderBoard() {
     const gridEl = document.getElementById('board-grid');
     gridEl.innerHTML = '';
     
-    for (let r = 0; r < 7; r++) { // Cambiado a 7
-        for (let c = 0; c < 7; c++) { // Cambiado a 7
+    for (let r = 0; r < 7; r++) { 
+        for (let c = 0; c < 7; c++) { 
             const cellVal = boardState.grid[r][c];
             const cell = document.createElement('div');
             cell.style.cssText = `background:rgba(0,0,0,.4);border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;border:1px solid rgba(255,255,255,.1);box-sizing:border-box;overflow:hidden;min-width:0;min-height:0;`;
@@ -50,11 +50,11 @@ function renderBoard() {
                 cell.innerHTML = '🪨';
                 cell.style.background = 'rgba(80,80,80,.5)';
                 cell.style.cursor = 'not-allowed';
-            } else if (cellVal === 'tree') {
-                cell.innerHTML = '🌳';
-                cell.style.background = 'rgba(15,110,86,.4)';
+            } else if (cellVal === 'heart') {
+                cell.innerHTML = '❤️';
+                cell.style.background = 'rgba(216, 80, 80, 0.2)';
             } else if (cellVal === 'chest') {
-                cell.innerHTML = '🎁';
+                cell.innerHTML = '🧰';
                 cell.style.background = 'rgba(246,226,102,.2)';
             }
 
@@ -72,7 +72,7 @@ function renderBoard() {
                 cell.style.borderColor = '#4a9eff';
             }
 
-            // Resaltar movimientos válidos (solo vacíos o cofres/árboles)
+            // Resaltar movimientos válidos (solo vacíos o cofres/corazones)
             if (selectedPiece && isValidMove(selectedPiece.r, selectedPiece.c, r, c)) {
                 cell.style.background = 'rgba(93,202,165,.2)';
                 cell.style.borderColor = '#5DCAA5';
@@ -139,10 +139,10 @@ function movePiece(fromR, fromC, toR, toC) {
     const targetVal = boardState.grid[toR][toC];
     
     // Lógica de casillas interactivas
-    if (targetVal === 'tree') {
+    if (targetVal === 'heart') {
         const healed = Math.min(100, boardState.pieces[pieceId].hp + 15);
         boardState.pieces[pieceId].hp = healed;
-        document.getElementById('board-log').textContent = `🌳 ${boardState.pieces[pieceId].name} se curó 15 HP en el Árbol de la Vida.`;
+        document.getElementById('board-log').textContent = `❤️ ${boardState.pieces[pieceId].name} pisó un Corazón de Vida y se curó 15 HP.`;
     } else if (targetVal === 'chest') {
         const effects = [
             { msg: '¡El cofre era una trampa! -20 HP.', hp: -20 },
@@ -154,7 +154,7 @@ function movePiece(fromR, fromC, toR, toC) {
         if (effect.hp) {
             boardState.pieces[pieceId].hp = Math.max(0, Math.min(100, boardState.pieces[pieceId].hp + effect.hp));
         }
-        document.getElementById('board-log').textContent = `🎁 ${effect.msg}`;
+        document.getElementById('board-log').textContent = `🧰 ${effect.msg}`;
     } else {
         document.getElementById('board-log').textContent = `${boardState.pieces[pieceId].name} se ha movido.`;
     }
