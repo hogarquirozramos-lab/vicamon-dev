@@ -44,39 +44,15 @@ function setupWebSocketServer(wss, getPlatformUSDCBalance) {
         if (msg.type === 'challenge_training') { const challenger = lobby.get(id); const target = lobby.get(msg.targetId); if (!challenger || !target || target.inBattle || challenger.inBattle) return; send(target.ws, { type: 'challenged', fromId: id, fromName: challenger.name, fromBeast: challenger.beast, isTraining: true }); }
         if (msg.type === 'accept') { const p1 = lobby.get(msg.fromId), p2 = lobby.get(id); if (!p1 || !p2 || p1.inBattle || p2.inBattle) return; if (msg.isTraining) { p1.inBattle = true; p2.inBattle = true; const bId = `btrain${uid()}`; battles.set(bId, { p1id: msg.fromId, p2id: id, st1: getStartState(p1.beast), st2: getStartState(p2.beast), turnId: msg.fromId, logs: [{t: `¡Entrenamiento 1v1!`, c: 'hi'}], isTraining: true, isCpu: false, p1Wallet: p1.wallet, p2Wallet: p2.wallet, p1Beast: p1.beast, p2Beast: p2.beast }); send(p1.ws, { type: 'battle_start', battleId: bId, role: 'p1', opponent: p2.name, opponentBeast: p2.beast, isTraining: true }); send(p2.ws, { type: 'battle_start', battleId: bId, role: 'p2', opponent: p1.name, opponentBeast: p1.beast, isTraining: true }); await pushLobby(); setTimeout(() => pushBattle(bId), 120); } else { if (p1.isGuest || p2.isGuest) { send(ws, { type: 'error', msg: 'Los invitados no pueden hacer batallas por HP.' }); return; } if (!await hasHP(p1.wallet, 100) || !await hasHP(p2.wallet, 100)) { send(p1.ws, { type: 'error', msg: 'Fondos insuficientes.' }); return; } await lockHP(p1.wallet, 100); await lockHP(p2.wallet, 100); p1.inBattle = true; p2.inBattle = true; const bId = `b${uid()}`; battles.set(bId, { p1id: msg.fromId, p2id: id, st1: getStartState(p1.beast), st2: getStartState(p2.beast), turnId: msg.fromId, logs: [], isCpu: false, isTraining: false, p1Wallet: p1.wallet, p2Wallet: p2.wallet, p1Beast: p1.beast, p2Beast: p2.beast }); battles.get(bId).logs.push({t: `¡Batalla por HP 1v1!`, c: 'hi'}); send(p1.ws, { type: 'battle_start', battleId: bId, role: 'p1', opponent: p2.name, opponentBeast: p2.beast, isCpu: false, isTraining: false }); send(p2.ws, { type: 'battle_start', battleId: bId, role: 'p2', opponent: p1.name, opponentBeast: p1.beast, isCpu: false, isTraining: false }); walletToBattle.set(p1.wallet, bId); walletToBattle.set(p2.wallet, bId); await pushLobby(); setTimeout(() => pushBattle(bId), 120); } }
         
-        // MODIFICADO: challenge_3v3 ahora inicia el tablero
+        // 3v3 ORIGINAL RESTAURADO
         if (msg.type === 'challenge_3v3') { const challenger = lobby.get(id); const target = lobby.get(msg.targetId); if (!challenger || !target || target.inBattle || challenger.inBattle) return; if (challenger.isGuest || target.isGuest) { send(ws, { type: 'error', msg: 'Los invitados no pueden hacer batallas por HP.' }); return; } const challengerHP = await getHP(challenger.wallet); const targetHP = await getHP(target.wallet); if (challengerHP < 300) { send(ws, { type: 'error', msg: `Necesitas 300 HP.` }); return; } if (targetHP < 300) { send(ws, { type: 'error', msg: `Ese jugador no tiene 300 HP.` }); return; } challenger.team = msg.team; send(target.ws, { type: 'challenged_3v3', fromId: id, fromName: challenger.name, isTraining: false }); }
         if (msg.type === 'challenge_3v3_training') { const challenger = lobby.get(id); const target = lobby.get(msg.targetId); if (!challenger || !target || target.inBattle || challenger.inBattle) return; challenger.team = msg.team; send(target.ws, { type: 'challenged_3v3', fromId: id, fromName: challenger.name, isTraining: true }); }
-        
-        // MODIFICADO: accept_3v3 ahora inicia el tablero
-        if (msg.type === 'accept_3v3') { 
-          const p1 = lobby.get(msg.fromId), p2 = lobby.get(id); 
-          if (!p1 || !p2 || p1.inBattle || p2.inBattle) return; 
-          p2.team = msg.team; 
-          if (!msg.isTraining) { 
-            if (p1.isGuest || p2.isGuest) { send(ws, { type: 'error', msg: 'Los invitados no pueden hacer batallas por HP.' }); return; } 
-            if (!await hasHP(p1.wallet, 300) || !await hasHP(p2.wallet, 300)) { send(p1.ws, { type: 'error', msg: 'Fondos insuficientes para 3v3.' }); return; } 
-            await lockHP(p1.wallet, 300); await lockHP(p2.wallet, 300); 
-          } 
-          p1.inBattle = true; p2.inBattle = true; 
-          const bId = `bteam${uid()}`; 
-          const boardData = setupBoard(p1, p2, p1.team, p2.team);
-          battles.set(bId, { 
-            p1id: msg.fromId, p2id: id, 
-            board: boardData, isBoard: true,
-            logs: [{t: `¡Combate de Tablero 3v3!`, c: 'hi'}], 
-            isTeamBattle: true, isTeamTraining: msg.isTraining, isCpu: false, 
-            p1Wallet: p1.wallet, p2Wallet: p2.wallet 
-          }); 
-          send(p1.ws, { type: 'board_start', battleId: bId, opponent: p2.name, isTraining: msg.isTraining, role: 'p1' }); 
-          send(p2.ws, { type: 'board_start', battleId: bId, opponent: p1.name, isTraining: msg.isTraining, role: 'p2' });
-          if (!msg.isTraining) { walletToBattle.set(p1.wallet, bId); walletToBattle.set(p2.wallet, bId); } 
-          await pushLobby(); 
-          pushBoardState(bId);
-        }
-        
-        // MODIFICADO: challenge_3v3_cpu ahora inicia el tablero
-        if (msg.type === 'challenge_3v3_cpu') { 
+        if (msg.type === 'accept_3v3') { const p1 = lobby.get(msg.fromId), p2 = lobby.get(id); if (!p1 || !p2 || p1.inBattle || p2.inBattle) return; p2.team = msg.team; if (!msg.isTraining) { if (p1.isGuest || p2.isGuest) { send(ws, { type: 'error', msg: 'Los invitados no pueden hacer batallas por HP.' }); return; } if (!await hasHP(p1.wallet, 300) || !await hasHP(p2.wallet, 300)) { send(p1.ws, { type: 'error', msg: 'Fondos insuficientes para 3v3.' }); return; } await lockHP(p1.wallet, 300); await lockHP(p2.wallet, 300); } p1.inBattle = true; p2.inBattle = true; const bId = `bteam${uid()}`; battles.set(bId, { p1id: msg.fromId, p2id: id, team1: p1.team.map(k => getStartState(k)), team2: p2.team.map(k => getStartState(k)), active1: 0, active2: 0, turnId: msg.fromId, logs: [{t: `¡Combate 3v3!`, c: 'hi'}], isTeamBattle: true, isTeamTraining: msg.isTraining, isCpu: false, p1Wallet: p1.wallet, p2Wallet: p2.wallet, p1Team: p1.team, p2Team: p2.team }); send(p1.ws, { type: 'battle_start', battleId: bId, role: 'p1', opponent: p2.name, opponentBeast: p2.team[0], isTeamBattle: true, isTraining: msg.isTraining, isCpu: false }); send(p2.ws, { type: 'battle_start', battleId: bId, role: 'p2', opponent: p1.name, opponentBeast: p1.team[0], isTeamBattle: true, isTraining: msg.isTraining, isCpu: false }); if (!msg.isTraining) { walletToBattle.set(p1.wallet, bId); walletToBattle.set(p2.wallet, bId); } await pushLobby(); setTimeout(() => pushTeamBattle(bId), 120); }
+        if (msg.type === 'challenge_cpu') { const pl = lobby.get(id); if (!pl || pl.inBattle) return; pl.inBattle = true; const cpuBeast = ZODIAC_KEYS[Math.floor(Math.random() * ZODIAC_KEYS.length)]; const bId = `bcpu${uid()}`; battles.set(bId, { p1id: CPU_ID, p2id: id, st1: getStartState(cpuBeast), st2: getStartState(pl.beast), turnId: CPU_ID, logs: [{t: `¡Entrenamiento 1v1 vs Master!`, c: 'hi'}], isCpu: true, cpuIsP1: true, cpuBeast }); send(ws, { type: 'battle_start', battleId: bId, role: 'p2', opponent: 'Zodiac Master', opponentBeast: cpuBeast, isCpu: true }); await pushLobby(); setTimeout(() => { pushCpuBattle(bId); scheduleCpuTurn(bId); }, 200); }
+        if (msg.type === 'challenge_3v3_cpu') { const pl = lobby.get(id); if (!pl || pl.inBattle) return; pl.inBattle = true; pl.team = msg.team; const cpuTeam = [ZODIAC_KEYS[Math.floor(Math.random()*ZODIAC_KEYS.length)], ZODIAC_KEYS[Math.floor(Math.random()*ZODIAC_KEYS.length)], ZODIAC_KEYS[Math.floor(Math.random()*ZODIAC_KEYS.length)]]; const bId = `bteamcpu${uid()}`; battles.set(bId, { p1id: CPU_ID, p2id: id, team1: cpuTeam.map(k => getStartState(k)), team2: pl.team.map(k => getStartState(k)), active1: 0, active2: 0, turnId: CPU_ID, logs: [{t: `¡Entrenamiento 3v3 vs Master!`, c: 'hi'}], isTeamBattle: true, isTeamCpu: true, cpuTeam: cpuTeam }); send(ws, { type: 'battle_start', battleId: bId, role: 'p2', opponent: 'Zodiac Master', opponentBeast: cpuTeam[0], isTeamBattle: true, isCpu: true }); await pushLobby(); const { pushTeamCpuBattle, doTeamCpuTurn } = require('./teamEngine'); setTimeout(() => { pushTeamCpuBattle(bId); setTimeout(() => doTeamCpuTurn(bId), 1000); }, 200); }
+
+        // NUEVO MODO TABLERO (SEPARADO)
+        if (msg.type === 'challenge_board_cpu') { 
           const pl = lobby.get(id); if (!pl || pl.inBattle) return; 
           pl.inBattle = true; pl.team = msg.team; 
           const cpuTeam = [ZODIAC_KEYS[Math.floor(Math.random()*ZODIAC_KEYS.length)], ZODIAC_KEYS[Math.floor(Math.random()*ZODIAC_KEYS.length)], ZODIAC_KEYS[Math.floor(Math.random()*ZODIAC_KEYS.length)]]; 
@@ -93,7 +69,7 @@ function setupWebSocketServer(wss, getPlatformUSDCBalance) {
           pushBoardState(bId);
         }
 
-        // NUEVO: Movimientos y ataques en el tablero
+        // Movimientos del tablero
         if (msg.type === 'board_move') {
           handleBoardMove(msg.battleId, id, msg.fromR, msg.fromC, msg.toR, msg.toC);
         }
@@ -141,17 +117,20 @@ function setupWebSocketServer(wss, getPlatformUSDCBalance) {
         }
         if (msg.type === 'gauntlet_continue') { const b = battles.get(msg.battleId); if (!b || !b.isGauntlet) return; const pl = lobby.get(id); if (msg.beast) pl.beast = msg.beast; b.st2 = getStartState(pl.beast); b.st1 = getStartState(b.cpuBeast); b.turnId = CPU_ID; pushCpuBattle(msg.battleId); scheduleGauntletCpuTurn(msg.battleId); }
         
+        // FIX: Corregido el error de resStatus y grandStatus.available
         if (msg.type === 'get_tower_status') {
           const pl = lobby.get(id); if (!pl) return;
-          let status = { grandAvailable: true, trainAvailable: true };
-          const grandStatus = await getTowerStatus();
-          status.grandAvailable = grandStatus.available;
-          if (!pl.isGuest) {
-            status.trainAvailable = !await checkTowerTrainingWin(pl.wallet);
-          } else {
+          const towerStatus = await getTowerStatus();
+          let status = {
+            grandAvailable: towerStatus.grandAvailable,
+            trainAvailable: towerStatus.trainAvailable
+          };
+          if (pl.isGuest) {
             status.trainAvailable = false;
+          } else {
+            status.trainAvailable = towerStatus.trainAvailable && !await checkTowerTrainingWin(pl.wallet);
           }
-          send(ws, { type: 'tower_status', status: resStatus });
+          send(ws, { type: 'tower_status', status: status });
           return;
         }
 
