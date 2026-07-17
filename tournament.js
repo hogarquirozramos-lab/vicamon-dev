@@ -39,7 +39,11 @@ function renderTournament() {
     const isHP = tournamentData.mode === 'HP';
     document.getElementById('tour-mode').textContent = `Torneo ${tournamentData.mode} (100 ${isHP ? 'HP' : 'XP'})`;
     document.getElementById('tour-pot').textContent = `${tournamentData.pot} ${isHP ? 'HP' : 'XP'}`;
-    document.getElementById('tour-status').textContent = tournamentData.status === 'waiting' ? 'Esperando jugadores...' : '¡Torneo en curso!';
+    
+    let statusText = 'Esperando jugadores...';
+    if (tournamentData.status === 'ongoing') statusText = '¡Torneo en curso!';
+    if (tournamentData.status === 'finished') statusText = 'El torneo ha terminado.';
+    document.getElementById('tour-status').textContent = statusText;
 
     const slots = tournamentData.slots || [];
     for (let i = 0; i < 4; i++) {
@@ -58,11 +62,31 @@ function renderTournament() {
         }
     }
 
-    // Limpiar Final y Campeón (luego lo actualizaremos con los ganadores reales)
+    // Actualizar Final y Campeón si hay datos
+    const bracket = tournamentData.bracket || { f: [null, null], champ: null };
     const w1 = document.getElementById('tour-slot-w1');
     const w2 = document.getElementById('tour-slot-w2');
     const champ = document.getElementById('tour-slot-champ');
-    if (w1) w1.innerHTML = `<span style="color:rgba(255,255,255,.3)">Ganador SF1</span>`;
-    if (w2) w2.innerHTML = `<span style="color:rgba(255,255,255,.3)">Ganador SF2</span>`;
-    if (champ) champ.innerHTML = `<span style="color:rgba(246,226,102,.5);font-weight:700;font-size:24px">🏆</span><span style="color:rgba(246,226,102,.5);font-size:11px;margin-top:5px">Esperando Campeón</span>`;
+
+    if (bracket.f && bracket.f[0]) {
+        const p = lobbyPlayers.find(pl => pl.id === bracket.f[0]); // Asumiendo que tenemos acceso a los nombres, o el servidor lo manda
+        const name = bracket.f[0] === myId ? myName : 'Ganador SF1'; // Simplificado por ahora
+        if(w1) w1.innerHTML = `<span style="color:#F6E265;font-weight:600">${name}</span>`;
+    } else {
+        if(w1) w1.innerHTML = `<span style="color:rgba(255,255,255,.3)">Ganador SF1</span>`;
+    }
+
+    if (bracket.f && bracket.f[1]) {
+        const name = bracket.f[1] === myId ? myName : 'Ganador SF2';
+        if(w2) w2.innerHTML = `<span style="color:#F6E265;font-weight:600">${name}</span>`;
+    } else {
+        if(w2) w2.innerHTML = `<span style="color:rgba(255,255,255,.3)">Ganador SF2</span>`;
+    }
+
+    if (bracket.champ) {
+        const name = bracket.champ === myId ? myName : '🏆 Campeón';
+        if(champ) champ.innerHTML = `<span style="color:#F6E265;font-weight:700;font-size:16px">${name}</span><span style="color:rgba(246,226,102,.5);font-size:11px;margin-top:5px">¡Felicidades!</span>`;
+    } else {
+        if(champ) champ.innerHTML = `<span style="color:rgba(246,226,102,.5);font-weight:700;font-size:24px">🏆</span><span style="color:rgba(246,226,102,.5);font-size:11px;margin-top:5px">Esperando Campeón</span>`;
+    }
 }
