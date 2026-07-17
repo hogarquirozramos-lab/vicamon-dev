@@ -247,6 +247,55 @@
   </div>
 </div>
 
+<!-- TOURNAMENT MODE -->
+<div id="s-tournament" class="screen">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <h1 style="margin:0">🏆 Modo Torneo (4 Jugadores)</h1>
+    <button class="btn btn-sm btn-red" onclick="leaveTournament()">🚪 Salir</button>
+  </div>
+  
+  <div style="background:rgba(246,226,102,.1);border:0.5px solid rgba(246,226,102,.3);border-radius:12px;padding:16px;margin-bottom:20px;text-align:center">
+    <div id="tour-mode" style="font-size:16px;font-weight:700;color:#F6E265">Torneo HP (100 HP)</div>
+    <div style="font-size:14px;color:rgba(255,255,255,.6);margin-top:4px">Pozo Acumulado: <span id="tour-pot" style="color:#5DCAA5;font-weight:700">0 HP</span> / 400 HP</div>
+  </div>
+
+  <!-- Bracket Visual -->
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:20px 10px;background:rgba(0,0,0,.2);border-radius:12px">
+    
+    <!-- Semifinales -->
+    <div style="display:flex;flex-direction:column;justify-content:space-around;height:250px;width:40%">
+      <div id="tour-slot-1" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:10px;text-align:center;min-height:50px;display:flex;align-items:center;justify-content:center">
+        <span style="color:rgba(255,255,255,.3)">Esperando J1...</span>
+      </div>
+      <div id="tour-slot-2" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:10px;text-align:center;min-height:50px;display:flex;align-items:center;justify-content:center">
+        <span style="color:rgba(255,255,255,.3)">Esperando J2...</span>
+      </div>
+    </div>
+
+    <!-- Final -->
+    <div style="display:flex;flex-direction:column;justify-content:center;height:250px;width:40%">
+      <div id="tour-slot-w1" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:10px;text-align:center;min-height:50px;display:flex;align-items:center;justify-content:center;margin-bottom:20px">
+        <span style="color:rgba(255,255,255,.3)">Ganador SF1</span>
+      </div>
+      <div id="tour-slot-w2" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:10px;text-align:center;min-height:50px;display:flex;align-items:center;justify-content:center">
+        <span style="color:rgba(255,255,255,.3)">Ganador SF2</span>
+      </div>
+    </div>
+
+    <!-- Campeón -->
+    <div style="display:flex;flex-direction:column;justify-content:center;height:250px;width:20%">
+      <div id="tour-slot-champ" style="background:rgba(246,226,102,.1);border:2px solid rgba(246,226,102,.5);border-radius:8px;padding:10px;text-align:center;min-height:80px;display:flex;align-items:center;justify-content:center">
+        <span style="color:rgba(246,226,102,.5);font-weight:700">🏆</span>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="tour-status" style="text-align:center;margin-top:20px;font-size:14px;color:#5DCAA5;font-weight:600">
+    Esperando a que los jugadores se inscriban...
+  </div>
+</div>
+  
 <!-- BATTLE -->
 <div id="s-battle" class="screen">
   <div class="arena-wrap">
