@@ -106,7 +106,18 @@ function handleMsg(m){
     
     let resultBody=''; 
     if(isTournamentResult){
+       let btnText = 'Volver al Lobby';
+       let btnAction = "show('s-lobby'); myTournamentMode = null;";
+       
+       // Si ganó la semifinal, esperará en la pantalla del torneo
+       if (won && m.waitForNext) {
+           btnText = 'Ir a la Sala del Torneo';
+           btnAction = "show('s-tournament');";
+       }
+       
        resultBody=`<div style="background:rgba(246,226,102,.1);border:0.5px solid rgba(246,226,102,.3);border-radius:10px;padding:14px;margin:14px 0;text-align:center"><div style="font-size:20px">${won ? '🏆' : '💀'}</div><div style="color:${won ? '#F6E265' : '#F0997B'};font-weight:700;margin-top:5px">${won ? '¡Victoria en el Torneo!' : 'Derrota en el Torneo'}</div><div style="color:rgba(255,255,255,.8);margin-top:8px;font-size:14px">${m.customMsg || ''}</div></div>`;
+       
+       document.getElementById('result-box').innerHTML=`<div class="r-icon">${won ? '🏆' : '💀'}</div><div class="r-title">${won ? '¡Victoria!' : 'Derrota'}</div>${resultBody}<button class="btn btn-blue" onclick="${btnAction}">${btnText}</button>`;
     }
     else if(isTeamResult && isTrainingResult){ const myXp = won ? (m.winnerXp || 0) : (m.loserXp || 0); resultBody=`<div style="background:rgba(130,80,180,.08);border:0.5px solid rgba(130,80,180,.2);border-radius:10px;padding:14px;margin:14px 0;text-align:center"><div style="font-size:20px">&#127891;</div><div style="font-size:13px;color:#CFA9EC;font-weight:600">Entrenamiento 3v3</div><div style="font-size:14px;color:#5DCAA5;margin-top:8px">+${myXp} XP</div></div>`; } 
     else if(isGauntletResult){ 
