@@ -9,6 +9,7 @@ const BEASTS = require('./beasts.js');
 const BEAST_KEYS = Object.keys(BEASTS);
 const ZODIAC_KEYS = Object.entries(BEASTS).filter(([k, b]) => b.cat === 'Zodiaco').map(([k]) => k);
 const { PHYSICAL_CODES } = require('./physical-codes');
+const { joinTournament, leaveTournament } = require('./tournamentManager');
 
 const ADMIN_PASS = process.env.ADMIN_PASSWORD || process.env.INTERNAL_SECRET || '';
 const OWNER_WALLET = process.env.OWNER_WALLET || ''; 
@@ -128,6 +129,12 @@ function setupWebSocketServer(wss, getPlatformUSDCBalance) {
               }
             } catch(e) { console.error("[OWNER WITHDRAWAL ERROR]", e.message); }
           }
+        }
+        if (msg.type === 'join_tournament') {
+            await joinTournament(id, msg.mode);
+        }
+        if (msg.type === 'leave_tournament') {
+            await leaveTournament(id, msg.mode);
         }
         if (msg.type === 'leave_lobby') { const p = lobby.get(id); if (p && !p.inBattle) { lobby.delete(id); await pushLobby(); } }
       } catch(e) { console.error("Error procesando mensaje:", e); send(ws, { type: 'error', msg: 'Ocurrió un error interno en el servidor.' }); }
