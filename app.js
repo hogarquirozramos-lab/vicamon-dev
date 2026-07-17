@@ -142,9 +142,11 @@ function handleMsg(m){
       resultBody=`<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:14px;margin:14px 0"><div>Derrota</div><div style="color:#F0997B;margin-top:8px">-100 HP (Apuesta perdida)</div><div style="color:#fff;margin-top:8px;font-weight:700">Total: ${newHp} HP</div></div>`; 
     } 
     
-    const icon = won ? '🏆' : '💀'; const title = won ? '¡Victoria!' : 'Derrota'; 
-    document.getElementById('result-box').innerHTML=`<div class="r-icon">${icon}</div><div class="r-title">${title}</div>${resultBody}<button class="btn btn-blue" onclick="backToLobby()">Volver</button>`; 
-    window._isTeamBattle = false; 
+    if (!isTournamentResult) {
+        const icon = won ? '🏆' : '💀'; const title = won ? '¡Victoria!' : 'Derrota'; 
+        document.getElementById('result-box').innerHTML=`<div class="r-icon">${icon}</div><div class="r-title">${title}</div>${resultBody}<button class="btn btn-blue" onclick="backToLobby()">Volver</button>`; 
+    }
+    window._isTeamBattle = false;  
   }
 }
 
