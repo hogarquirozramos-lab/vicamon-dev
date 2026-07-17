@@ -1,6 +1,6 @@
 const { lobby, battles, send, broadcast, pushBattle } = require('./state');
 const { getStartState } = require('./battleEngine');
-const { lockHP, unlockHP, addHP } = require('./hp-balance');
+const { lockHP, unlockHP, addHP, updatePlayerStats, getTopPlayers } = require('./hp-balance');
 
 // Almacén de torneos activos
 const tournaments = {
@@ -123,7 +123,7 @@ function startTournamentMatch(p1Id, p2Id, mode, round) {
     const p1 = lobby.get(p1Id);
     const p2 = lobby.get(p2Id);
     if (!p1 || !p2) {
-        // Si alguien se desconectó antes de empezar, el otro gana por defecto (no debería pasar por el bloqueo)
+        // Si alguien se desconectó antes de empezar, el otro gana por defecto
         const winnerId = p1 ? p1Id : p2Id;
         const loserId = p1 ? p2Id : p1Id;
         reportTournamentResult(null, winnerId, loserId, mode, round);
@@ -148,6 +148,25 @@ function startTournamentMatch(p1Id, p2Id, mode, round) {
 }
 
 async function reportTournamentResult(bId, winnerId, loserId, mode, round) {
+    // Si se llama desde battleEngine, bId no será null, recuperamos los datos
+    if (bId) {
+        const b = battles.get(bId);
+        if (!b) return;
+        mode = b.tourMode;
+        round = b.tourRound;
+        
+        // FIX: Actualizar estadísticas solo si es un torneo de HP
+        if (mode === 'HP' && b.p1Wallet && b.p2Wallet) {
+            const winnerWallet = b.p1id === winnerId ? b.p1Wallet : b.p2Wallet;
+            const loserWallet = b.p1id === loserId ? b.p1Wallet : b.p2Wallet;
+            if (winnerWallet && loserWallet) {
+                await updatePlayerStats(winnerWallet, loserWallet);
+                const top = await getTopPlayers(3);
+                broadcast({ type: 'leaderboard_update', top });
+            }
+        }
+    }
+
     const tour = tournaments[mode];
     if (!tour) return;
 
