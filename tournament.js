@@ -10,6 +10,11 @@ function openTournamentMenu(mode) {
     if (ws && ws.readyState === 1) {
         ws.send(JSON.stringify({ type: 'get_tournament_state', mode: mode }));
     }
+    // Configurar el texto inicial del botón
+    const joinBtn = document.querySelector('#s-tournament .btn-lg');
+    if (joinBtn) {
+        joinBtn.textContent = mode === 'HP' ? '✅ Inscribirse (100 HP)' : '✅ Inscribirse (Gratis)';
+    }
 }
 
 function handleTournamentState(data) {
@@ -37,8 +42,8 @@ function renderTournament() {
     if (!tournamentData) return;
     
     const isHP = tournamentData.mode === 'HP';
-    document.getElementById('tour-mode').textContent = `Torneo ${tournamentData.mode} (100 ${isHP ? 'HP' : 'XP'})`;
-    document.getElementById('tour-pot').textContent = `${tournamentData.pot} ${isHP ? 'HP' : 'XP'}`;
+    document.getElementById('tour-mode').textContent = isHP ? 'Torneo HP (100 HP)' : 'Torneo XP (Gratis)';
+    document.getElementById('tour-pot').textContent = isHP ? `${tournamentData.pot} HP` : 'Gloria';
     
     let statusText = 'Esperando jugadores...';
     if (tournamentData.status === 'ongoing') statusText = '¡Torneo en curso!';
@@ -69,8 +74,7 @@ function renderTournament() {
     const champ = document.getElementById('tour-slot-champ');
 
     if (bracket.f && bracket.f[0]) {
-        const p = lobbyPlayers.find(pl => pl.id === bracket.f[0]); // Asumiendo que tenemos acceso a los nombres, o el servidor lo manda
-        const name = bracket.f[0] === myId ? myName : 'Ganador SF1'; // Simplificado por ahora
+        const name = bracket.f[0] === myId ? myName : 'Ganador SF1';
         if(w1) w1.innerHTML = `<span style="color:#F6E265;font-weight:600">${name}</span>`;
     } else {
         if(w1) w1.innerHTML = `<span style="color:rgba(255,255,255,.3)">Ganador SF1</span>`;
