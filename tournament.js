@@ -7,7 +7,7 @@ function joinTournamentTest() {
         mode: 'HP',
         pot: 100, // Tú entraste, hay 100 HP en el pozo
         slots: [
-            { name: 'Tú (Invitado)', status: 'waiting' },
+            { name: myName, status: 'waiting' }, // FIX: Usa tu nombre real
             { name: 'Esperando...', status: 'empty' },
             { name: 'Esperando...', status: 'empty' },
             { name: 'Esperando...', status: 'empty' }
@@ -33,6 +33,7 @@ function renderTournament() {
         if (slot.status === 'empty') {
             el.innerHTML = `<span style="color:rgba(255,255,255,.3)">${slot.name}</span>`;
             el.style.borderColor = 'rgba(255,255,255,.1)';
+            el.style.boxShadow = 'none';
         } else {
             el.innerHTML = `<span style="color:#fff;font-weight:600">${slot.name}</span>`;
             el.style.borderColor = '#5DCAA5';
