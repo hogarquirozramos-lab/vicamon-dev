@@ -27,13 +27,11 @@ function broadcastTournamentState(mode) {
     const tour = tournaments[mode];
     if (!tour) return;
 
-    // Avisar a los que están en el torneo
     tour.players.forEach(p => {
         const pl = lobby.get(p.id);
         if (pl) send(pl.ws, { type: 'tournament_state', ...state });
     });
     
-    // Avisar a los que están en el lobby
     lobby.forEach(p => {
         if (!p.inTournament) send(p.ws, { type: 'tournament_state', ...state });
     });
@@ -101,7 +99,6 @@ function startTournament(mode) {
     const tour = tournaments[mode];
     tour.status = 'ongoing';
     
-    // Mezclar jugadores para las llaves
     const shuffled = [...tour.players].sort(() => Math.random() - 0.5);
     const [p1, p2, p3, p4] = shuffled;
     
@@ -114,7 +111,6 @@ function startTournament(mode) {
 
     broadcastTournamentState(mode);
 
-    // Iniciar Semifinales
     startTournamentMatch(p1.id, p2.id, mode, 'sf1');
     startTournamentMatch(p3.id, p4.id, mode, 'sf2');
 }
@@ -123,7 +119,6 @@ function startTournamentMatch(p1Id, p2Id, mode, round) {
     const p1 = lobby.get(p1Id);
     const p2 = lobby.get(p2Id);
     if (!p1 || !p2) {
-        // Si alguien se desconectó antes de empezar, el otro gana por defecto
         const winnerId = p1 ? p1Id : p2Id;
         const loserId = p1 ? p2Id : p1Id;
         reportTournamentResult(null, winnerId, loserId, mode, round);
@@ -148,14 +143,12 @@ function startTournamentMatch(p1Id, p2Id, mode, round) {
 }
 
 async function reportTournamentResult(bId, winnerId, loserId, mode, round) {
-    // Si se llama desde battleEngine, bId no será null, recuperamos los datos
     if (bId) {
         const b = battles.get(bId);
         if (!b) return;
         mode = b.tourMode;
         round = b.tourRound;
         
-        // FIX: Actualizar estadísticas solo si es un torneo de HP
         if (mode === 'HP' && b.p1Wallet && b.p2Wallet) {
             const winnerWallet = b.p1id === winnerId ? b.p1Wallet : b.p2Wallet;
             const loserWallet = b.p1id === loserId ? b.p1Wallet : b.p2Wallet;
@@ -170,78 +163,78 @@ async function reportTournamentResult(bId, winnerId, loserId, mode, round) {
     const tour = tournaments[mode];
     if (!tour) return;
 
-    // Marcar perdedor como eliminado
     const loser = tour.players.find(p => p.id === loserId);
     if (loser) loser.eliminated = true;
     const loserPl = lobby.get(loserId);
-    if(loserPl) loserPl.inTournament = false; // Ya puede jugar otras cosas
+    if(loserPl) loserPl.inTournament = false;
 
-    // Avanzar ganador
-    if (round === 'sf1') {
-        tour.bracket.f[0] = winnerId;
-    } else if (round === 'sf2') {
-        tour.bracket.f[1] = winnerId;
-    } else if (round === 'final') {
+    const winnerPl = lobby.get(winnerId);
+    const isTrainingMode = (mode === 'XP');
+
+    // --- LÓGICA DE LA FINAL ---
+    if (round === 'final') {
         tour.bracket.champ = winnerId;
-        await endTournament(mode, winnerId, loserId);
+        tour.status = 'finished';
+        
+        let champMsg = '¡Eres el Campeón del Torneo! 🏆';
+        let runnerMsg = 'Quedaste en 2do lugar.';
+        
+        if (mode === 'HP') {
+            if (winnerPl) await addHP(winnerPl.wallet, 250);
+            if (loserPl) await addHP(loserPl.wallet, 125);
+            champMsg += ' Ganaste 250 HP.';
+            runnerMsg += ' Recuperas 125 HP.';
+        } else {
+            champMsg += ' Ganaste 500 XP.';
+        }
+
+        if (winnerPl) {
+            send(winnerPl.ws, { type: 'battle_end', won: true, isTournament: true, isTraining: isTrainingMode, customMsg: champMsg, tourFinished: true });
+            winnerPl.inTournament = false;
+        }
+        if (loserPl) {
+            send(loserPl.ws, { type: 'battle_end', won: false, isTournament: true, isTraining: isTrainingMode, customMsg: runnerMsg, tourFinished: true });
+        }
+
+        tour.players.forEach(p => {
+            if (p.eliminated) {
+                const pl = lobby.get(p.id);
+                if (pl) send(pl.ws, { type: 'tournament_end', msg: `El torneo terminó. Campeón: ${winnerPl?.name || 'Nadie'}` });
+            }
+        });
+
+        broadcastTournamentState(mode);
+        
+        setTimeout(() => {
+            tournaments[mode] = { players: [], status: 'waiting', pot: 0, bracket: { sf1: [], sf2: [], f: [], champ: null } };
+            lobby.forEach(p => send(p.ws, { type: 'tournament_state', mode: mode, status: 'waiting', pot: 0, slots: [], bracket: { sf1: [], sf2: [], f: [], champ: null } }));
+        }, 10000);
+        
         return;
     }
 
-    // Si ambas semifinales terminaron, iniciar la final
+    // --- LÓGICA DE SEMIFINALES ---
+    if (round === 'sf1') tour.bracket.f[0] = winnerId;
+    if (round === 'sf2') tour.bracket.f[1] = winnerId;
+
+    const winnerMsg = '¡Ganaste la semifinal! Esperando al otro finalista...';
+    const loserMsg = 'Has sido eliminado del torneo.';
+
+    if (winnerPl) {
+        // FIX: Enviar battle_end con waitForNext para que el frontend lo lleve a la sala de espera
+        send(winnerPl.ws, { type: 'battle_end', won: true, isTournament: true, isTraining: isTrainingMode, customMsg: winnerMsg, waitForNext: true });
+    }
+    if (loserPl) {
+        send(loserPl.ws, { type: 'battle_end', won: false, isTournament: true, isTraining: isTrainingMode, customMsg: loserMsg, waitForNext: false });
+    }
+
     if (tour.bracket.f[0] && tour.bracket.f[1]) {
         broadcastTournamentState(mode);
-        startTournamentMatch(tour.bracket.f[0], tour.bracket.f[1], mode, 'final');
+        // Dar 5 segundos para que lean el resultado antes de iniciar la final
+        setTimeout(() => startTournamentMatch(tour.bracket.f[0], tour.bracket.f[1], mode, 'final'), 5000);
     } else {
-        // Avisar al ganador que espere la otra semifinal
-        const winnerPl = lobby.get(winnerId);
-        if (winnerPl) send(winnerPl.ws, { type: 'tournament_wait', msg: '¡Ganaste! Esperando al ganador de la otra llave...' });
         broadcastTournamentState(mode);
     }
-}
-
-async function endTournament(mode, champId, runnerUpId) {
-    const tour = tournaments[mode];
-    tour.status = 'finished';
-
-    const champ = lobby.get(champId);
-    const runnerUp = lobby.get(runnerUpId);
-
-    let champMsg = '¡Eres el Campeón del Torneo! 🏆';
-    let runnerMsg = 'Quedaste en 2do lugar.';
-
-    if (mode === 'HP') {
-        await addHP(champ.wallet, 250);
-        await addHP(runnerUp.wallet, 125);
-        champMsg += ' Ganaste 250 HP.';
-        runnerMsg += ' Recuperas 125 HP.';
-    } else {
-        champMsg += ' Ganaste 500 XP.';
-    }
-
-    if (champ) {
-        send(champ.ws, { type: 'battle_end', won: true, isTournament: true, isTraining: (mode==='XP'), customMsg: champMsg });
-        champ.inTournament = false;
-    }
-    if (runnerUp) {
-        send(runnerUp.ws, { type: 'battle_end', won: false, isTournament: true, isTraining: (mode==='XP'), customMsg: runnerMsg });
-        runnerUp.inTournament = false;
-    }
-
-    // Avisar a los eliminados en semifinales que el torneo terminó
-    tour.players.forEach(p => {
-        if (p.eliminated) {
-            const pl = lobby.get(p.id);
-            if (pl) send(pl.ws, { type: 'tournament_end', msg: `El torneo terminó. Campeón: ${champ?.name || 'Nadie'}` });
-        }
-    });
-
-    broadcastTournamentState(mode);
-    
-    // Resetear torneo después de 10 segundos
-    setTimeout(() => {
-        tournaments[mode] = { players: [], status: 'waiting', pot: 0, bracket: { sf1: [], sf2: [], f: [], champ: null } };
-        lobby.forEach(p => send(p.ws, { type: 'tournament_state', mode: mode, status: 'waiting', pot: 0, slots: [], bracket: { sf1: [], sf2: [], f: [], champ: null } }));
-    }, 10000);
 }
 
 module.exports = { 
