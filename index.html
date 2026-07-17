@@ -259,33 +259,40 @@
     <div style="font-size:14px;color:rgba(255,255,255,.6);margin-top:4px">Pozo Acumulado: <span id="tour-pot" style="color:#5DCAA5;font-weight:700">0 HP</span> / 400 HP</div>
   </div>
 
-  <!-- Bracket Visual -->
-  <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:20px 10px;background:rgba(0,0,0,.2);border-radius:12px">
+  <!-- Bracket Visual (Llave Eliminatoria) -->
+  <div style="display:flex;justify-content:space-around;align-items:center;gap:10px;padding:20px 10px;background:rgba(0,0,0,.2);border-radius:12px">
     
-    <!-- Semifinales -->
-    <div style="display:flex;flex-direction:column;justify-content:space-around;height:250px;width:40%">
-      <div id="tour-slot-1" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:10px;text-align:center;min-height:50px;display:flex;align-items:center;justify-content:center">
+    <!-- Columna 1: Semifinales (4 Jugadores) -->
+    <div style="display:flex;flex-direction:column;justify-content:space-around;height:350px;width:30%">
+      <div id="tour-slot-1" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:12px;text-align:center;min-height:50px;display:flex;align-items:center;justify-content:center;margin-bottom:20px">
         <span style="color:rgba(255,255,255,.3)">Esperando J1...</span>
       </div>
-      <div id="tour-slot-2" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:10px;text-align:center;min-height:50px;display:flex;align-items:center;justify-content:center">
+      <div id="tour-slot-2" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:12px;text-align:center;min-height:50px;display:flex;align-items:center;justify-content:center">
         <span style="color:rgba(255,255,255,.3)">Esperando J2...</span>
+      </div>
+      <div id="tour-slot-3" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:12px;text-align:center;min-height:50px;display:flex;align-items:center;justify-content:center;margin-top:20px;margin-bottom:20px">
+        <span style="color:rgba(255,255,255,.3)">Esperando J3...</span>
+      </div>
+      <div id="tour-slot-4" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:12px;text-align:center;min-height:50px;display:flex;align-items:center;justify-content:center">
+        <span style="color:rgba(255,255,255,.3)">Esperando J4...</span>
       </div>
     </div>
 
-    <!-- Final -->
-    <div style="display:flex;flex-direction:column;justify-content:center;height:250px;width:40%">
-      <div id="tour-slot-w1" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:10px;text-align:center;min-height:50px;display:flex;align-items:center;justify-content:center;margin-bottom:20px">
+    <!-- Columna 2: Final (2 Ganadores) -->
+    <div style="display:flex;flex-direction:column;justify-content:center;height:350px;width:30%">
+      <div id="tour-slot-w1" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:12px;text-align:center;min-height:50px;display:flex;align-items:center;justify-content:center;margin-bottom:40px">
         <span style="color:rgba(255,255,255,.3)">Ganador SF1</span>
       </div>
-      <div id="tour-slot-w2" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:10px;text-align:center;min-height:50px;display:flex;align-items:center;justify-content:center">
+      <div id="tour-slot-w2" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:12px;text-align:center;min-height:50px;display:flex;align-items:center;justify-content:center">
         <span style="color:rgba(255,255,255,.3)">Ganador SF2</span>
       </div>
     </div>
 
-    <!-- Campeón -->
-    <div style="display:flex;flex-direction:column;justify-content:center;height:250px;width:20%">
-      <div id="tour-slot-champ" style="background:rgba(246,226,102,.1);border:2px solid rgba(246,226,102,.5);border-radius:8px;padding:10px;text-align:center;min-height:80px;display:flex;align-items:center;justify-content:center">
-        <span style="color:rgba(246,226,102,.5);font-weight:700">🏆</span>
+    <!-- Columna 3: Campeón -->
+    <div style="display:flex;flex-direction:column;justify-content:center;height:350px;width:30%">
+      <div id="tour-slot-champ" style="background:rgba(246,226,102,.1);border:2px solid rgba(246,226,102,.5);border-radius:8px;padding:12px;text-align:center;min-height:80px;display:flex;align-items:center;justify-content:center;flex-direction:column">
+        <span style="color:rgba(246,226,102,.5);font-weight:700;font-size:24px">🏆</span>
+        <span style="color:rgba(246,226,102,.5);font-size:11px;margin-top:5px">Esperando Campeón</span>
       </div>
     </div>
 
