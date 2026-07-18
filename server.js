@@ -5,15 +5,15 @@ const { WebSocketServer } = require('ws');
 
 const {
   getHP, addHP, isTxProcessed, markTxProcessed,
-  getPlatformHp, getPlatformUsdc, clearPlatformHp, setPlatformHp,
+  getPlatformHp, getPlatformUsdc, clearPlatformHp, setPlatformHp, addPlatformHp,
   PLATFORM_WALLET, PLATFORM_THRESHOLD, USDC_PER_HP,
   getAllPlayersDebug, adminSetHP, adminResetPlatform, adminUnlockAllHP,
   getPlayerStats, getPlayerRank, getTotalPlayersHP, getExcedente
 } = require('./hp-balance');
 const { sendUSDC } = require('./transfer');
 
-// Importar el manejador de WebSockets modularizado
 const { setupWebSocketServer } = require('./wsHandlers');
+const { initializeContent } = require('./contentManager'); // NUEVO: Content Manager
 
 const ADMIN_PASS = process.env.ADMIN_PASSWORD || process.env.INTERNAL_SECRET || '';
 const OWNER_WALLET = process.env.OWNER_WALLET || ''; 
@@ -35,6 +35,19 @@ async function getPlatformUSDCBalance() {
   return 0;
 }
 
+async function syncPlatformBalance() {
+  try {
+    const realUsdc = await getPlatformUSDCBalance();
+    const realHp = Math.floor(realUsdc / USDC_PER_HP);
+    await setPlatformHp(realHp);
+    console.log(`[SYNC] Plataforma HP sincronizado a ${realHp} (${realUsdc} USDC)`);
+  } catch(e) {
+    console.error("[SYNC ERROR]", e.message);
+  }
+}
+syncPlatformBalance(); 
+setInterval(syncPlatformBalance, 300000); 
+
 const MIME = { '.html':'text/html', '.js':'application/javascript', '.css':'text/css', '.png':'image/png', '.jpg':'image/jpeg', '.gif':'image/gif', '.svg':'image/svg+xml', '.ico':'image/x-icon' };
 
 const server = http.createServer(async (req, res) => {
@@ -52,17 +65,13 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // MODIFICADO: Sincroniza DB con wallet real y devuelve métricas de tesorería
   if (urlPath === '/admin-data') { 
     const pass = new URL(req.url, 'http://localhost').searchParams.get('pass') || ''; 
     if (pass !== ADMIN_PASS) { res.writeHead(403); res.end('Forbidden'); return; } 
     try { 
-      const realUsdc = await getPlatformUSDCBalance(); 
-      const realHp = Math.floor(realUsdc / USDC_PER_HP); 
-      await setPlatformHp(realHp); // Sincroniza el HP en la DB con el balance real de la wallet
-      
+      await syncPlatformBalance(); 
       const players = await getAllPlayersDebug(); 
-      const platformHp = realHp; 
+      const platformHp = await getPlatformHp(); 
       const playersTotalHp = await getTotalPlayersHP(); 
       const excedente = platformHp - playersTotalHp; 
       
@@ -70,7 +79,7 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify({ 
         players, 
         platformHp, 
-        platformUsdc: realUsdc, 
+        platformUsdc: platformHp * USDC_PER_HP, 
         playersTotalHp, 
         playersTotalUsdc: playersTotalHp * USDC_PER_HP, 
         excedente, 
@@ -99,7 +108,7 @@ const server = http.createServer(async (req, res) => {
     return; 
   }
   
-  if (urlPath === '/payment' && req.method === 'POST') { const secret = req.headers['x-internal-secret']; if (secret !== (process.env.INTERNAL_SECRET || 'dev-secret')) { res.writeHead(403); res.end(JSON.stringify({ error: 'Forbidden' })); return; } let body = ''; req.on('data', c => body += c); req.on('end', async () => { try { const { wallet, amount, signature, memo } = JSON.parse(body); if (await isTxProcessed(signature)) { res.writeHead(200); res.end(JSON.stringify({ ok: false, reason: 'duplicate' })); return; } const hp = Math.round((amount / 100_000) * 100); const { broadcast, lobby, send } = require('./state'); const newBalance = await addHP(wallet, hp); lobby.forEach(p => { if (p.wallet === wallet) send(p.ws, { type: 'hp_updated', hp: newBalance }); }); await markTxProcessed(signature); res.writeHead(200); res.end(JSON.stringify({ ok: true, wallet, hp, newBalance })); checkPlatformTransfer(); } catch (e) { res.writeHead(400); res.end(JSON.stringify({ error: e.message })); } }); return; }
+  if (urlPath === '/payment' && req.method === 'POST') { const secret = req.headers['x-internal-secret']; if (secret !== (process.env.INTERNAL_SECRET || 'dev-secret')) { res.writeHead(403); res.end(JSON.stringify({ error: 'Forbidden' })); return; } let body = ''; req.on('data', c => body += c); req.on('end', async () => { try { const { wallet, amount, signature, memo } = JSON.parse(body); if (await isTxProcessed(signature)) { res.writeHead(200); res.end(JSON.stringify({ ok: false, reason: 'duplicate' })); return; } const hp = Math.round((amount / 100_000) * 100); const { broadcast, lobby, send } = require('./state'); const newBalance = await addHP(wallet, hp); await addPlatformHp(hp); lobby.forEach(p => { if (p.wallet === wallet) send(p.ws, { type: 'hp_updated', hp: newBalance }); }); await markTxProcessed(signature); res.writeHead(200); res.end(JSON.stringify({ ok: true, wallet, hp, newBalance })); syncPlatformBalance(); } catch (e) { res.writeHead(400); res.end(JSON.stringify({ error: e.message })); } }); return; }
   
   const file = urlPath === '/' ? '/index.html' : urlPath;
   const fp = path.join(__dirname, file);
@@ -110,9 +119,12 @@ async function checkPlatformTransfer() { const usdc = await getPlatformUsdc(); i
 
 const wss = new WebSocketServer({ server });
 
-// Inicializar la lógica de WebSockets usando nuestro nuevo módulo
 setupWebSocketServer(wss, getPlatformUSDCBalance);
 
 setTimeout(() => { try { require('./payment-monitor'); } catch(e) { console.error('[ERROR] Monitor:', e.message); } }, 5000);
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Zodiac Battle corriendo en http://localhost:${PORT}`));
+
+// NUEVO: Inicializar el Content Manager antes de escuchar conexiones
+initializeContent().then(() => {
+  const PORT = process.env.PORT || 3000;
+  server.listen(PORT, () => console.log(`Zodiac Battle corriendo en http://localhost:${PORT}`));
+});
