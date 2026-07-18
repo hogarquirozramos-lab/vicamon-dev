@@ -47,179 +47,183 @@
     <button onclick="login()">Desbloquear</button>
   </div>
 
-  <div class="tabs">
-    <div class="tab active" onclick="showTab('treasury', this)">💰 Tesorería</div>
-    <div class="tab" onclick="showTab('attacks', this)">⚔️ Ataques</div>
-    <div class="tab" onclick="showTab('vicamons', this)">🐉 Vicamons</div>
+  <!-- CONTENIDO OCULTO POR SEGURIDAD -->
+  <div id="admin-content" style="display:none;">
+    <div class="tabs">
+      <div class="tab active" onclick="showTab('treasury', this)">💰 Tesorería</div>
+      <div class="tab" onclick="showTab('attacks', this)">⚔️ Ataques</div>
+      <div class="tab" onclick="showTab('vicamons', this)">🐉 Vicamons</div>
+    </div>
+
+    <!-- TESORERÍA -->
+    <div id="tab-treasury" class="tab-content active">
+      <div class="metrics-grid">
+        <div class="metric-card" id="wallet-card">
+          <div class="metric-title">Wallet Plataforma (Real)</div>
+          <div class="metric-value" id="wallet-hp">0 HP</div>
+          <div class="metric-value" style="font-size:14px;color:#aaa" id="wallet-usdc">0.000 USDC</div>
+        </div>
+        <div class="metric-card" id="players-card">
+          <div class="metric-title">Deuda Jugadores</div>
+          <div class="metric-value" id="players-hp">0 HP</div>
+          <div class="metric-value" style="font-size:14px;color:#aaa" id="players-usdc">0.000 USDC</div>
+        </div>
+        <div class="metric-card" id="excedente-card">
+          <div class="metric-title">Excedente (Ganancia)</div>
+          <div class="metric-value" id="excedente-hp">0 HP</div>
+          <div class="metric-value" style="font-size:14px;color:#aaa" id="excedente-usdc">0.000 USDC</div>
+        </div>
+      </div>
+
+      <div class="admin-actions">
+        <button onclick="withdrawFunds()" id="btn-withdraw" class="btn-withdraw">💸 Retirar Ganancias a Wallet</button>
+        <button onclick="resetPlatformHP()">Resetear HP Plataforma</button>
+        <button onclick="unlockAllHP()">Desbloquear HP de todos</button>
+      </div>
+
+      <table id="tbl" style="display:none">
+        <thead><tr><th>Wallet</th><th>Nickname</th><th>HP</th><th>HP Bloqueados</th><th>Acción</th></tr></thead>
+        <tbody id="data"></tbody>
+      </table>
+    </div>
+
+    <!-- ATAQUES -->
+    <div id="tab-attacks" class="tab-content">
+      <h2>Crear / Editar Ataque</h2>
+      <div class="form-grid">
+        <div>
+          <div class="form-group">
+            <label>ID Único (ej: lanzallamas_v2)</label>
+            <input type="text" id="atk-id">
+          </div>
+          <div class="form-group">
+            <label>Nombre</label>
+            <input type="text" id="atk-name">
+          </div>
+          <div class="form-group">
+            <label>Daño (0 si es buff)</label>
+            <input type="number" id="atk-d" value="0">
+          </div>
+          <div class="form-group">
+            <label>Precisión (%)</label>
+            <input type="number" id="atk-acc" value="100">
+          </div>
+        </div>
+        <div>
+          <div class="form-group">
+            <label>Efecto (fx)</label>
+            <select id="atk-fx">
+              <option value="">Ninguno</option>
+              <option value="burn">Quemar (2t)</option>
+              <option value="poison5">Veneno (5t)</option>
+              <option value="poison3l">Veneno Leve (3t)</option>
+              <option value="stun">Aturdir</option>
+              <option value="blind">Cegar</option>
+              <option value="shield2">Escudo x2</option>
+              <option value="heal20">Curar 20</option>
+              <option value="heal30">Curar 30</option>
+              <option value="drain10">Drenar 10</option>
+              <option value="weaken">Debilitar</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>PP (99 = Infinito)</label>
+            <input type="number" id="atk-pp" value="10">
+          </div>
+          <div class="form-group">
+            <label>Tipo</label>
+            <select id="atk-type">
+              <option value="basico">Básico</option>
+              <option value="buff">Buff/Defensa</option>
+              <option value="mixto">Mixto</option>
+              <option value="especial">Especial</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Costo en HP (Para comprarlo)</label>
+            <input type="number" id="atk-cost" value="50">
+          </div>
+        </div>
+      </div>
+      <div class="form-group" style="margin-top:15px">
+        <label>Descripción</label>
+        <input type="text" id="atk-desc" placeholder="Descripción del ataque">
+      </div>
+      <button onclick="saveAttack()" style="margin-top:15px;width:100%;padding:12px">💾 Guardar Ataque en BD</button>
+    </div>
+
+    <!-- VICAMONS -->
+    <div id="tab-vicamons" class="tab-content">
+      <h2>Crear / Editar Vicamon</h2>
+      <div class="form-grid">
+        <div>
+          <div class="form-group">
+            <label>ID Único (ej: tunqui)</label>
+            <input type="text" id="vic-id">
+          </div>
+          <div class="form-group">
+            <label>Nombre</label>
+            <input type="text" id="vic-name">
+          </div>
+          <div class="form-group">
+            <label>Subtítulo</label>
+            <input type="text" id="vic-sub">
+          </div>
+          <div class="form-group">
+            <label>URL de Imagen (ej: Tunqui.png)</label>
+            <input type="text" id="vic-img">
+          </div>
+        </div>
+        <div>
+          <div class="form-group">
+            <label>Categoría</label>
+            <select id="vic-cat">
+              <option value="Zodiaco">Zodiaco</option>
+              <option value="Físico">Físico</option>
+              <option value="Especial">Especial</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Elemento</label>
+            <select id="vic-el">
+              <option value="fuego">Fuego</option>
+              <option value="tierra">Tierra</option>
+              <option value="aire">Aire</option>
+              <option value="agua">Agua</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Estilo</label>
+            <select id="vic-style">
+              <option value="agresivo">Agresivo</option>
+              <option value="defensivo">Defensivo</option>
+              <option value="tactico">Táctico</option>
+              <option value="equilibrado">Equilibrado</option>
+              <option value="veneno">Veneno</option>
+              <option value="caos">Caos</option>
+              <option value="soporte">Soporte</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Stats (JSON: {"atk":70,"def":80,"spd":90})</label>
+            <input type="text" id="vic-stats" value='{"atk":70,"def":70,"spd":70}'>
+          </div>
+        </div>
+      </div>
+
+      <h3 style="margin-top:20px">Asignar Ataques</h3>
+      <p style="font-size:12px;color:#aaa">Selecciona 4 ataques del catálogo. Carga los ataques primero si no aparecen.</p>
+      <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr 1fr">
+        <div class="form-group"><label>Ataque 1</label><select class="vic-atk-select" id="vic-atk1"></select></div>
+        <div class="form-group"><label>Ataque 2</label><select class="vic-atk-select" id="vic-atk2"></select></div>
+        <div class="form-group"><label>Ataque 3</label><select class="vic-atk-select" id="vic-atk3"></select></div>
+        <div class="form-group"><label>Ataque 4</label><select class="vic-atk-select" id="vic-atk4"></select></div>
+      </div>
+      <button onclick="saveVicamon()" style="margin-top:15px;width:100%;padding:12px">💾 Guardar Vicamon en BD</button>
+      <button onclick="loadContent()" style="margin-top:10px;width:100%;padding:10px;background:#333">🔄 Recargar Ataques en Desplegables</button>
+    </div>
   </div>
-
-  <!-- TESORERÍA -->
-  <div id="tab-treasury" class="tab-content active">
-    <div class="metrics-grid">
-      <div class="metric-card" id="wallet-card">
-        <div class="metric-title">Wallet Plataforma (Real)</div>
-        <div class="metric-value" id="wallet-hp">0 HP</div>
-        <div class="metric-value" style="font-size:14px;color:#aaa" id="wallet-usdc">0.000 USDC</div>
-      </div>
-      <div class="metric-card" id="players-card">
-        <div class="metric-title">Deuda Jugadores</div>
-        <div class="metric-value" id="players-hp">0 HP</div>
-        <div class="metric-value" style="font-size:14px;color:#aaa" id="players-usdc">0.000 USDC</div>
-      </div>
-      <div class="metric-card" id="excedente-card">
-        <div class="metric-title">Excedente (Ganancia)</div>
-        <div class="metric-value" id="excedente-hp">0 HP</div>
-        <div class="metric-value" style="font-size:14px;color:#aaa" id="excedente-usdc">0.000 USDC</div>
-      </div>
-    </div>
-
-    <div class="admin-actions">
-      <button onclick="withdrawFunds()" id="btn-withdraw" class="btn-withdraw">💸 Retirar Ganancias a Wallet</button>
-      <button onclick="resetPlatformHP()">Resetear HP Plataforma</button>
-      <button onclick="unlockAllHP()">Desbloquear HP de todos</button>
-    </div>
-
-    <table id="tbl" style="display:none">
-      <thead><tr><th>Wallet</th><th>Nickname</th><th>HP</th><th>HP Bloqueados</th><th>Acción</th></tr></thead>
-      <tbody id="data"></tbody>
-    </table>
-  </div>
-
-  <!-- ATAQUES -->
-  <div id="tab-attacks" class="tab-content">
-    <h2>Crear / Editar Ataque</h2>
-    <div class="form-grid">
-      <div>
-        <div class="form-group">
-          <label>ID Único (ej: lanzallamas_v2)</label>
-          <input type="text" id="atk-id">
-        </div>
-        <div class="form-group">
-          <label>Nombre</label>
-          <input type="text" id="atk-name">
-        </div>
-        <div class="form-group">
-          <label>Daño (0 si es buff)</label>
-          <input type="number" id="atk-d" value="0">
-        </div>
-        <div class="form-group">
-          <label>Precisión (%)</label>
-          <input type="number" id="atk-acc" value="100">
-        </div>
-      </div>
-      <div>
-        <div class="form-group">
-          <label>Efecto (fx)</label>
-          <select id="atk-fx">
-            <option value="">Ninguno</option>
-            <option value="burn">Quemar (2t)</option>
-            <option value="poison5">Veneno (5t)</option>
-            <option value="poison3l">Veneno Leve (3t)</option>
-            <option value="stun">Aturdir</option>
-            <option value="blind">Cegar</option>
-            <option value="shield2">Escudo x2</option>
-            <option value="heal20">Curar 20</option>
-            <option value="heal30">Curar 30</option>
-            <option value="drain10">Drenar 10</option>
-            <option value="weaken">Debilitar</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>PP (99 = Infinito)</label>
-          <input type="number" id="atk-pp" value="10">
-        </div>
-        <div class="form-group">
-          <label>Tipo</label>
-          <select id="atk-type">
-            <option value="basico">Básico</option>
-            <option value="buff">Buff/Defensa</option>
-            <option value="mixto">Mixto</option>
-            <option value="especial">Especial</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Costo en HP (Para comprarlo)</label>
-          <input type="number" id="atk-cost" value="50">
-        </div>
-      </div>
-    </div>
-    <div class="form-group" style="margin-top:15px">
-      <label>Descripción</label>
-      <input type="text" id="atk-desc" placeholder="Descripción del ataque">
-    </div>
-    <button onclick="saveAttack()" style="margin-top:15px;width:100%;padding:12px">💾 Guardar Ataque en BD</button>
-  </div>
-
-  <!-- VICAMONS -->
-  <div id="tab-vicamons" class="tab-content">
-    <h2>Crear / Editar Vicamon</h2>
-    <div class="form-grid">
-      <div>
-        <div class="form-group">
-          <label>ID Único (ej: tunqui)</label>
-          <input type="text" id="vic-id">
-        </div>
-        <div class="form-group">
-          <label>Nombre</label>
-          <input type="text" id="vic-name">
-        </div>
-        <div class="form-group">
-          <label>Subtítulo</label>
-          <input type="text" id="vic-sub">
-        </div>
-        <div class="form-group">
-          <label>URL de Imagen (ej: Tunqui.png)</label>
-          <input type="text" id="vic-img">
-        </div>
-      </div>
-      <div>
-        <div class="form-group">
-          <label>Categoría</label>
-          <select id="vic-cat">
-            <option value="Zodiaco">Zodiaco</option>
-            <option value="Físico">Físico</option>
-            <option value="Especial">Especial</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Elemento</label>
-          <select id="vic-el">
-            <option value="fuego">Fuego</option>
-            <option value="tierra">Tierra</option>
-            <option value="aire">Aire</option>
-            <option value="agua">Agua</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Estilo</label>
-          <select id="vic-style">
-            <option value="agresivo">Agresivo</option>
-            <option value="defensivo">Defensivo</option>
-            <option value="tactico">Táctico</option>
-            <option value="equilibrado">Equilibrado</option>
-            <option value="veneno">Veneno</option>
-            <option value="caos">Caos</option>
-            <option value="soporte">Soporte</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Stats (JSON: {"atk":70,"def":80,"spd":90})</label>
-          <input type="text" id="vic-stats" value='{"atk":70,"def":70,"spd":70}'>
-        </div>
-      </div>
-    </div>
-
-    <h3 style="margin-top:20px">Asignar Ataques</h3>
-    <p style="font-size:12px;color:#aaa">Selecciona 4 ataques del catálogo. Carga los ataques primero si no aparecen.</p>
-    <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr 1fr">
-      <div class="form-group"><label>Ataque 1</label><select class="vic-atk-select" id="vic-atk1"></select></div>
-      <div class="form-group"><label>Ataque 2</label><select class="vic-atk-select" id="vic-atk2"></select></div>
-      <div class="form-group"><label>Ataque 3</label><select class="vic-atk-select" id="vic-atk3"></select></div>
-      <div class="form-group"><label>Ataque 4</label><select class="vic-atk-select" id="vic-atk4"></select></div>
-    </div>
-    <button onclick="saveVicamon()" style="margin-top:15px;width:100%;padding:12px">💾 Guardar Vicamon en BD</button>
-    <button onclick="loadContent()" style="margin-top:10px;width:100%;padding:10px;background:#333">🔄 Recargar Ataques en Desplegables</button>
-  </div>
+  <!-- FIN DEL CONTENIDO OCULTO -->
 
   <script>
     let globalPass='';
@@ -236,9 +240,14 @@
       }
     }
 
-    function login(){
+    async function login(){
       globalPass=document.getElementById('pass').value;
       if(!globalPass) return alert('Ingresa la contraseña');
+      const res=await fetch('/admin-data?pass='+encodeURIComponent(globalPass));
+      if(!res.ok){ alert('Contraseña incorrecta'); return; }
+      
+      // FIX: Mostrar el contenido solo si la contraseña es correcta
+      document.getElementById('admin-content').style.display = 'block';
       loadData();
       loadContent();
     }
