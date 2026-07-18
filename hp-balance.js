@@ -12,8 +12,11 @@ pool.query(`INSERT INTO platform (id, hp) VALUES (1, 0) ON CONFLICT DO NOTHING;`
 pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS wins INTEGER DEFAULT 0;`).catch(e=>{});
 pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS losses INTEGER DEFAULT 0;`).catch(e=>{});
 pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS last_name VARCHAR(20);`).catch(e=>{});
-
 pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS tower_train_date VARCHAR(10);`).catch(e=>{});
+
+// NUEVAS TABLAS PARA CONTENT MANAGER (VICAMONS Y ATTACKS)
+pool.query(`CREATE TABLE IF NOT EXISTS attacks (id VARCHAR(50) PRIMARY KEY, name VARCHAR(50), d INT, acc INT, fx VARCHAR(50), pp INT, desc TEXT, type VARCHAR(20), cost INT);`).catch(e => console.error("Error creando tabla attacks:", e));
+pool.query(`CREATE TABLE IF NOT EXISTS vicamons (id VARCHAR(50) PRIMARY KEY, name VARCHAR(50), sub VARCHAR(50), img VARCHAR(100), el VARCHAR(20), style VARCHAR(20), cat VARCHAR(20), stats JSONB, attacks JSONB);`).catch(e => console.error("Error creando tabla vicamons:", e));
 
 const USDC_PER_HP = 0.001;
 const PLATFORM_WALLET = process.env.PLATFORM_WALLET || 'U3jwNBDnw4kCQ5CYRp5mAf4hbr4dadyUGXDhXdyLXMv';
@@ -72,7 +75,6 @@ async function settleGauntletTiered(wallet, defeatedCount) {
   } 
 }
 
-// NUEVAS FUNCIONES DE TESORERÍA AUTOMATIZADA
 async function getTotalPlayersHP() {
   const res = await pool.query('SELECT COALESCE(SUM(hp), 0) as total_hp, COALESCE(SUM(locked_hp), 0) as total_locked FROM players');
   const totalHp = res.rows.length > 0 ? parseInt(res.rows[0].total_hp, 10) : 0;
@@ -177,9 +179,12 @@ async function checkOwnerWithdrawal() {
   return { shouldWithdraw: false };
 }
 
-// NUEVO: Sincronizar el HP de la plataforma con el balance real de la wallet
 async function setPlatformHp(hp) { 
   await pool.query('UPDATE platform SET hp = $1 WHERE id = 1', [hp]); 
+}
+
+async function addPlatformHp(hp) {
+  await pool.query('UPDATE platform SET hp = hp + $1 WHERE id = 1', [hp]);
 }
 
 async function cashout(wallet) { const client = await pool.connect(); try { await client.query('BEGIN'); const res = await client.query('SELECT hp FROM players WHERE wallet = $1 FOR UPDATE', [wallet]); const hp = res.rows.length > 0 ? res.rows[0].hp : 0; if (hp <= 0) { await client.query('ROLLBACK'); return { ok: false, reason: 'no_hp', hp: 0, usdc: 0 }; } await client.query('UPDATE players SET hp = 0 WHERE wallet = $1', [wallet]); await client.query('COMMIT'); return { ok: true, hp, usdc: parseFloat((hp * USDC_PER_HP).toFixed(6)) }; } catch(e) { await client.query('ROLLBACK'); return { ok: false, reason: 'db_error', hp: 0, usdc: 0 }; } finally { client.release(); } }
@@ -187,9 +192,21 @@ async function getPlatformHp() { const res = await pool.query('SELECT hp FROM pl
 async function getPlatformUsdc() { return parseFloat(((await getPlatformHp()) * USDC_PER_HP).toFixed(6)); }
 async function clearPlatformHp(hp) { await pool.query('UPDATE platform SET hp = GREATEST(0, hp - $1) WHERE id = 1', [hp]); }
 
+// FUNCIONES PARA CONTENT MANAGER
+async function getAllAttacksDB() { const res = await pool.query('SELECT * FROM attacks'); return res.rows; }
+async function getAllVicamonsDB() { const res = await pool.query('SELECT * FROM vicamons'); return res.rows; }
+async function saveAttackDB(data) { 
+  await pool.query(`INSERT INTO attacks (id, name, d, acc, fx, pp, desc, type, cost) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (id) DO UPDATE SET name=$2, d=$3, acc=$4, fx=$5, pp=$6, desc=$7, type=$8, cost=$9`, 
+  [data.id, data.name, data.d, data.acc, data.fx, data.pp, data.desc, data.type, data.cost]); 
+}
+async function saveVicamonDB(data) { 
+  await pool.query(`INSERT INTO vicamons (id, name, sub, img, el, style, cat, stats, attacks) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (id) DO UPDATE SET name=$2, sub=$3, img=$4, el=$5, style=$6, cat=$7, stats=$8, attacks=$9`, 
+  [data.id, data.name, data.sub, data.img, data.el, data.style, data.cat, JSON.stringify(data.stats), JSON.stringify(data.attacks)]); 
+}
+
 module.exports = {
   getHP, addHP, hasHP, lockHP, unlockHP, settleMatch, settleTeamMatch, settleGauntletTiered, cashout,
-  getPlatformHp, getPlatformUsdc, clearPlatformHp, setPlatformHp,
+  getPlatformHp, getPlatformUsdc, clearPlatformHp, setPlatformHp, addPlatformHp,
   PLATFORM_WALLET, PLATFORM_THRESHOLD: 1.00, USDC_PER_HP,
   getAllPlayersDebug, updatePlayerName, updatePlayerStats, getTopPlayers,
   getPlayerStats, getPlayerRank,
@@ -197,5 +214,6 @@ module.exports = {
   adminSetHP, adminResetPlatform, adminUnlockAllHP,
   calculateGauntletReward,
   getTowerStatus, claimTowerGrandPrize, checkTowerTrainingWin, claimTowerTrainingWin,
-  getExcedente, getTotalPlayersHP, checkOwnerWithdrawal
+  getExcedente, getTotalPlayersHP, checkOwnerWithdrawal,
+  getAllAttacksDB, getAllVicamonsDB, saveAttackDB, saveVicamonDB
 };
