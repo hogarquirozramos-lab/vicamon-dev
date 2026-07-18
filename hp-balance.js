@@ -15,7 +15,8 @@ pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS last_name VARCHAR(20);`
 pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS tower_train_date VARCHAR(10);`).catch(e=>{});
 
 // NUEVAS TABLAS PARA CONTENT MANAGER (VICAMONS Y ATTACKS)
-pool.query(`CREATE TABLE IF NOT EXISTS attacks (id VARCHAR(50) PRIMARY KEY, name VARCHAR(50), d INT, acc INT, fx VARCHAR(50), pp INT, desc TEXT, type VARCHAR(20), cost INT);`).catch(e => console.error("Error creando tabla attacks:", e));
+// FIX: Cambiamos 'desc' por 'description' porque 'desc' es una palabra reservada en SQL
+pool.query(`CREATE TABLE IF NOT EXISTS attacks (id VARCHAR(50) PRIMARY KEY, name VARCHAR(50), d INT, acc INT, fx VARCHAR(50), pp INT, description TEXT, type VARCHAR(20), cost INT);`).catch(e => console.error("Error creando tabla attacks:", e));
 pool.query(`CREATE TABLE IF NOT EXISTS vicamons (id VARCHAR(50) PRIMARY KEY, name VARCHAR(50), sub VARCHAR(50), img VARCHAR(100), el VARCHAR(20), style VARCHAR(20), cat VARCHAR(20), stats JSONB, attacks JSONB);`).catch(e => console.error("Error creando tabla vicamons:", e));
 
 const USDC_PER_HP = 0.001;
@@ -195,8 +196,9 @@ async function clearPlatformHp(hp) { await pool.query('UPDATE platform SET hp = 
 // FUNCIONES PARA CONTENT MANAGER
 async function getAllAttacksDB() { const res = await pool.query('SELECT * FROM attacks'); return res.rows; }
 async function getAllVicamonsDB() { const res = await pool.query('SELECT * FROM vicamons'); return res.rows; }
+// FIX: Usar 'description' en lugar de 'desc'
 async function saveAttackDB(data) { 
-  await pool.query(`INSERT INTO attacks (id, name, d, acc, fx, pp, desc, type, cost) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (id) DO UPDATE SET name=$2, d=$3, acc=$4, fx=$5, pp=$6, desc=$7, type=$8, cost=$9`, 
+  await pool.query(`INSERT INTO attacks (id, name, d, acc, fx, pp, description, type, cost) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (id) DO UPDATE SET name=$2, d=$3, acc=$4, fx=$5, pp=$6, description=$7, type=$8, cost=$9`, 
   [data.id, data.name, data.d, data.acc, data.fx, data.pp, data.desc, data.type, data.cost]); 
 }
 async function saveVicamonDB(data) { 
