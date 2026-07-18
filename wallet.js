@@ -51,7 +51,6 @@ async function connectPhantom() {
 function openPhantomApp() {
   if(isGuest && typeof ws !== 'undefined' && ws) { try { ws.close(); } catch(e) {} }
   const currentUrl = window.location.href;
-  // Deep link de Phantom para abrir esta URL dentro de su navegador
   const deepLink = `https://phantom.app/ul/browse/${currentUrl}`;
   window.location.href = deepLink;
 }
@@ -77,28 +76,24 @@ function updateHPDisplay(hp){
   if(isGuest) hp = 0; 
   myCurrentHP = hp || 0; 
   
-  // Actualizar textos de HP
   const el=document.getElementById('pick-hp-val'); if(el){ el.textContent=hp+' HP'; el.style.color=hp>=100?'#5DCAA5':'#EF9F27'; } 
   const loginHp=document.getElementById('wallet-hp'); if(loginHp){ loginHp.textContent=hp+' HP'; loginHp.style.color=hp>=100?'#5DCAA5':'#EF9F27'; } 
   const profHp=document.getElementById('profile-hp'); if(profHp){ profHp.textContent=hp+' HP'; profHp.style.color=hp>=100?'#5DCAA5':'#EF9F27'; } 
   const profUsdc=document.getElementById('profile-usdc'); if(profUsdc){ profUsdc.textContent=(hp*0.001).toFixed(3)+' USDC'; } 
   
-  // Mostrar/Ocultar Botones de Cashout (Perfil y Lobby)
   const showCashout = hp > 0 && !isGuest;
   const btnProf = document.getElementById('btn-cashout'); 
   if(btnProf){ btnProf.style.display = showCashout ? 'inline-block' : 'none'; btnProf.disabled = false; btnProf.textContent='💰 Cashout'; } 
   const btnLobby = document.getElementById('btn-cashout-lobby'); 
   if(btnLobby){ btnLobby.style.display = showCashout ? 'inline-block' : 'none'; }
   
-  // Botón de la torre
   const btnG = document.getElementById('btn-gauntlet'); 
   if (btnG && typeof GAUNTLET_HABILITADO !== 'undefined') { 
     btnG.style.display = 'inline-block'; 
-    btnG.disabled = false; // El botón del lobby siempre está habilitado
-    btnG.textContent = '🏰 Torre'; 
+    if (isGuest) { btnG.disabled = false; btnG.textContent = '🏰 Torre (XP)'; } 
+    else { btnG.disabled = myCurrentHP < 100; btnG.textContent = '🏰 Torre (100 HP)'; } 
   } 
   
-  // Widgets de depósito
   const lobbyWidget = document.getElementById('lobby-deposit-widget'); if(lobbyWidget) lobbyWidget.innerHTML = depositWidgetHTML(); 
   const profWidget = document.getElementById('profile-deposit-widget'); if(profWidget) profWidget.innerHTML = depositWidgetHTML(); 
   const labWidget = document.getElementById('lab-deposit-widget'); if(labWidget) labWidget.innerHTML = depositWidgetHTML(); 
@@ -117,7 +112,7 @@ async function doCashout(){
   if(btnLobby){btnLobby.disabled=true;btnLobby.textContent='...';} 
   if(!ws || ws.readyState !== 1){ 
     if(btnProf){btnProf.disabled=false;btnProf.textContent='💰 Cashout';} 
-    if(btnLobby){btnLobby.disabled=false;btnLobby.textContent='💰 Cashout';} 
+    if(btnLobby){btnLobby.disabled=false;btnLobby.textContent='💰';} 
     return; 
   } 
   ws.send(JSON.stringify({type:'cashout'})); 
