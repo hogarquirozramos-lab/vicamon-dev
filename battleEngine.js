@@ -1,4 +1,5 @@
-const BEASTS = require('./beasts.js');
+// FIX: Usar BD en memoria, con beasts.js como respaldo de emergencia
+const BEASTS = global.BEASTS_DB || require('./beasts.js');
 const { 
   settleMatch, getHP, updatePlayerStats, 
   getPlayerStats, getPlayerRank, getTopPlayers, 
@@ -133,7 +134,7 @@ function tickEffects(st, name) {
 async function endBattle(bId, winnerId, loserId, winnerHp, forfeit=false) {
   const b = battles.get(bId);
   
-  // NUEVO: Si es una batalla de torneo, redirigir a tournamentManager
+  // Si es una batalla de torneo, redirigir a tournamentManager
   if (b && b.isTournament) {
     const { reportTournamentResult } = require('./tournamentManager');
     await reportTournamentResult(bId, winnerId, loserId);
