@@ -8,12 +8,13 @@ const {
   getPlatformHp, getPlatformUsdc, clearPlatformHp, setPlatformHp, addPlatformHp,
   PLATFORM_WALLET, PLATFORM_THRESHOLD, USDC_PER_HP,
   getAllPlayersDebug, adminSetHP, adminResetPlatform, adminUnlockAllHP,
-  getPlayerStats, getPlayerRank, getTotalPlayersHP, getExcedente
+  getPlayerStats, getPlayerRank, getTotalPlayersHP, getExcedente,
+  getAllAttacksDB, getAllVicamonsDB, saveAttackDB, saveVicamonDB // NUEVO: Imports para Admin Lab
 } = require('./hp-balance');
 const { sendUSDC } = require('./transfer');
 
 const { setupWebSocketServer } = require('./wsHandlers');
-const { initializeContent } = require('./contentManager'); // NUEVO: Content Manager
+const { initializeContent } = require('./contentManager');
 
 const ADMIN_PASS = process.env.ADMIN_PASSWORD || process.env.INTERNAL_SECRET || '';
 const OWNER_WALLET = process.env.OWNER_WALLET || ''; 
@@ -97,6 +98,47 @@ const server = http.createServer(async (req, res) => {
   if (urlPath === '/admin-unlock-hp' && req.method === 'POST') { let body = ''; req.on('data', c => body += c); req.on('end', async () => { try { const { pass } = JSON.parse(body); if (pass !== ADMIN_PASS) { res.writeHead(403); res.end(JSON.stringify({ ok: false })); return; } await adminUnlockAllHP(); res.writeHead(200); res.end(JSON.stringify({ ok: true })); } catch(e) { res.writeHead(400); res.end(JSON.stringify({ ok: false })); } }); return; }
   if (urlPath === '/admin-withdraw' && req.method === 'POST') { let body = ''; req.on('data', c => body += c); req.on('end', async () => { try { const { pass } = JSON.parse(body); if (pass !== ADMIN_PASS) { res.writeHead(403); res.end(JSON.stringify({ ok: false, msg: 'Forbidden' })); return; } if (!OWNER_WALLET) { res.writeHead(400); res.end(JSON.stringify({ ok: false, msg: 'OWNER_WALLET no configurada en el servidor' })); return; } const balance = await getPlatformUSDCBalance(); if (balance <= 0.001) { res.writeHead(400); res.end(JSON.stringify({ ok: false, msg: 'No hay suficientes USDC para retirar' })); return; } const sig = await sendUSDC(OWNER_WALLET, balance); const hpToClear = Math.round(balance / USDC_PER_HP); await clearPlatformHp(hpToClear); res.writeHead(200); res.end(JSON.stringify({ ok: true, amount: balance, sig })); } catch(e) { res.writeHead(500); res.end(JSON.stringify({ ok: false, msg: e.message })); } }); return; }
 
+  // --- NUEVAS RUTAS PARA EL ADMIN LAB ---
+  if (urlPath === '/admin-get-content' && req.method === 'GET') {
+    const pass = new URL(req.url, 'http://localhost').searchParams.get('pass') || '';
+    if (pass !== ADMIN_PASS) { res.writeHead(403); res.end('Forbidden'); return; }
+    try {
+      const attacks = await getAllAttacksDB();
+      const vicamons = await getAllVicamonsDB();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ attacks, vicamons }));
+    } catch(e) { res.writeHead(500); res.end('Error'); }
+    return;
+  }
+
+  if (urlPath === '/admin-save-attack' && req.method === 'POST') {
+    let body = ''; req.on('data', c => body += c); req.on('end', async () => {
+      try {
+        const { pass, data } = JSON.parse(body);
+        if (pass !== ADMIN_PASS) { res.writeHead(403); res.end(JSON.stringify({ ok: false })); return; }
+        await saveAttackDB(data);
+        // Recargar memoria en caliente
+        await initializeContent();
+        res.writeHead(200); res.end(JSON.stringify({ ok: true }));
+      } catch(e) { res.writeHead(400); res.end(JSON.stringify({ ok: false, msg: e.message })); }
+    });
+    return;
+  }
+
+  if (urlPath === '/admin-save-vicamon' && req.method === 'POST') {
+    let body = ''; req.on('data', c => body += c); req.on('end', async () => {
+      try {
+        const { pass, data } = JSON.parse(body);
+        if (pass !== ADMIN_PASS) { res.writeHead(403); res.end(JSON.stringify({ ok: false })); return; }
+        await saveVicamonDB(data);
+        // Recargar memoria en caliente
+        await initializeContent();
+        res.writeHead(200); res.end(JSON.stringify({ ok: true }));
+      } catch(e) { res.writeHead(400); res.end(JSON.stringify({ ok: false, msg: e.message })); }
+    });
+    return;
+  }
+
   if (urlPath === '/hp') { 
     const wallet = new URL(req.url, 'http://localhost').searchParams.get('wallet') || ''; 
     if (wallet.startsWith('guest_')) { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ hp: 0, wallet, stats: { wins: 0, losses: 0, rank: null } })); return; } 
@@ -123,7 +165,6 @@ setupWebSocketServer(wss, getPlatformUSDCBalance);
 
 setTimeout(() => { try { require('./payment-monitor'); } catch(e) { console.error('[ERROR] Monitor:', e.message); } }, 5000);
 
-// NUEVO: Inicializar el Content Manager antes de escuchar conexiones
 initializeContent().then(() => {
   const PORT = process.env.PORT || 3000;
   server.listen(PORT, () => console.log(`Zodiac Battle corriendo en http://localhost:${PORT}`));
