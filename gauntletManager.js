@@ -1,4 +1,5 @@
-const BEASTS = require('./beasts.js');
+// FIX: Usar BD en memoria, con beasts.js como respaldo
+const BEASTS = global.BEASTS_DB || require('./beasts.js');
 const { lobby, battles, pushCpuBattle, broadcast, send, pushLobby } = require('./state');
 const { applyAtk, tickEffects, getStartState } = require('./battleEngine');
 const { settleGauntletTiered, getPlayerStats, getPlayerRank, getTopPlayers, claimTowerGrandPrize, claimTowerTrainingWin, getHP } = require('./hp-balance');
@@ -22,15 +23,13 @@ async function endGauntlet(bId, playerId, won, defeatedCount = 0) {
   try {
     if (won) {
       if (towerMode === 'hp') {
-        // La función claimTowerGrandPrize ahora libera los 100 HP y paga los 1000 HP totales (900 reales de la plataforma)
         const claimed = await claimTowerGrandPrize(pl.wallet);
         if (claimed) {
           newHp = await getHP(pl.wallet);
-          reward = 900; // Ganancia NETA real del jugador
+          reward = 900; 
           customMsg = '¡FELICIDADES! Eres el ganador del premio de 1000 HP. (Inversión 100 HP + Ganancia 900 HP).';
           broadcast({ type: 'chat_message', name: '⚔️ VICAMON', text: `🏆 ¡${pl.name} ha conquistado la Torre de Batalla y se lleva 1000 HP!` });
         } else {
-          // Si el excedente ya no daba mientras jugaba, se le da la recompensa de escalar normal (200 HP -> +100 neto)
           const result = await settleGauntletTiered(pl.wallet, 12);
           newHp = result.newHp;
           reward = result.reward - 100; 
@@ -50,11 +49,10 @@ async function endGauntlet(bId, playerId, won, defeatedCount = 0) {
         customMsg = '¡Ganaste la Torre! Si estuvieras jugando con tu wallet, te habrías llevado 1000 HP.';
       }
     } else {
-      // Si pierde
       if (towerMode === 'hp') {
         const result = await settleGauntletTiered(pl.wallet, defeatedCount);
         newHp = result.newHp;
-        reward = result.reward - 100; // Balance neto
+        reward = result.reward - 100; 
         const dbStats = await getPlayerStats(pl.wallet);
         if (dbStats) { stats.wins = dbStats.wins; stats.losses = dbStats.losses; }
         stats.rank = await getPlayerRank(pl.wallet);
