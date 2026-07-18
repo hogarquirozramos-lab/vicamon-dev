@@ -6,84 +6,250 @@
   <style>
     body{font-family:system-ui;background:#0a0a0f;color:#fff;padding:20px;max-width:1000px;margin:0 auto}
     .header{display:flex;gap:10px;margin-bottom:20px;align-items:center}
-    input,button{background:#1a1a24;border:1px solid #333;color:#fff;padding:10px;border-radius:8px;outline:none}
+    input,button,select,textarea{background:#1a1a24;border:1px solid #333;color:#fff;padding:10px;border-radius:8px;outline:none;font-family:system-ui}
     button{cursor:pointer;background:#4a9eff;border:none;font-weight:bold}
     button:disabled{opacity:.5;cursor:not-allowed}
     
-    /* Nuevas tarjetas de métricas */
+    .tabs{display:flex;gap:10px;margin-bottom:20px;border-bottom:1px solid #333}
+    .tab{padding:10px 20px;cursor:pointer;color:#888;border-bottom:2px solid transparent}
+    .tab.active{color:#fff;border-bottom:2px solid #4a9eff}
+    .tab-content{display:none}
+    .tab-content.active{display:block}
+    
     .metrics-grid{display:grid;grid-template-columns:repeat(3, 1fr);gap:15px;margin-bottom:20px}
-    .metric-card{background:#14141e;padding:15px;border-radius:12px;border:1px solid #2a2a35;text-align:center;transition:all .3s}
-    .metric-title{font-size:12px;color:#85B7EB;text-transform:uppercase;margin-bottom:10px;letter-spacing:.05em}
+    .metric-card{background:#14141e;padding:15px;border-radius:12px;border:1px solid #2a2a35;text-align:center}
+    .metric-title{font-size:12px;color:#85B7EB;text-transform:uppercase;margin-bottom:10px}
     .metric-value{font-size:24px;font-weight:bold;color:#fff;margin-bottom:5px}
-    .metric-sub{font-size:14px;color:#aaa}
-    .status-red{border-color:#F0997B !important;box-shadow:0 0 12px rgba(240,153,122,.2)}
-    .status-green{border-color:#5DCAA5 !important;box-shadow:0 0 12px rgba(93,202,165,.2)}
+    .status-red{border-color:#F0997B !important}
+    .status-green{border-color:#5DCAA5 !important}
     .text-red{color:#F0997B !important}
     .text-green{color:#5DCAA5 !important}
-
+    
     .admin-actions{margin-top:20px;display:flex;gap:10px;flex-wrap:wrap}
-    .btn-withdraw{background:#F5A623;color:#000;padding:10px 20px;font-size:14px}
+    .btn-withdraw{background:#F5A623;color:#000}
     
     table{width:100%;border-collapse:collapse;background:#14141e;border-radius:12px;overflow:hidden;margin-top:20px}
     th,td{padding:12px;border-bottom:1px solid #2a2a35;text-align:left;font-size:14px}
     th{color:#85B7EB;text-transform:uppercase;font-size:12px}
-    td input{width:80px;padding:5px;background:#111;border:1px solid #333;text-align:center;color:#fff;border-radius:4px}
+    td input{width:80px;padding:5px;text-align:center}
     .btn-save{background:#5DCAA5;padding:8px 16px;color:#000}
+
+    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;background:#14141e;padding:20px;border-radius:12px}
+    .form-group{display:flex;flex-direction:column;gap:5px;margin-bottom:15px}
+    .form-group label{font-size:12px;color:#aaa}
+    .form-group input, .form-group select{width:100%;padding:8px}
   </style>
 </head>
 <body>
-  <h1>Panel de Administración</h1>
+  <h1>Panel de Administración VICAMON</h1>
   <div class="header">
     <input type="password" id="pass" placeholder="Contraseña de admin" style="flex:1">
-    <button onclick="loadData()">Desbloquear y Sincronizar</button>
+    <button onclick="login()">Desbloquear</button>
   </div>
 
-  <!-- TABLERO DE TESORERÍA -->
-  <div class="metrics-grid">
-    <div class="metric-card" id="wallet-card">
-      <div class="metric-title">Wallet Plataforma (Real)</div>
-      <div class="metric-value" id="wallet-hp">0 HP</div>
-      <div class="metric-sub" id="wallet-usdc">0.000 USDC</div>
-    </div>
-    <div class="metric-card" id="players-card">
-      <div class="metric-title">Deuda Jugadores</div>
-      <div class="metric-value" id="players-hp">0 HP</div>
-      <div class="metric-sub" id="players-usdc">0.000 USDC</div>
-    </div>
-    <div class="metric-card" id="excedente-card">
-      <div class="metric-title">Excedente (Ganancia)</div>
-      <div class="metric-value" id="excedente-hp">0 HP</div>
-      <div class="metric-sub" id="excedente-usdc">0.000 USDC</div>
-    </div>
+  <div class="tabs">
+    <div class="tab active" onclick="showTab('treasury', this)">💰 Tesorería</div>
+    <div class="tab" onclick="showTab('attacks', this)">⚔️ Ataques</div>
+    <div class="tab" onclick="showTab('vicamons', this)">🐉 Vicamons</div>
   </div>
 
-  <div class="admin-actions">
-    <button onclick="withdrawFunds()" id="btn-withdraw" class="btn-withdraw">💸 Retirar Ganancias a Wallet</button>
-    <button onclick="resetPlatformHP()">Resetear HP Plataforma</button>
-    <button onclick="unlockAllHP()">Desbloquear HP de todos</button>
+  <!-- TESORERÍA -->
+  <div id="tab-treasury" class="tab-content active">
+    <div class="metrics-grid">
+      <div class="metric-card" id="wallet-card">
+        <div class="metric-title">Wallet Plataforma (Real)</div>
+        <div class="metric-value" id="wallet-hp">0 HP</div>
+        <div class="metric-value" style="font-size:14px;color:#aaa" id="wallet-usdc">0.000 USDC</div>
+      </div>
+      <div class="metric-card" id="players-card">
+        <div class="metric-title">Deuda Jugadores</div>
+        <div class="metric-value" id="players-hp">0 HP</div>
+        <div class="metric-value" style="font-size:14px;color:#aaa" id="players-usdc">0.000 USDC</div>
+      </div>
+      <div class="metric-card" id="excedente-card">
+        <div class="metric-title">Excedente (Ganancia)</div>
+        <div class="metric-value" id="excedente-hp">0 HP</div>
+        <div class="metric-value" style="font-size:14px;color:#aaa" id="excedente-usdc">0.000 USDC</div>
+      </div>
+    </div>
+
+    <div class="admin-actions">
+      <button onclick="withdrawFunds()" id="btn-withdraw" class="btn-withdraw">💸 Retirar Ganancias a Wallet</button>
+      <button onclick="resetPlatformHP()">Resetear HP Plataforma</button>
+      <button onclick="unlockAllHP()">Desbloquear HP de todos</button>
+    </div>
+
+    <table id="tbl" style="display:none">
+      <thead><tr><th>Wallet</th><th>Nickname</th><th>HP</th><th>HP Bloqueados</th><th>Acción</th></tr></thead>
+      <tbody id="data"></tbody>
+    </table>
   </div>
 
-  <table id="tbl" style="display:none">
-    <thead>
-      <tr><th>Wallet</th><th>Nickname</th><th>HP</th><th>HP Bloqueados</th><th>Acción</th></tr>
-    </thead>
-    <tbody id="data"></tbody>
-  </table>
+  <!-- ATAQUES -->
+  <div id="tab-attacks" class="tab-content">
+    <h2>Crear / Editar Ataque</h2>
+    <div class="form-grid">
+      <div>
+        <div class="form-group">
+          <label>ID Único (ej: lanzallamas_v2)</label>
+          <input type="text" id="atk-id">
+        </div>
+        <div class="form-group">
+          <label>Nombre</label>
+          <input type="text" id="atk-name">
+        </div>
+        <div class="form-group">
+          <label>Daño (0 si es buff)</label>
+          <input type="number" id="atk-d" value="0">
+        </div>
+        <div class="form-group">
+          <label>Precisión (%)</label>
+          <input type="number" id="atk-acc" value="100">
+        </div>
+      </div>
+      <div>
+        <div class="form-group">
+          <label>Efecto (fx)</label>
+          <select id="atk-fx">
+            <option value="">Ninguno</option>
+            <option value="burn">Quemar (2t)</option>
+            <option value="poison5">Veneno (5t)</option>
+            <option value="poison3l">Veneno Leve (3t)</option>
+            <option value="stun">Aturdir</option>
+            <option value="blind">Cegar</option>
+            <option value="shield2">Escudo x2</option>
+            <option value="heal20">Curar 20</option>
+            <option value="heal30">Curar 30</option>
+            <option value="drain10">Drenar 10</option>
+            <option value="weaken">Debilitar</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>PP (99 = Infinito)</label>
+          <input type="number" id="atk-pp" value="10">
+        </div>
+        <div class="form-group">
+          <label>Tipo</label>
+          <select id="atk-type">
+            <option value="basico">Básico</option>
+            <option value="buff">Buff/Defensa</option>
+            <option value="mixto">Mixto</option>
+            <option value="especial">Especial</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Costo en HP (Para comprarlo)</label>
+          <input type="number" id="atk-cost" value="50">
+        </div>
+      </div>
+    </div>
+    <div class="form-group" style="margin-top:15px">
+      <label>Descripción</label>
+      <input type="text" id="atk-desc" placeholder="Descripción del ataque">
+    </div>
+    <button onclick="saveAttack()" style="margin-top:15px;width:100%;padding:12px">💾 Guardar Ataque en BD</button>
+  </div>
+
+  <!-- VICAMONS -->
+  <div id="tab-vicamons" class="tab-content">
+    <h2>Crear / Editar Vicamon</h2>
+    <div class="form-grid">
+      <div>
+        <div class="form-group">
+          <label>ID Único (ej: tunqui)</label>
+          <input type="text" id="vic-id">
+        </div>
+        <div class="form-group">
+          <label>Nombre</label>
+          <input type="text" id="vic-name">
+        </div>
+        <div class="form-group">
+          <label>Subtítulo</label>
+          <input type="text" id="vic-sub">
+        </div>
+        <div class="form-group">
+          <label>URL de Imagen (ej: Tunqui.png)</label>
+          <input type="text" id="vic-img">
+        </div>
+      </div>
+      <div>
+        <div class="form-group">
+          <label>Categoría</label>
+          <select id="vic-cat">
+            <option value="Zodiaco">Zodiaco</option>
+            <option value="Físico">Físico</option>
+            <option value="Especial">Especial</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Elemento</label>
+          <select id="vic-el">
+            <option value="fuego">Fuego</option>
+            <option value="tierra">Tierra</option>
+            <option value="aire">Aire</option>
+            <option value="agua">Agua</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Estilo</label>
+          <select id="vic-style">
+            <option value="agresivo">Agresivo</option>
+            <option value="defensivo">Defensivo</option>
+            <option value="tactico">Táctico</option>
+            <option value="equilibrado">Equilibrado</option>
+            <option value="veneno">Veneno</option>
+            <option value="caos">Caos</option>
+            <option value="soporte">Soporte</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Stats (JSON: {"atk":70,"def":80,"spd":90})</label>
+          <input type="text" id="vic-stats" value='{"atk":70,"def":70,"spd":70}'>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="margin-top:20px">Asignar Ataques</h3>
+    <p style="font-size:12px;color:#aaa">Selecciona 4 ataques del catálogo. Carga los ataques primero si no aparecen.</p>
+    <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr 1fr">
+      <div class="form-group"><label>Ataque 1</label><select class="vic-atk-select" id="vic-atk1"></select></div>
+      <div class="form-group"><label>Ataque 2</label><select class="vic-atk-select" id="vic-atk2"></select></div>
+      <div class="form-group"><label>Ataque 3</label><select class="vic-atk-select" id="vic-atk3"></select></div>
+      <div class="form-group"><label>Ataque 4</label><select class="vic-atk-select" id="vic-atk4"></select></div>
+    </div>
+    <button onclick="saveVicamon()" style="margin-top:15px;width:100%;padding:12px">💾 Guardar Vicamon en BD</button>
+    <button onclick="loadContent()" style="margin-top:10px;width:100%;padding:10px;background:#333">🔄 Recargar Ataques en Desplegables</button>
+  </div>
 
   <script>
     let globalPass='';
+    let contentAttacks = [];
 
-    async function loadData(){
+    function showTab(tabName, el) {
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.getElementById('tab-' + tabName).classList.add('active');
+      el.classList.add('active');
+      
+      if(tabName === 'attacks' || tabName === 'vicamons') {
+        if(contentAttacks.length === 0) loadContent();
+      }
+    }
+
+    function login(){
       globalPass=document.getElementById('pass').value;
       if(!globalPass) return alert('Ingresa la contraseña');
+      loadData();
+      loadContent();
+    }
+
+    async function loadData(){
       const res=await fetch('/admin-data?pass='+encodeURIComponent(globalPass));
       if(!res.ok){ alert('Contraseña incorrecta'); return; }
       const data=await res.json();
       
-      // Mostrar tabla
       document.getElementById('tbl').style.display='table';
       
-      // Actualizar tarjetas
       const wHp = document.getElementById('wallet-hp');
       const wUsdc = document.getElementById('wallet-usdc');
       const pHp = document.getElementById('players-hp');
@@ -101,69 +267,103 @@
       eHp.textContent = data.excedente + ' HP';
       eUsdc.textContent = data.excedenteUsdc.toFixed(4) + ' USDC';
 
-      // Colores Deuda Jugadores (Rojo si es mayor a la wallet)
-      if(data.playersTotalHp > data.platformHp) {
-        pCard.classList.add('status-red'); pCard.classList.remove('status-green');
-        pHp.classList.add('text-red'); pHp.classList.remove('text-green');
-      } else {
-        pCard.classList.add('status-green'); pCard.classList.remove('status-red');
-        pHp.classList.add('text-green'); pHp.classList.remove('text-red');
-      }
+      if(data.playersTotalHp > data.platformHp) { pCard.classList.add('status-red'); pCard.classList.remove('status-green'); pHp.classList.add('text-red'); }
+      else { pCard.classList.add('status-green'); pCard.classList.remove('status-red'); pHp.classList.add('text-green'); }
 
-      // Colores Excedente (Rojo si es negativo)
-      if(data.excedente < 0) {
-        eCard.classList.add('status-red'); eCard.classList.remove('status-green');
-        eHp.classList.add('text-red'); eHp.classList.remove('text-green');
-      } else {
-        eCard.classList.add('status-green'); eCard.classList.remove('status-red');
-        eHp.classList.add('text-green'); eHp.classList.remove('text-red');
-      }
+      if(data.excedente < 0) { eCard.classList.add('status-red'); eCard.classList.remove('status-green'); eHp.classList.add('text-red'); }
+      else { eCard.classList.add('status-green'); eCard.classList.remove('status-red'); eHp.classList.add('text-green'); }
 
-      // Colores Wallet (Rojo si es menor a la suma de deuda + excedente)
-      const totalEsperado = data.playersTotalHp + data.excedente;
-      if(data.platformHp < totalEsperado) {
-        wCard.classList.add('status-red'); wCard.classList.remove('status-green');
-        wHp.classList.add('text-red'); wHp.classList.remove('text-green');
-      } else {
-        wCard.classList.add('status-green'); wCard.classList.remove('status-red');
-        wHp.classList.add('text-green'); wHp.classList.remove('text-red');
-      }
+      if(data.platformHp < data.playersTotalHp + data.excedente) { wCard.classList.add('status-red'); wCard.classList.remove('status-green'); wHp.classList.add('text-red'); }
+      else { wCard.classList.add('status-green'); wCard.classList.remove('status-red'); wHp.classList.add('text-green'); }
 
-      // Poblar tabla de jugadores
       document.getElementById('data').innerHTML=data.players.map(p=>'<tr><td>'+p.wallet.slice(0,8)+'...'+p.wallet.slice(-4)+'</td><td>'+(p.last_name||'-')+'</td><td><input type="number" value="'+p.hp+'" id="hp-'+p.wallet+'"></td><td>'+(p.locked_hp||0)+'</td><td><button class="btn-save" onclick="saveHP(\''+p.wallet+'\')">Guardar</button></td></tr>').join('');
+    }
+
+    async function loadContent(){
+      const res = await fetch('/admin-get-content?pass='+encodeURIComponent(globalPass));
+      if(!res.ok) return;
+      const data = await res.json();
+      contentAttacks = data.attacks;
+      
+      const optionsHtml = data.attacks.map(a => `<option value="${a.id}">${a.name} (${a.type})</option>`).join('');
+      document.querySelectorAll('.vic-atk-select').forEach(sel => {
+        sel.innerHTML = '<option value="">-- Selecciona --</option>' + optionsHtml;
+      });
+    }
+
+    async function saveAttack(){
+      const data = {
+        id: document.getElementById('atk-id').value.trim(),
+        name: document.getElementById('atk-name').value.trim(),
+        d: parseInt(document.getElementById('atk-d').value) || 0,
+        acc: parseInt(document.getElementById('atk-acc').value) || 100,
+        fx: document.getElementById('atk-fx').value || null,
+        pp: parseInt(document.getElementById('atk-pp').value) || 10,
+        desc: document.getElementById('atk-desc').value.trim(),
+        type: document.getElementById('atk-type').value,
+        cost: parseInt(document.getElementById('atk-cost').value) || 0
+      };
+      if(!data.id || !data.name) return alert('ID y Nombre son obligatorios');
+
+      const res = await fetch('/admin-save-attack', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pass:globalPass, data})});
+      const result = await res.json();
+      if(result.ok) { alert('✓ Ataque guardado! El servidor lo ha recargado en memoria.'); loadContent(); }
+      else alert('Error: ' + result.msg);
+    }
+
+    async function saveVicamon(){
+      const stats = JSON.parse(document.getElementById('vic-stats').value || '{}');
+      const attacks = [
+        document.getElementById('vic-atk1').value,
+        document.getElementById('vic-atk2').value,
+        document.getElementById('vic-atk3').value,
+        document.getElementById('vic-atk4').value
+      ].filter(a => a !== "");
+
+      if(attacks.length !== 4) return alert('Debes seleccionar exactamente 4 ataques');
+
+      const data = {
+        id: document.getElementById('vic-id').value.trim(),
+        name: document.getElementById('vic-name').value.trim(),
+        sub: document.getElementById('vic-sub').value.trim(),
+        img: document.getElementById('vic-img').value.trim(),
+        cat: document.getElementById('vic-cat').value,
+        el: document.getElementById('vic-el').value,
+        style: document.getElementById('vic-style').value,
+        stats: stats,
+        attacks: attacks
+      };
+      if(!data.id || !data.name) return alert('ID y Nombre son obligatorios');
+
+      const res = await fetch('/admin-save-vicamon', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pass:globalPass, data})});
+      const result = await res.json();
+      if(result.ok) alert('✓ Vicamon guardado! El servidor lo ha recargado en memoria. Ya puedes invocarlo o verlo en el Bestiario.');
+      else alert('Error: ' + result.msg);
     }
 
     async function saveHP(wallet){
       const hp=document.getElementById('hp-'+wallet).value;
       const res=await fetch('/admin-update-hp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pass:globalPass,wallet,hp:parseInt(hp)})});
-      const data=await res.json();
-      if(data.ok) { alert('✓ HP actualizado a '+hp); loadData(); } 
-      else { alert('Error al actualizar'); }
+      if(res.ok) alert('✓ HP actualizado'); else alert('Error');
     }
 
     async function resetPlatformHP(){
-      if(!confirm('¿Resetear el HP de la plataforma a 0?')) return;
+      if(!confirm('¿Resetear HP de plataforma a 0?')) return;
       const res=await fetch('/admin-reset-platform',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pass:globalPass})});
-      if(res.ok) { alert('✓ HP de la plataforma reseteado.'); loadData(); }
+      if(res.ok) loadData();
     }
 
     async function unlockAllHP(){
-      if(!confirm('¿Desbloquear todos los HP de jugadores?')) return;
+      if(!confirm('¿Desbloquear HP de todos?')) return;
       const res=await fetch('/admin-unlock-hp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pass:globalPass})});
-      if(res.ok) { alert('✓ HP desbloqueados.'); loadData(); }
+      if(res.ok) alert('✓ HP desbloqueados');
     }
 
     async function withdrawFunds(){
-      const btn=document.getElementById('btn-withdraw');
-      if(!confirm('¿Retirar TODOS los USDC de la plataforma a tu wallet personal?')) return;
-      btn.disabled=true; btn.textContent='Procesando retiro...';
-      try{
-        const res=await fetch('/admin-withdraw',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pass:globalPass})});
-        const data=await res.json();
-        if(data.ok){ alert('✓ Retiro exitoso! Se enviaron '+data.amount+' USDC. TX: '+data.sig); location.reload(); }
-        else{ alert('Error al retirar: '+(data.msg||'Desconocido')); }
-      }catch(e){ alert('Error de conexión'); }
-      btn.disabled=false; btn.textContent='💸 Retirar Ganancias a Wallet';
+      if(!confirm('¿Retirar TODOS los USDC a tu wallet?')) return;
+      const res=await fetch('/admin-withdraw',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pass:globalPass})});
+      const data=await res.json();
+      if(data.ok) alert('✓ Retiro exitoso!'); else alert('Error: '+data.msg);
     }
   </script>
 </body>
