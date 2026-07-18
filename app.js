@@ -16,13 +16,14 @@ var mySt={}, oppSt={}, pendingFrom=null, pendingIsTraining=false, pendingIs3v3=f
 var reconnectTimer=null, isKicked=false;
 var gauntletBattleId = null, gauntletSelectedBeast = null;
 var qrScanner = null; 
-
 var pendingChallengeTargetId = null;
 var teamSelectionMode = '1v1'; 
 var selectedTeam = []; 
 var myTeam = [];
 var isGauntletChallenge = false;
+var isBoardChallenge = false; 
 var lastMsgTime = Date.now(); 
+window._boardRole = 'p1';
 
 setInterval(() => { if (ws && ws.readyState === 1) { if (Date.now() - lastMsgTime > 25000) { console.log("WS timeout, forzando reconexión..."); try { ws.close(); } catch(e) {} return; } ws.send(JSON.stringify({type:'ping'})); } }, 10000);
 
@@ -91,6 +92,10 @@ function handleMsg(m){
   if(m.type==='hp_updated'){ updateHPDisplay(m.hp); myCurrentHP=isGuest?0:m.hp; }
   if(m.type==='cashout_result'){ const btn=document.getElementById('btn-cashout'); if(!m.ok){ if(btn){btn.disabled=false;btn.textContent='💰 Cashout';} alert('Error: '+m.reason); return; } if(m.status==='confirmed'){ if(btn){btn.disabled=false;btn.textContent='💰 Cashout';} if(!isGuest) updateHPDisplay(0); alert(`✓ Cashout: ${m.usdc} USDC`); } }
   if(m.type==='physical_code_success'){ if(!myPhysicalBeasts.includes(m.beast)) myPhysicalBeasts.push(m.beast); localStorage.setItem('vicamon_physical_codes', JSON.stringify((JSON.parse(localStorage.getItem('vicamon_physical_codes')||'[]')).concat(m.code).filter((v,i,a)=>a.indexOf(v)===i))); updatePhysicalUI(); buildBestiary(); playSfx('curacion'); }
+  
+  // FIX: Manejo de mensajes informativos (ej. reto rechazado)
+  if(m.type === 'info'){ alert('ℹ️ ' + m.msg); }
+  
   if(m.type==='error'){ alert('⚠ ' + m.msg); show('s-lobby'); }
   if(m.type==='opponent_disconnected'){ const turnBar = document.getElementById('turn-bar'); if(turnBar) turnBar.innerHTML = '<span style="color:#EF9F27">⏳ Rival desconectado. Esperando reconexión (60s)...</span>'; document.querySelectorAll('.atk-btn').forEach(btn => btn.disabled = true); }
   if(m.type==='opponent_reconnected'){ const turnBar = document.getElementById('turn-bar'); if(turnBar) turnBar.innerHTML = '<span>Turno del rival...</span>'; }
@@ -109,7 +114,6 @@ function handleMsg(m){
        let btnText = 'Volver al Lobby';
        let btnAction = "show('s-lobby'); myTournamentMode = null;";
        
-       // Si ganó la semifinal, esperará en la pantalla del torneo
        if (won && m.waitForNext) {
            btnText = 'Ir a la Sala del Torneo';
            btnAction = "show('s-tournament');";
@@ -146,7 +150,7 @@ function handleMsg(m){
         const icon = won ? '🏆' : '💀'; const title = won ? '¡Victoria!' : 'Derrota'; 
         document.getElementById('result-box').innerHTML=`<div class="r-icon">${icon}</div><div class="r-title">${title}</div>${resultBody}<button class="btn btn-blue" onclick="backToLobby()">Volver</button>`; 
     }
-    window._isTeamBattle = false;  
+    window._isTeamBattle = false; 
   }
 }
 
