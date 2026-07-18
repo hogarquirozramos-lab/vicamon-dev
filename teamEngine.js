@@ -1,4 +1,5 @@
-const BEASTS = require('./beasts.js');
+// FIX: Usar BD en memoria, con beasts.js como respaldo
+const BEASTS = global.BEASTS_DB || require('./beasts.js');
 const { lobby, battles, send, broadcast, pushLobby, walletToBattle } = require('./state');
 const { applyAtk, tickEffects, getStartState } = require('./battleEngine');
 const { settleTeamMatch, updatePlayerStats, getPlayerStats, getPlayerRank, getTopPlayers } = require('./hp-balance');
@@ -205,7 +206,6 @@ async function doTeamCpuTurn(bId) {
     const idx = cpuPickAttack(cpuSt, plSt, b.cpuTeam[b.active1]);
     const atk = BEASTS[b.cpuTeam[b.active1]].attacks[idx];
     if (cpuSt.pp[idx] < 99) cpuSt.pp[idx]--;
-    // FIX: Se usaba atkKey que no existía aquí. Corregido para usar pl.team[b.active2]
     b.logs.push(...applyAtk(cpuSt, plSt, atk, BEASTS[b.cpuTeam[b.active1]].name, BEASTS[pl.team[b.active2]].name));
     if (await checkTeamDeath(bId, true, true)) return;
   }
