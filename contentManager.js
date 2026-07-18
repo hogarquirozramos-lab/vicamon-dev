@@ -57,8 +57,9 @@ async function initializeContent() {
         stats: v.stats,
         attacks: v.attacks.map(atkId => {
           const atkData = ATTACKS[atkId];
+          // FIX: Mapear 'description' de la BD a 'desc' que usa el motor
           if (!atkData) return { n: 'Desconocido', d: 0, acc: 100, pp: 99, desc: 'Error' };
-          return { n: atkData.name, d: atkData.d, acc: atkData.acc, fx: atkData.fx, pp: atkData.pp, desc: atkData.desc };
+          return { n: atkData.name, d: atkData.d, acc: atkData.acc, fx: atkData.fx, pp: atkData.pp, desc: atkData.description };
         })
       };
     });
