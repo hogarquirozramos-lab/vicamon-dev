@@ -1,4 +1,4 @@
-const BEASTS_FALLBACK = require('./beasts.js'); // El respaldo por si la BD falla
+const BEASTS_FALLBACK = require('./beasts.js');
 const { getAllAttacksDB, getAllVicamonsDB, saveAttackDB, saveVicamonDB } = require('./hp-balance');
 
 let ATTACKS = {};
@@ -17,13 +17,15 @@ async function initializeContent() {
       // 1. Migrar Ataques
       const uniqueAttacks = {};
       for (const key in BEASTS_FALLBACK) {
-        BEASTS_FALLBACK[key].attacks.forEach((atk, i) => {
+        const beast = BEASTS_FALLBACK[key];
+        for (let i = 0; i < beast.attacks.length; i++) {
+          const atk = beast.attacks[i];
           const atkId = `${key}_atk${i+1}`;
           if (!uniqueAttacks[atkId]) {
             uniqueAttacks[atkId] = { ...atk, id: atkId, type: 'basico', cost: 0 };
             await saveAttackDB(uniqueAttacks[atkId]);
           }
-        });
+        }
       }
       
       // 2. Migrar Vicamons
