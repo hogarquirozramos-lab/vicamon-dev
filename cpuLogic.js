@@ -1,4 +1,5 @@
-const BEASTS = require('./beasts.js');
+// FIX: Usar BD en memoria, con beasts.js como respaldo
+const BEASTS = global.BEASTS_DB || require('./beasts.js');
 const { lobby, battles, pushCpuBattle } = require('./state');
 const { applyAtk, tickEffects, endBattle } = require('./battleEngine');
 const { cpuPickAttack } = require('./cpuAI');
@@ -12,11 +13,11 @@ async function checkCpuDeath(bId) {
   const plId  = b.cpuIsP1 ? b.p2id : b.p1id;
   
   if (cpuSt.hp <= 0) { 
-    await endBattle(bId, plId, CPU_ID, Math.max(0, plSt.hp), b.isLabSimulation); 
+    await endBattle(bId, plId, CPU_ID, Math.max(0, plSt.hp)); 
     return true; 
   }
   if (plSt.hp <= 0) { 
-    await endBattle(bId, CPU_ID, plId, Math.max(0, cpuSt.hp), b.isLabSimulation); 
+    await endBattle(bId, CPU_ID, plId, Math.max(0, cpuSt.hp)); 
     return true; 
   }
   return false;
@@ -84,8 +85,7 @@ async function processCpuPlayerTurn(bId, playerId, atkIndex) {
     plSt.recharge--; 
     b.logs.push({t: `${pl.name} recargando...`, c: 'special'}); 
   } else if (atkIndex >= 0) {
-    // FIX: Si es batalla de laboratorio, leemos los ataques del objeto customBeast
-    const atks = b.customBeast ? b.customBeast.attacks : BEASTS[pl.beast]?.attacks;
+    const atks = BEASTS[pl.beast]?.attacks;
     const atk = atks?.[atkIndex]; if (!atk) return;
     if (plSt.pp[atkIndex] <= 0) {
       b.logs.push({t: `${pl.name} intentó usar ${atk.n} pero no tiene PP. ¡Turno perdido!`, c: 'bad'});
