@@ -4,25 +4,46 @@ const { getAllAttacksDB, getAllVicamonsDB, saveAttackDB, saveVicamonDB } = requi
 let ATTACKS = {};
 let BEASTS = {};
 
+// NUEVO: Clasificador automático de ataques
+function classifyAttackType(atk) {
+  // Si no hace daño, es un Buff/Defensa/Utilidad
+  if (!atk.d || atk.d === 0) {
+    if (atk.fx === 'chaos' || atk.fx === 'chaosHi') return 'especial'; // El caos es especial
+    return 'buff';
+  }
+  // Si tiene un efecto de estado, es Mixto
+  if (atk.fx && atk.fx !== 'null') return 'mixto';
+  
+  // Si tiene auto-daño, ignora escudo, o es un golpe muy fuerte/impreciso, es Especial
+  if (atk.self > 0 || atk.pierce || atk.d >= 28 || (atk.d >= 20 && atk.acc < 85)) return 'especial';
+  
+  // Por descarte, es Básico
+  return 'basico';
+}
+
 async function initializeContent() {
   try {
     console.log("[CONTENT] Inicializando contenido desde BD...");
     
-    // FIX: Sincronizar y reparar nombres de ataques fallback (por si la migración inicial falló)
+    // Sincronizar y reparar datos desde beasts.js (incluyendo el nuevo 'type')
     for (const key in BEASTS_FALLBACK) {
       const beast = BEASTS_FALLBACK[key];
       for (let i = 0; i < beast.attacks.length; i++) {
         const atk = beast.attacks[i];
         const atkId = `${key}_atk${i+1}`;
+        
+        // NUEVO: Calcular el tipo automáticamente
+        const attackType = classifyAttackType(atk);
+        
         const atkData = { 
           id: atkId, 
-          name: atk.n, // Mapeamos 'n' a 'name'
+          name: atk.n, 
           d: atk.d, 
           acc: atk.acc, 
           fx: atk.fx, 
           pp: atk.pp, 
-          desc: atk.desc, // Mapeamos 'desc' a 'desc' (luego en BD se guarda como 'description')
-          type: 'basico', 
+          desc: atk.desc, 
+          type: attackType, // Asignamos el tipo calculado
           cost: 0 
         };
         await saveAttackDB(atkData);
