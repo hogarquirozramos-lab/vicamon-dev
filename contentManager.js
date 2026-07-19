@@ -7,28 +7,36 @@ let BEASTS = {};
 async function initializeContent() {
   try {
     console.log("[CONTENT] Inicializando contenido desde BD...");
+    
+    // FIX: Sincronizar y reparar nombres de ataques fallback (por si la migración inicial falló)
+    for (const key in BEASTS_FALLBACK) {
+      const beast = BEASTS_FALLBACK[key];
+      for (let i = 0; i < beast.attacks.length; i++) {
+        const atk = beast.attacks[i];
+        const atkId = `${key}_atk${i+1}`;
+        const atkData = { 
+          id: atkId, 
+          name: atk.n, // Mapeamos 'n' a 'name'
+          d: atk.d, 
+          acc: atk.acc, 
+          fx: atk.fx, 
+          pp: atk.pp, 
+          desc: atk.desc, // Mapeamos 'desc' a 'desc' (luego en BD se guarda como 'description')
+          type: 'basico', 
+          cost: 0 
+        };
+        await saveAttackDB(atkData);
+      }
+    }
+
     let dbAttacks = await getAllAttacksDB();
     let dbVicamons = await getAllVicamonsDB();
 
     // Si la BD está vacía, migramos desde beasts.js (Solo ocurre la primera vez)
-    if (dbAttacks.length === 0 || dbVicamons.length === 0) {
+    if (dbVicamons.length === 0) {
       console.log("[CONTENT] BD vacía. Migrando datos iniciales desde beasts.js...");
       
-      // 1. Migrar Ataques
-      const uniqueAttacks = {};
-      for (const key in BEASTS_FALLBACK) {
-        const beast = BEASTS_FALLBACK[key];
-        for (let i = 0; i < beast.attacks.length; i++) {
-          const atk = beast.attacks[i];
-          const atkId = `${key}_atk${i+1}`;
-          if (!uniqueAttacks[atkId]) {
-            uniqueAttacks[atkId] = { ...atk, id: atkId, type: 'basico', cost: 0 };
-            await saveAttackDB(uniqueAttacks[atkId]);
-          }
-        }
-      }
-      
-      // 2. Migrar Vicamons
+      // Migrar Vicamons
       for (const key in BEASTS_FALLBACK) {
         const b = BEASTS_FALLBACK[key];
         const atkIds = b.attacks.map((_, i) => `${key}_atk${i+1}`);
@@ -39,7 +47,6 @@ async function initializeContent() {
         await saveVicamonDB(vicamonData);
       }
       
-      // Volvemos a leer la BD ahora con datos
       dbAttacks = await getAllAttacksDB();
       dbVicamons = await getAllVicamonsDB();
       console.log("[CONTENT] Migración completada.");
@@ -57,7 +64,6 @@ async function initializeContent() {
         stats: v.stats,
         attacks: v.attacks.map(atkId => {
           const atkData = ATTACKS[atkId];
-          // FIX: Mapear 'description' de la BD a 'desc' que usa el motor
           if (!atkData) return { n: 'Desconocido', d: 0, acc: 100, pp: 99, desc: 'Error' };
           return { n: atkData.name, d: atkData.d, acc: atkData.acc, fx: atkData.fx, pp: atkData.pp, desc: atkData.description };
         })
