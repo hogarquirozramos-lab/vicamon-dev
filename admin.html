@@ -9,13 +9,11 @@
     input,button,select,textarea{background:#1a1a24;border:1px solid #333;color:#fff;padding:10px;border-radius:8px;outline:none;font-family:system-ui}
     button{cursor:pointer;background:#4a9eff;border:none;font-weight:bold}
     button:disabled{opacity:.5;cursor:not-allowed}
-    
     .tabs{display:flex;gap:10px;margin-bottom:20px;border-bottom:1px solid #333}
     .tab{padding:10px 20px;cursor:pointer;color:#888;border-bottom:2px solid transparent}
     .tab.active{color:#fff;border-bottom:2px solid #4a9eff}
     .tab-content{display:none}
     .tab-content.active{display:block}
-    
     .metrics-grid{display:grid;grid-template-columns:repeat(3, 1fr);gap:15px;margin-bottom:20px}
     .metric-card{background:#14141e;padding:15px;border-radius:12px;border:1px solid #2a2a35;text-align:center}
     .metric-title{font-size:12px;color:#85B7EB;text-transform:uppercase;margin-bottom:10px}
@@ -24,22 +22,17 @@
     .status-green{border-color:#5DCAA5 !important}
     .text-red{color:#F0997B !important}
     .text-green{color:#5DCAA5 !important}
-    
     .admin-actions{margin-top:20px;display:flex;gap:10px;flex-wrap:wrap}
     .btn-withdraw{background:#F5A623;color:#000}
-    
     table{width:100%;border-collapse:collapse;background:#14141e;border-radius:12px;overflow:hidden;margin-top:20px}
     th,td{padding:12px;border-bottom:1px solid #2a2a35;text-align:left;font-size:14px}
     th{color:#85B7EB;text-transform:uppercase;font-size:12px}
     td input{width:80px;padding:5px;text-align:center}
     .btn-save{background:#5DCAA5;padding:8px 16px;color:#000}
-
     .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;background:#14141e;padding:20px;border-radius:12px}
     .form-group{display:flex;flex-direction:column;gap:5px;margin-bottom:15px}
     .form-group label{font-size:12px;color:#aaa}
     .form-group input, .form-group select{width:100%;padding:8px}
-    
-    /* NUEVO: Estilos para el catálogo de ataques */
     .atk-catalog-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:15px}
     .atk-card{background:#14141e;padding:10px;border-radius:8px;cursor:pointer;text-align:center;border:1px solid #2a2a35;transition:0.2s}
     .atk-card:hover{border-color:#4a9eff;background:#1a1a2e}
@@ -59,6 +52,7 @@
       <div class="tab active" onclick="showTab('treasury', this)">💰 Tesorería</div>
       <div class="tab" onclick="showTab('attacks', this)">⚔️ Ataques</div>
       <div class="tab" onclick="showTab('vicamons', this)">🐉 Vicamons</div>
+      <div class="tab" onclick="showTab('simulator', this)">🧪 Simulador</div>
     </div>
 
     <!-- TESORERÍA -->
@@ -167,7 +161,7 @@
       </div>
 
       <h3 style="margin-top:20px">Asignar Ataques</h3>
-      <p style="font-size:12px;color:#aaa">Selecciona 4 ataques del catálogo. Carga los ataques primero si no aparecen.</p>
+      <p style="font-size:12px;color:#aaa">Selecciona 4 attaques del catálogo. Carga los ataques primero si no aparecen.</p>
       <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr 1fr">
         <div class="form-group"><label>Ataque 1</label><select class="vic-atk-select" id="vic-atk1" onchange="updateVicAtkDesc(1)"></select><div id="vic-atk1-desc" style="font-size:10px;color:#888;margin-top:5px;min-height:25px"></div></div>
         <div class="form-group"><label>Ataque 2</label><select class="vic-atk-select" id="vic-atk2" onchange="updateVicAtkDesc(2)"></select><div id="vic-atk2-desc" style="font-size:10px;color:#888;margin-top:5px;min-height:25px"></div></div>
@@ -176,6 +170,14 @@
       </div>
       <button onclick="saveVicamon()" style="margin-top:15px;width:100%;padding:12px">💾 Guardar Vicamon en BD</button>
       <button onclick="loadContent()" style="margin-top:10px;width:100%;padding:10px;background:#333">🔄 Recargar Ataques en Desplegables</button>
+    </div>
+
+    <!-- SIMULADOR -->
+    <div id="tab-simulator" class="tab-content">
+      <h2>Coliseo de Pruebas (Balance)</h2>
+      <p>Simula batallas 1v1 entre todos los Vicamons existentes para evaluar su balance de forma rápida.</p>
+      <button onclick="runSimulation()" style="padding:12px;width:100%">⚔️ Simular Meta (Todos vs Todos)</button>
+      <div id="sim-results" style="margin-top:20px"></div>
     </div>
   </div>
 
@@ -238,15 +240,11 @@
       if(!res.ok) return;
       const data = await res.json();
       contentAttacks = data.attacks;
-      
-      // Llenar desplegables de Vicamons
       const optionsHtml = data.attacks.map(a => `<option value="${a.id}">${a.name} (${a.type})</option>`).join('');
       document.querySelectorAll('.vic-atk-select').forEach((sel, i) => {
         sel.innerHTML = '<option value="">-- Selecciona --</option>' + optionsHtml;
-        updateVicAtkDesc(i+1); // Actualizar descripción si ya tenían un valor
+        updateVicAtkDesc(i+1);
       });
-
-      // Llenar Catálogo de Ataques
       const types = ['basico', 'buff', 'mixto', 'especial'];
       let catalogHtml = '';
       types.forEach(type => {
@@ -324,6 +322,25 @@
       const result = await res.json();
       if(result.ok) alert('✓ Vicamon guardado! El servidor lo ha recargado en memoria. Ya puedes invocarlo o verlo en el Bestiario.');
       else alert('Error: ' + result.msg);
+    }
+
+    // NUEVO: Simulador
+    async function runSimulation(){
+      const btn = event.target;
+      btn.disabled = true; btn.textContent = 'Simulando... Esto puede tardar unos segundos.';
+      const res = await fetch('/admin-run-simulation', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pass:globalPass})});
+      const data = await res.json();
+      btn.disabled = false; btn.textContent = '⚔️ Simular Meta (Todos vs Todos)';
+      if(data.ok){
+        let html = '<table><tr><th>Rank</th><th>Vicamon</th><th>Victorias</th><th>Derrotas</th><th>Empates</th><th>Win Rate</th></tr>';
+        data.results.forEach((r, i) => {
+          html += `<tr><td>${i+1}</td><td>${r.name}</td><td style="color:#5DCAA5">${r.wins}</td><td style="color:#F0997B">${r.losses}</td><td>${r.draws}</td><td style="font-weight:bold">${r.winRate}%</td></tr>`;
+        });
+        html += '</table>';
+        document.getElementById('sim-results').innerHTML = html;
+      } else {
+        alert('Error en simulación');
+      }
     }
 
     async function saveHP(wallet){
