@@ -9,12 +9,13 @@ const {
   PLATFORM_WALLET, PLATFORM_THRESHOLD, USDC_PER_HP,
   getAllPlayersDebug, adminSetHP, adminResetPlatform, adminUnlockAllHP,
   getPlayerStats, getPlayerRank, getTotalPlayersHP, getExcedente,
-  getAllAttacksDB, getAllVicamonsDB, saveAttackDB, saveVicamonDB // NUEVO: Imports para Admin Lab
+  getAllAttacksDB, getAllVicamonsDB, saveAttackDB, saveVicamonDB
 } = require('./hp-balance');
 const { sendUSDC } = require('./transfer');
 
 const { setupWebSocketServer } = require('./wsHandlers');
 const { initializeContent } = require('./contentManager');
+const { runMetaSimulation } = require('./simulatorManager'); // NUEVO: Simulador
 
 const ADMIN_PASS = process.env.ADMIN_PASSWORD || process.env.INTERNAL_SECRET || '';
 const OWNER_WALLET = process.env.OWNER_WALLET || ''; 
@@ -98,7 +99,7 @@ const server = http.createServer(async (req, res) => {
   if (urlPath === '/admin-unlock-hp' && req.method === 'POST') { let body = ''; req.on('data', c => body += c); req.on('end', async () => { try { const { pass } = JSON.parse(body); if (pass !== ADMIN_PASS) { res.writeHead(403); res.end(JSON.stringify({ ok: false })); return; } await adminUnlockAllHP(); res.writeHead(200); res.end(JSON.stringify({ ok: true })); } catch(e) { res.writeHead(400); res.end(JSON.stringify({ ok: false })); } }); return; }
   if (urlPath === '/admin-withdraw' && req.method === 'POST') { let body = ''; req.on('data', c => body += c); req.on('end', async () => { try { const { pass } = JSON.parse(body); if (pass !== ADMIN_PASS) { res.writeHead(403); res.end(JSON.stringify({ ok: false, msg: 'Forbidden' })); return; } if (!OWNER_WALLET) { res.writeHead(400); res.end(JSON.stringify({ ok: false, msg: 'OWNER_WALLET no configurada en el servidor' })); return; } const balance = await getPlatformUSDCBalance(); if (balance <= 0.001) { res.writeHead(400); res.end(JSON.stringify({ ok: false, msg: 'No hay suficientes USDC para retirar' })); return; } const sig = await sendUSDC(OWNER_WALLET, balance); const hpToClear = Math.round(balance / USDC_PER_HP); await clearPlatformHp(hpToClear); res.writeHead(200); res.end(JSON.stringify({ ok: true, amount: balance, sig })); } catch(e) { res.writeHead(500); res.end(JSON.stringify({ ok: false, msg: e.message })); } }); return; }
 
-  // --- NUEVAS RUTAS PARA EL ADMIN LAB ---
+  // RUTAS ADMIN LAB
   if (urlPath === '/admin-get-content' && req.method === 'GET') {
     const pass = new URL(req.url, 'http://localhost').searchParams.get('pass') || '';
     if (pass !== ADMIN_PASS) { res.writeHead(403); res.end('Forbidden'); return; }
@@ -110,30 +111,39 @@ const server = http.createServer(async (req, res) => {
     } catch(e) { res.writeHead(500); res.end('Error'); }
     return;
   }
-
   if (urlPath === '/admin-save-attack' && req.method === 'POST') {
     let body = ''; req.on('data', c => body += c); req.on('end', async () => {
       try {
         const { pass, data } = JSON.parse(body);
         if (pass !== ADMIN_PASS) { res.writeHead(403); res.end(JSON.stringify({ ok: false })); return; }
         await saveAttackDB(data);
-        // Recargar memoria en caliente
-        await initializeContent();
+        await initializeContent(); // Recargar memoria
         res.writeHead(200); res.end(JSON.stringify({ ok: true }));
       } catch(e) { res.writeHead(400); res.end(JSON.stringify({ ok: false, msg: e.message })); }
     });
     return;
   }
-
   if (urlPath === '/admin-save-vicamon' && req.method === 'POST') {
     let body = ''; req.on('data', c => body += c); req.on('end', async () => {
       try {
         const { pass, data } = JSON.parse(body);
         if (pass !== ADMIN_PASS) { res.writeHead(403); res.end(JSON.stringify({ ok: false })); return; }
         await saveVicamonDB(data);
-        // Recargar memoria en caliente
-        await initializeContent();
+        await initializeContent(); // Recargar memoria
         res.writeHead(200); res.end(JSON.stringify({ ok: true }));
+      } catch(e) { res.writeHead(400); res.end(JSON.stringify({ ok: false, msg: e.message })); }
+    });
+    return;
+  }
+  
+  // NUEVO: RUTA SIMULADOR
+  if (urlPath === '/admin-run-simulation' && req.method === 'POST') {
+    let body = ''; req.on('data', c => body += c); req.on('end', async () => {
+      try {
+        const { pass } = JSON.parse(body);
+        if (pass !== ADMIN_PASS) { res.writeHead(403); res.end(JSON.stringify({ ok: false })); return; }
+        const results = await runMetaSimulation();
+        res.writeHead(200); res.end(JSON.stringify({ ok: true, results }));
       } catch(e) { res.writeHead(400); res.end(JSON.stringify({ ok: false, msg: e.message })); }
     });
     return;
@@ -157,12 +167,8 @@ const server = http.createServer(async (req, res) => {
   fs.readFile(fp, (err, data) => { if (err) { res.writeHead(404); res.end('Not found'); return; } res.writeHead(200, { 'Content-Type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream' }); res.end(data); });
 });
 
-async function checkPlatformTransfer() { const usdc = await getPlatformUsdc(); if (usdc < PLATFORM_THRESHOLD) return; try { const sig = await sendUSDC(PLATFORM_WALLET, usdc); const hpCleared = Math.round(usdc / USDC_PER_HP); await clearPlatformHp(hpCleared); } catch (e) {} }
-
 const wss = new WebSocketServer({ server });
-
 setupWebSocketServer(wss, getPlatformUSDCBalance);
-
 setTimeout(() => { try { require('./payment-monitor'); } catch(e) { console.error('[ERROR] Monitor:', e.message); } }, 5000);
 
 initializeContent().then(() => {
