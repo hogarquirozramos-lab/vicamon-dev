@@ -101,13 +101,22 @@ function handleMsg(m){
     if(isGauntletResult && !isGuest) updateHPDisplay(newHp); 
     if(isTeamResult && !isTrainingResult && !isGuest) updateHPDisplay(newHp); 
     
-    // NUEVO: Lógica FOMO para invitados
+    // NUEVO: Lógica FOMO dinámica para invitados
     let fomoMsg = '';
     let fomoBtn = '';
     if (isGuest) {
         fomoBtn = `<button class="btn btn-blue" style="margin-top:15px;width:100%;background:rgba(246,226,102,.2);border-color:rgba(246,226,102,.4);color:#F6E265" onclick="connectPhantom()">👻 Conectar Wallet y Ganar HP Real</button>`;
+        
+        let myXpTemp = 0;
+        if (won) {
+            if (isTeamResult && isTrainingResult) myXpTemp = m.winnerXp || 0;
+            else if (isTrainingResult) myXpTemp = m.winnerXp || 0;
+            else if (isCpuResult) myXpTemp = m.winnerXp || 0;
+        }
+        
         if (won && (isTrainingResult || isCpuResult)) {
-            fomoMsg = `<div style="margin-top:12px;padding:12px;background:rgba(246,226,102,.1);border:1px solid rgba(246,226,102,.3);border-radius:8px;color:#F6E265;font-size:13px;line-height:1.5;">💡 <b>¡Estás perdiendo dinero!</b><br>Ganaste XP, pero si tuvieras tu Wallet conectada, habrías ganado <b>100 HP ($0.10 USDC)</b> reales.</div>`;
+            const usdEq = (myXpTemp * 0.001).toFixed(3);
+            fomoMsg = `<div style="margin-top:12px;padding:12px;background:rgba(246,226,102,.1);border:1px solid rgba(246,226,102,.3);border-radius:8px;color:#F6E265;font-size:13px;line-height:1.5;">💡 <b>¡Estás perdiendo dinero!</b><br>Ganaste ${myXpTemp} XP, pero si tuvieras tu Wallet conectada, habrías ganado <b>${myXpTemp} HP ($${usdEq} USDC)</b> reales.</div>`;
         } else if (!won && (isTrainingResult || isCpuResult)) {
             fomoMsg = `<div style="margin-top:12px;padding:12px;background:rgba(74,158,255,.1);border:1px solid rgba(74,158,255,.3);border-radius:8px;color:#85B7EB;font-size:13px;line-height:1.5;">💡 <b>¿Jugamos en serio?</b><br>Conecta tu Wallet para batallar por HP y ganar USDC en cada victoria.</div>`;
         }
