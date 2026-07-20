@@ -169,14 +169,13 @@ function rejectChallenge(){
     pendingIsTraining=false; pendingIs3v3=false; 
 }
 
-// NUEVO: Obtener lista de clasificación completa
 function getFullLeaderboard() {
   if (ws && ws.readyState === 1) {
     ws.send(JSON.stringify({ type: 'get_full_leaderboard' }));
   }
 }
 
-// NUEVO: Renderizar la tabla de clasificación en el Modal
+// NUEVO: Renderizar la tabla de clasificación mostrando la Clase (Tier) de cada jugador
 function renderFullLeaderboard(list) {
   const listEl = document.getElementById('full-leaderboard-list');
   if (!list || list.length === 0) {
@@ -184,13 +183,23 @@ function renderFullLeaderboard(list) {
     document.getElementById('modal-leaderboard').classList.remove('hidden');
     return;
   }
+  
+  const tierNames = {
+    1: { name: '👑 VicaLegend', color: '#F6E265' },
+    2: { name: '🌌 VicaMaster', color: '#CFA9EC' },
+    3: { name: '⚔️ VicaWarrior', color: '#85B7EB' },
+    4: { name: '🛸 VicaExplorer', color: '#5DCAA5' },
+    5: { name: '🎓 VicaTrainer', color: '#F0997B' }
+  };
+  
   let html = '<table style="width:100%; border-collapse: collapse; font-size:13px;">';
   list.forEach((p, i) => {
-    const rank = i + 1;
-    const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${rank}`;
+    const rank = p.rank || (i + 1);
+    const tierInfo = tierNames[p.tier] || tierNames[5];
     html += `<tr style="border-bottom:1px solid #2a2a35;">
-      <td style="padding:8px; width:40px; text-align:center; font-weight:bold; color:#aaa;">${medal}</td>
+      <td style="padding:8px; width:40px; text-align:center; font-weight:bold; color:#aaa;">#${rank}</td>
       <td style="padding:8px; font-weight:600; text-transform:uppercase;">${p.last_name || 'Anónimo'}</td>
+      <td style="padding:8px; font-size:11px; color:${tierInfo.color}; white-space:nowrap;">${tierInfo.name}</td>
       <td style="padding:8px; text-align:right; color:#5DCAA5;">${p.wins}V</td>
       <td style="padding:8px; text-align:right; color:#F0997B; width:40px;">${p.losses}D</td>
     </tr>`;
