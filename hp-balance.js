@@ -39,8 +39,8 @@ async function adminUnlockAllHP() { await pool.query('UPDATE players SET hp = hp
 async function updatePlayerName(wallet, name) { await pool.query(`INSERT INTO players (wallet, last_name) VALUES ($1, $2) ON CONFLICT (wallet) DO UPDATE SET last_name = $2`, [wallet, name]); }
 async function updatePlayerStats(winnerWallet, loserWallet) { await pool.query('UPDATE players SET wins = wins + 1 WHERE wallet = $1', [winnerWallet]); await pool.query('UPDATE players SET losses = losses + 1 WHERE wallet = $1', [loserWallet]); }
 async function getTopPlayers(limit = 3) { const res = await pool.query('SELECT last_name, wins, losses FROM players WHERE wins > 0 ORDER BY wins DESC, losses ASC LIMIT $1', [limit]); return res.rows; }
+async function getLeaderboard(limit = 100) { const res = await pool.query('SELECT last_name, wins, losses FROM players WHERE wins > 0 OR losses > 0 ORDER BY wins DESC, losses ASC LIMIT $1', [limit]); return res.rows; }
 
-// NUEVO: getPlayerStats ahora calcula el Tier (Clase) dinámicamente
 async function getPlayerStats(wallet) {
   const res = await pool.query('SELECT wins, losses FROM players WHERE wallet = $1', [wallet]);
   if (res.rows.length === 0) return { wins: 0, losses: 0, rank: null, tier: 0, totalRanked: 0 };
@@ -58,16 +58,16 @@ async function getPlayerStats(wallet) {
     
     if (totalRanked > 0) {
       const percentile = (rank / totalRanked) * 100;
-      if (percentile <= 5) tier = 1; // Top 5%
-      else if (percentile <= 15) tier = 2; // Top 15%
-      else if (percentile <= 30) tier = 3; // Top 30%
-      else if (percentile <= 50) tier = 4; // Top 50%
-      else tier = 5; // Bottom 50%
+      if (percentile <= 5) tier = 1;
+      else if (percentile <= 15) tier = 2;
+      else if (percentile <= 30) tier = 3;
+      else if (percentile <= 50) tier = 4;
+      else tier = 5;
     } else {
       tier = 5;
     }
   } else {
-    tier = 0; // Unranked (Huevo)
+    tier = 0;
   }
   
   return { wins, losses, rank, tier, totalRanked };
@@ -128,18 +128,8 @@ async function getTotalPlayersHP() {
   return totalHp + totalLocked;
 }
 
-async function getExcedente() {
-  return cachedExcedente; 
-}
-
-async function getTowerStatus() {
-  const excedente = cachedExcedente;
-  return {
-    grandAvailable: excedente >= 2000,
-    trainAvailable: excedente >= 10,
-    excedente: excedente
-  };
-}
+async function getExcedente() { return cachedExcedente; }
+async function getTowerStatus() { const excedente = cachedExcedente; return { grandAvailable: excedente >= 2000, trainAvailable: excedente >= 10, excedente: excedente }; }
 
 async function claimTowerGrandPrize(wallet) {
   const client = await pool.connect();
@@ -149,32 +139,18 @@ async function claimTowerGrandPrize(wallet) {
     const playersRes = await client.query('SELECT COALESCE(SUM(hp), 0) as total_hp, COALESCE(SUM(locked_hp), 0) as total_locked FROM players');
     const playersHp = parseInt(playersRes.rows[0].total_hp, 10) + parseInt(playersRes.rows[0].total_locked, 10);
     const excedente = platRes.rows[0].hp - playersHp;
-
-    if (excedente < 2000) {
-      await client.query('ROLLBACK');
-      return false; 
-    }
-    
+    if (excedente < 2000) { await client.query('ROLLBACK'); return false; } 
     await client.query('UPDATE players SET locked_hp = GREATEST(0, locked_hp - 100), hp = hp + 1000 WHERE wallet = $1', [wallet]);
     await client.query('UPDATE platform SET hp = hp - 900 WHERE id = 1');
-    
     await client.query('COMMIT');
     updateCachedExcedente(); 
     return true;
-  } catch(e) {
-    await client.query('ROLLBACK');
-    return false;
-  } finally {
-    client.release();
-  }
+  } catch(e) { await client.query('ROLLBACK'); return false; } finally { client.release(); }
 }
 
 async function checkTowerTrainingWin(wallet) {
   const res = await pool.query('SELECT tower_train_date FROM players WHERE wallet = $1', [wallet]);
-  if (res.rows.length > 0) {
-    const today = new Date().toISOString().split('T')[0];
-    return res.rows[0].tower_train_date === today;
-  }
+  if (res.rows.length > 0) { const today = new Date().toISOString().split('T')[0]; return res.rows[0].tower_train_date === today; }
   return false;
 }
 
@@ -183,78 +159,40 @@ async function claimTowerTrainingWin(wallet) {
   try {
     await client.query('BEGIN');
     const res = await client.query('SELECT tower_train_date, hp FROM players WHERE wallet = $1 FOR UPDATE', [wallet]);
-    if (res.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return false;
-    }
+    if (res.rows.length === 0) { await client.query('ROLLBACK'); return false; }
     const today = new Date().toISOString().split('T')[0];
-    if (res.rows[0].tower_train_date === today) {
-      await client.query('ROLLBACK');
-      return false;
-    }
-    
+    if (res.rows[0].tower_train_date === today) { await client.query('ROLLBACK'); return false; }
     const platRes = await client.query('SELECT hp FROM platform WHERE id = 1 FOR UPDATE');
     const playersRes = await client.query('SELECT COALESCE(SUM(hp), 0) as total_hp, COALESCE(SUM(locked_hp), 0) as total_locked FROM players');
     const playersHp = parseInt(playersRes.rows[0].total_hp, 10) + parseInt(playersRes.rows[0].total_locked, 10);
     const excedente = platRes.rows[0].hp - playersHp;
-
-    if (excedente < 10) {
-      await client.query('ROLLBACK');
-      return false;
-    }
-
+    if (excedente < 10) { await client.query('ROLLBACK'); return false; }
     await client.query('UPDATE players SET hp = hp + 10, tower_train_date = $1 WHERE wallet = $2', [today, wallet]);
     await client.query('UPDATE platform SET hp = hp - 10 WHERE id = 1');
     await client.query('COMMIT');
     updateCachedExcedente(); 
     const newHp = res.rows[0].hp + 10;
     return { ok: true, newHp };
-  } catch(e) {
-    await client.query('ROLLBACK');
-    return false;
-  } finally {
-    client.release();
-  }
+  } catch(e) { await client.query('ROLLBACK'); return false; } finally { client.release(); }
 }
 
-async function checkOwnerWithdrawal() {
-  if (cachedExcedente >= 4000) {
-    return { shouldWithdraw: true, amountUsdc: 1.0, hpToClear: 1000 };
-  }
-  return { shouldWithdraw: false };
-}
-
-async function setPlatformHp(hp) { 
-  await pool.query('UPDATE platform SET hp = $1 WHERE id = 1', [hp]); 
-  updateCachedExcedente();
-}
-
-async function addPlatformHp(hp) {
-  await pool.query('UPDATE platform SET hp = hp + $1 WHERE id = 1', [hp]);
-  updateCachedExcedente();
-}
-
+async function checkOwnerWithdrawal() { if (cachedExcedente >= 4000) { return { shouldWithdraw: true, amountUsdc: 1.0, hpToClear: 1000 }; } return { shouldWithdraw: false }; }
+async function setPlatformHp(hp) { await pool.query('UPDATE platform SET hp = $1 WHERE id = 1', [hp]); updateCachedExcedente(); }
+async function addPlatformHp(hp) { await pool.query('UPDATE platform SET hp = hp + $1 WHERE id = 1', [hp]); updateCachedExcedente(); }
 async function cashout(wallet) { const client = await pool.connect(); try { await client.query('BEGIN'); const res = await client.query('SELECT hp FROM players WHERE wallet = $1 FOR UPDATE', [wallet]); const hp = res.rows.length > 0 ? res.rows[0].hp : 0; if (hp <= 0) { await client.query('ROLLBACK'); return { ok: false, reason: 'no_hp', hp: 0, usdc: 0 }; } await client.query('UPDATE players SET hp = 0 WHERE wallet = $1', [wallet]); await client.query('COMMIT'); updateCachedExcedente(); return { ok: true, hp, usdc: parseFloat((hp * USDC_PER_HP).toFixed(6)) }; } catch(e) { await client.query('ROLLBACK'); return { ok: false, reason: 'db_error', hp: 0, usdc: 0 }; } finally { client.release(); } }
 async function getPlatformHp() { const res = await pool.query('SELECT hp FROM platform WHERE id = 1'); return res.rows.length > 0 ? res.rows[0].hp : 0; }
 async function getPlatformUsdc() { return parseFloat(((await getPlatformHp()) * USDC_PER_HP).toFixed(6)); }
 async function clearPlatformHp(hp) { await pool.query('UPDATE platform SET hp = GREATEST(0, hp - $1) WHERE id = 1', [hp]); updateCachedExcedente(); }
-
 async function getAllAttacksDB() { const res = await pool.query('SELECT * FROM attacks'); return res.rows; }
 async function getAllVicamonsDB() { const res = await pool.query('SELECT * FROM vicamons'); return res.rows; }
-async function saveAttackDB(data) { 
-  await pool.query(`INSERT INTO attacks (id, name, d, acc, fx, pp, description, type, cost) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (id) DO UPDATE SET name=$2, d=$3, acc=$4, fx=$5, pp=$6, description=$7, type=$8, cost=$9`, 
-  [data.id, data.name, data.d, data.acc, data.fx, data.pp, data.desc, data.type, data.cost]); 
-}
-async function saveVicamonDB(data) { 
-  await pool.query(`INSERT INTO vicamons (id, name, sub, img, el, style, cat, stats, attacks) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (id) DO UPDATE SET name=$2, sub=$3, img=$4, el=$5, style=$6, cat=$7, stats=$8, attacks=$9`, 
-  [data.id, data.name, data.sub, data.img, data.el, data.style, data.cat, JSON.stringify(data.stats), JSON.stringify(data.attacks)]); 
-}
+async function saveAttackDB(data) { await pool.query(`INSERT INTO attacks (id, name, d, acc, fx, pp, description, type, cost) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (id) DO UPDATE SET name=$2, d=$3, acc=$4, fx=$5, pp=$6, description=$7, type=$8, cost=$9`, [data.id, data.name, data.d, data.acc, data.fx, data.pp, data.desc, data.type, data.cost]); }
+async function saveVicamonDB(data) { await pool.query(`INSERT INTO vicamons (id, name, sub, img, el, style, cat, stats, attacks) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (id) DO UPDATE SET name=$2, sub=$3, img=$4, el=$5, style=$6, cat=$7, stats=$8, attacks=$9`, [data.id, data.name, data.sub, data.img, data.el, data.style, data.cat, JSON.stringify(data.stats), JSON.stringify(data.attacks)]); }
 
 module.exports = {
   getHP, addHP, hasHP, lockHP, unlockHP, settleMatch, settleTeamMatch, settleGauntletTiered, cashout,
   getPlatformHp, getPlatformUsdc, clearPlatformHp, setPlatformHp, addPlatformHp,
   PLATFORM_WALLET, PLATFORM_THRESHOLD: 1.00, USDC_PER_HP,
-  getAllPlayersDebug, updatePlayerName, updatePlayerStats, getTopPlayers,
+  getAllPlayersDebug, updatePlayerName, updatePlayerStats, getTopPlayers, getLeaderboard,
   getPlayerStats, getPlayerRank,
   isTxProcessed, markTxProcessed,
   adminSetHP, adminResetPlatform, adminUnlockAllHP,
