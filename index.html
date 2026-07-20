@@ -192,6 +192,7 @@
     <div id="leaderboard-podium" style="display:flex;justify-content:space-between;gap:8px">
       <div style="flex:1;color:rgba(255,255,255,.3);text-align:center;font-size:11px;padding:20px 0">Gana batallas reales para aparecer aquí</div>
     </div>
+    <button class="btn btn-sm" style="width:100%; margin-top:10px;" onclick="getFullLeaderboard()">📜 Ver Clasificación Completa</button>
   </div>
   
   <div class="lobby-zone">
@@ -395,6 +396,14 @@
   </div>
 </div>
 
+<div class="modal-bg hidden" id="modal-leaderboard">
+  <div class="modal" style="max-width:450px; text-align:left;">
+    <h3 style="text-align:center;">🏆 Clasificación Global</h3>
+    <div id="full-leaderboard-list" style="max-height: 300px; overflow-y: auto; margin-top: 15px; border-top: 1px solid #333;"></div>
+    <button class="btn btn-sm btn-red" style="margin-top: 15px; width:100%;" onclick="document.getElementById('modal-leaderboard').classList.add('hidden')">Cerrar</button>
+  </div>
+</div>
+  
 <!-- SCRIPTS -->
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="beasts.js"></script>
