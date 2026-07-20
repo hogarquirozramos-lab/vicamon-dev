@@ -69,7 +69,7 @@ window.addEventListener('load', async () => {
 
 async function checkHPNow(fromConnect=false) { if (!myWallet || isGuest) return; try { const res = await fetch('/hp?wallet='+myWallet); const data = await res.json(); const hp = data.hp || 0; const loginHp = document.getElementById('wallet-hp'); if(loginHp){ loginHp.textContent=hp+' HP'; loginHp.style.color=hp>=100?'#5DCAA5':'#EF9F27'; } updateHPDisplay(hp); if (data.stats) updateProfileUI(data.stats); if(document.getElementById('s-lobby').classList.contains('active') && ws){ ws.send(JSON.stringify({type:'ping'})); } if (hp >= 100) { document.getElementById('step-charge').style.display='none'; document.getElementById('step-name').style.opacity='1'; document.getElementById('step-name').style.pointerEvents='auto'; } else { document.getElementById('step-charge').style.display='block'; document.getElementById('step-name').style.opacity='1'; document.getElementById('step-name').style.pointerEvents='auto'; } } catch(e) { document.getElementById('wallet-hp').textContent = 'Error'; } }
 
-// NUEVO: Lógica de Tiers (Clases) actualizada
+// NUEVO: Nombres de Rangos estilo Vicamon
 function updateProfileUI(stats) { 
   if (stats) myStats = stats; 
   const nameEl = document.getElementById('profile-name'); 
@@ -81,12 +81,12 @@ function updateProfileUI(stats) {
     document.getElementById('profile-losses').textContent = myStats.losses || 0; 
     
     const tierNames = {
-      0: { name: '🥚 Huevo Energético', color: '#aaa' },
-      1: { name: '👑 Leyenda Vital', color: '#F6E265' },
-      2: { name: '🌌 Maestro Estelar', color: '#CFA9EC' },
-      3: { name: '⚔️ Guerrero Astral', color: '#85B7EB' },
-      4: { name: '🛸 Explorador Cósmico', color: '#5DCAA5' },
-      5: { name: '🐣 Aprendiz Novato', color: '#F0997B' }
+      0: { name: '🥚 VicaNoob', color: '#aaa' },
+      1: { name: '👑 VicaLegend', color: '#F6E265' },
+      2: { name: '🌌 VicaMaster', color: '#CFA9EC' },
+      3: { name: '⚔️ VicaWarrior', color: '#85B7EB' },
+      4: { name: '🛸 VicaExplorer', color: '#5DCAA5' },
+      5: { name: '🎓 VicaTrainer', color: '#F0997B' }
     };
     
     const tierInfo = tierNames[myStats.tier || 0];
