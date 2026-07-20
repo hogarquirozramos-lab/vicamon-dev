@@ -39,7 +39,29 @@ async function adminUnlockAllHP() { await pool.query('UPDATE players SET hp = hp
 async function updatePlayerName(wallet, name) { await pool.query(`INSERT INTO players (wallet, last_name) VALUES ($1, $2) ON CONFLICT (wallet) DO UPDATE SET last_name = $2`, [wallet, name]); }
 async function updatePlayerStats(winnerWallet, loserWallet) { await pool.query('UPDATE players SET wins = wins + 1 WHERE wallet = $1', [winnerWallet]); await pool.query('UPDATE players SET losses = losses + 1 WHERE wallet = $1', [loserWallet]); }
 async function getTopPlayers(limit = 3) { const res = await pool.query('SELECT last_name, wins, losses FROM players WHERE wins > 0 ORDER BY wins DESC, losses ASC LIMIT $1', [limit]); return res.rows; }
-async function getLeaderboard(limit = 100) { const res = await pool.query('SELECT last_name, wins, losses FROM players WHERE wins > 0 OR losses > 0 ORDER BY wins DESC, losses ASC LIMIT $1', [limit]); return res.rows; }
+
+// NUEVO: getLeaderboard ahora calcula el Tier y el Rank de cada jugador en la lista
+async function getLeaderboard(limit = 100) {
+    const tRes = await pool.query('SELECT COUNT(*) as total FROM players WHERE wins > 0 OR losses > 0');
+    const totalRanked = parseInt(tRes.rows[0].total, 10);
+    if (totalRanked === 0) return [];
+    
+    const res = await pool.query('SELECT last_name, wins, losses FROM players WHERE wins > 0 OR losses > 0 ORDER BY wins DESC, losses ASC LIMIT $1', [limit]);
+    
+    return res.rows.map((p, index) => {
+        const rank = index + 1;
+        let tier = 5; 
+        if (totalRanked > 0) {
+            const percentile = (rank / totalRanked) * 100;
+            if (percentile <= 5) tier = 1;
+            else if (percentile <= 15) tier = 2;
+            else if (percentile <= 30) tier = 3;
+            else if (percentile <= 50) tier = 4;
+            else tier = 5;
+        }
+        return { ...p, rank, tier };
+    });
+}
 
 async function getPlayerStats(wallet) {
   const res = await pool.query('SELECT wins, losses FROM players WHERE wallet = $1', [wallet]);
