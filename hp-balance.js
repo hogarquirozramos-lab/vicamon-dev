@@ -19,7 +19,6 @@ pool.query(`CREATE TABLE IF NOT EXISTS vicamons (id VARCHAR(50) PRIMARY KEY, nam
 const USDC_PER_HP = 0.001;
 const PLATFORM_WALLET = process.env.PLATFORM_WALLET || 'U3jwNBDnw4kCQ5CYRp5mAf4hbr4dadyUGXDhXdyLXMv';
 
-// FIX: Caché en memoria para evitar caída del servidor por exceso de consultas
 let cachedExcedente = 0;
 async function updateCachedExcedente() {
   try {
@@ -28,9 +27,8 @@ async function updateCachedExcedente() {
     cachedExcedente = platformHp - playersHp;
   } catch(e) { console.error("Error actualizando excedente caché:", e); }
 }
-// Actualizar el excedente cada 10 segundos en segundo plano
 setInterval(updateCachedExcedente, 10000);
-updateCachedExcedente(); // Llamada inicial
+updateCachedExcedente(); 
 
 async function getAllPlayersDebug() { const res = await pool.query('SELECT wallet, hp, locked_hp, wins, losses, last_name FROM players'); return res.rows; }
 async function isTxProcessed(signature) { const res = await pool.query('SELECT 1 FROM processed_txs WHERE signature = $1', [signature]); return res.rows.length > 0; }
@@ -41,8 +39,45 @@ async function adminUnlockAllHP() { await pool.query('UPDATE players SET hp = hp
 async function updatePlayerName(wallet, name) { await pool.query(`INSERT INTO players (wallet, last_name) VALUES ($1, $2) ON CONFLICT (wallet) DO UPDATE SET last_name = $2`, [wallet, name]); }
 async function updatePlayerStats(winnerWallet, loserWallet) { await pool.query('UPDATE players SET wins = wins + 1 WHERE wallet = $1', [winnerWallet]); await pool.query('UPDATE players SET losses = losses + 1 WHERE wallet = $1', [loserWallet]); }
 async function getTopPlayers(limit = 3) { const res = await pool.query('SELECT last_name, wins, losses FROM players WHERE wins > 0 ORDER BY wins DESC, losses ASC LIMIT $1', [limit]); return res.rows; }
-async function getPlayerStats(wallet) { const res = await pool.query('SELECT wins, losses FROM players WHERE wallet = $1', [wallet]); if (res.rows.length > 0) return res.rows[0]; return { wins: 0, losses: 0 }; }
-async function getPlayerRank(wallet) { const pRes = await pool.query('SELECT wins, losses FROM players WHERE wallet = $1', [wallet]); if (pRes.rows.length === 0 || pRes.rows[0].wins === 0) return null; const { wins, losses } = pRes.rows[0]; const rRes = await pool.query('SELECT COUNT(*) + 1 as rank FROM players WHERE wins > $1 OR (wins = $1 AND losses < $2)', [wins, losses]); return parseInt(rRes.rows[0].rank, 10); }
+
+// NUEVO: getPlayerStats ahora calcula el Tier (Clase) dinámicamente
+async function getPlayerStats(wallet) {
+  const res = await pool.query('SELECT wins, losses FROM players WHERE wallet = $1', [wallet]);
+  if (res.rows.length === 0) return { wins: 0, losses: 0, rank: null, tier: 0, totalRanked: 0 };
+  
+  const { wins, losses } = res.rows[0];
+  let rank = null;
+  let tier = 0; 
+  let totalRanked = 0;
+
+  if (wins > 0 || losses > 0) {
+    const rRes = await pool.query('SELECT COUNT(*) + 1 as rank FROM players WHERE wins > $1 OR (wins = $1 AND losses < $2)', [wins, losses]);
+    const tRes = await pool.query('SELECT COUNT(*) as total FROM players WHERE wins > 0 OR losses > 0');
+    rank = parseInt(rRes.rows[0].rank, 10);
+    totalRanked = parseInt(tRes.rows[0].total, 10);
+    
+    if (totalRanked > 0) {
+      const percentile = (rank / totalRanked) * 100;
+      if (percentile <= 5) tier = 1; // Top 5%
+      else if (percentile <= 15) tier = 2; // Top 15%
+      else if (percentile <= 30) tier = 3; // Top 30%
+      else if (percentile <= 50) tier = 4; // Top 50%
+      else tier = 5; // Bottom 50%
+    } else {
+      tier = 5;
+    }
+  } else {
+    tier = 0; // Unranked (Huevo)
+  }
+  
+  return { wins, losses, rank, tier, totalRanked };
+}
+
+async function getPlayerRank(wallet) { 
+  const stats = await getPlayerStats(wallet);
+  return stats.rank;
+}
+
 async function getHP(wallet) { const res = await pool.query('SELECT hp FROM players WHERE wallet = $1', [wallet]); return res.rows.length > 0 ? res.rows[0].hp : 0; }
 async function addHP(wallet, hp) { await pool.query(`INSERT INTO players (wallet, hp, locked_hp) VALUES ($1, $2, 0) ON CONFLICT (wallet) DO UPDATE SET hp = players.hp + $2`, [wallet, hp]); return await getHP(wallet); }
 async function hasHP(wallet, amount = 100) { return (await getHP(wallet)) >= amount; }
@@ -94,7 +129,7 @@ async function getTotalPlayersHP() {
 }
 
 async function getExcedente() {
-  return cachedExcedente; // FIX: Devuelve el valor en caché
+  return cachedExcedente; 
 }
 
 async function getTowerStatus() {
@@ -124,7 +159,7 @@ async function claimTowerGrandPrize(wallet) {
     await client.query('UPDATE platform SET hp = hp - 900 WHERE id = 1');
     
     await client.query('COMMIT');
-    updateCachedExcedente(); // Actualizar caché
+    updateCachedExcedente(); 
     return true;
   } catch(e) {
     await client.query('ROLLBACK');
@@ -171,7 +206,7 @@ async function claimTowerTrainingWin(wallet) {
     await client.query('UPDATE players SET hp = hp + 10, tower_train_date = $1 WHERE wallet = $2', [today, wallet]);
     await client.query('UPDATE platform SET hp = hp - 10 WHERE id = 1');
     await client.query('COMMIT');
-    updateCachedExcedente(); // Actualizar caché
+    updateCachedExcedente(); 
     const newHp = res.rows[0].hp + 10;
     return { ok: true, newHp };
   } catch(e) {
@@ -204,7 +239,6 @@ async function getPlatformHp() { const res = await pool.query('SELECT hp FROM pl
 async function getPlatformUsdc() { return parseFloat(((await getPlatformHp()) * USDC_PER_HP).toFixed(6)); }
 async function clearPlatformHp(hp) { await pool.query('UPDATE platform SET hp = GREATEST(0, hp - $1) WHERE id = 1', [hp]); updateCachedExcedente(); }
 
-// FUNCIONES PARA CONTENT MANAGER
 async function getAllAttacksDB() { const res = await pool.query('SELECT * FROM attacks'); return res.rows; }
 async function getAllVicamonsDB() { const res = await pool.query('SELECT * FROM vicamons'); return res.rows; }
 async function saveAttackDB(data) { 
