@@ -13,14 +13,24 @@ pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS wins INTEGER DEFAULT 0;
 pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS losses INTEGER DEFAULT 0;`).catch(e=>{});
 pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS last_name VARCHAR(20);`).catch(e=>{});
 pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS tower_train_date VARCHAR(10);`).catch(e=>{});
-
-// NUEVAS TABLAS PARA CONTENT MANAGER (VICAMONS Y ATTACKS)
-// FIX: Cambiamos 'desc' por 'description' porque 'desc' es una palabra reservada en SQL
 pool.query(`CREATE TABLE IF NOT EXISTS attacks (id VARCHAR(50) PRIMARY KEY, name VARCHAR(50), d INT, acc INT, fx VARCHAR(50), pp INT, description TEXT, type VARCHAR(20), cost INT);`).catch(e => console.error("Error creando tabla attacks:", e));
 pool.query(`CREATE TABLE IF NOT EXISTS vicamons (id VARCHAR(50) PRIMARY KEY, name VARCHAR(50), sub VARCHAR(50), img VARCHAR(100), el VARCHAR(20), style VARCHAR(20), cat VARCHAR(20), stats JSONB, attacks JSONB);`).catch(e => console.error("Error creando tabla vicamons:", e));
 
 const USDC_PER_HP = 0.001;
 const PLATFORM_WALLET = process.env.PLATFORM_WALLET || 'U3jwNBDnw4kCQ5CYRp5mAf4hbr4dadyUGXDhXdyLXMv';
+
+// FIX: Caché en memoria para evitar caída del servidor por exceso de consultas
+let cachedExcedente = 0;
+async function updateCachedExcedente() {
+  try {
+    const platformHp = await getPlatformHp();
+    const playersHp = await getTotalPlayersHP();
+    cachedExcedente = platformHp - playersHp;
+  } catch(e) { console.error("Error actualizando excedente caché:", e); }
+}
+// Actualizar el excedente cada 10 segundos en segundo plano
+setInterval(updateCachedExcedente, 10000);
+updateCachedExcedente(); // Llamada inicial
 
 async function getAllPlayersDebug() { const res = await pool.query('SELECT wallet, hp, locked_hp, wins, losses, last_name FROM players'); return res.rows; }
 async function isTxProcessed(signature) { const res = await pool.query('SELECT 1 FROM processed_txs WHERE signature = $1', [signature]); return res.rows.length > 0; }
@@ -84,13 +94,11 @@ async function getTotalPlayersHP() {
 }
 
 async function getExcedente() {
-  const platformHp = await getPlatformHp();
-  const playersHp = await getTotalPlayersHP();
-  return platformHp - playersHp;
+  return cachedExcedente; // FIX: Devuelve el valor en caché
 }
 
 async function getTowerStatus() {
-  const excedente = await getExcedente();
+  const excedente = cachedExcedente;
   return {
     grandAvailable: excedente >= 2000,
     trainAvailable: excedente >= 10,
@@ -116,6 +124,7 @@ async function claimTowerGrandPrize(wallet) {
     await client.query('UPDATE platform SET hp = hp - 900 WHERE id = 1');
     
     await client.query('COMMIT');
+    updateCachedExcedente(); // Actualizar caché
     return true;
   } catch(e) {
     await client.query('ROLLBACK');
@@ -162,6 +171,7 @@ async function claimTowerTrainingWin(wallet) {
     await client.query('UPDATE players SET hp = hp + 10, tower_train_date = $1 WHERE wallet = $2', [today, wallet]);
     await client.query('UPDATE platform SET hp = hp - 10 WHERE id = 1');
     await client.query('COMMIT');
+    updateCachedExcedente(); // Actualizar caché
     const newHp = res.rows[0].hp + 10;
     return { ok: true, newHp };
   } catch(e) {
@@ -173,8 +183,7 @@ async function claimTowerTrainingWin(wallet) {
 }
 
 async function checkOwnerWithdrawal() {
-  const excedente = await getExcedente();
-  if (excedente >= 4000) {
+  if (cachedExcedente >= 4000) {
     return { shouldWithdraw: true, amountUsdc: 1.0, hpToClear: 1000 };
   }
   return { shouldWithdraw: false };
@@ -182,21 +191,22 @@ async function checkOwnerWithdrawal() {
 
 async function setPlatformHp(hp) { 
   await pool.query('UPDATE platform SET hp = $1 WHERE id = 1', [hp]); 
+  updateCachedExcedente();
 }
 
 async function addPlatformHp(hp) {
   await pool.query('UPDATE platform SET hp = hp + $1 WHERE id = 1', [hp]);
+  updateCachedExcedente();
 }
 
-async function cashout(wallet) { const client = await pool.connect(); try { await client.query('BEGIN'); const res = await client.query('SELECT hp FROM players WHERE wallet = $1 FOR UPDATE', [wallet]); const hp = res.rows.length > 0 ? res.rows[0].hp : 0; if (hp <= 0) { await client.query('ROLLBACK'); return { ok: false, reason: 'no_hp', hp: 0, usdc: 0 }; } await client.query('UPDATE players SET hp = 0 WHERE wallet = $1', [wallet]); await client.query('COMMIT'); return { ok: true, hp, usdc: parseFloat((hp * USDC_PER_HP).toFixed(6)) }; } catch(e) { await client.query('ROLLBACK'); return { ok: false, reason: 'db_error', hp: 0, usdc: 0 }; } finally { client.release(); } }
+async function cashout(wallet) { const client = await pool.connect(); try { await client.query('BEGIN'); const res = await client.query('SELECT hp FROM players WHERE wallet = $1 FOR UPDATE', [wallet]); const hp = res.rows.length > 0 ? res.rows[0].hp : 0; if (hp <= 0) { await client.query('ROLLBACK'); return { ok: false, reason: 'no_hp', hp: 0, usdc: 0 }; } await client.query('UPDATE players SET hp = 0 WHERE wallet = $1', [wallet]); await client.query('COMMIT'); updateCachedExcedente(); return { ok: true, hp, usdc: parseFloat((hp * USDC_PER_HP).toFixed(6)) }; } catch(e) { await client.query('ROLLBACK'); return { ok: false, reason: 'db_error', hp: 0, usdc: 0 }; } finally { client.release(); } }
 async function getPlatformHp() { const res = await pool.query('SELECT hp FROM platform WHERE id = 1'); return res.rows.length > 0 ? res.rows[0].hp : 0; }
 async function getPlatformUsdc() { return parseFloat(((await getPlatformHp()) * USDC_PER_HP).toFixed(6)); }
-async function clearPlatformHp(hp) { await pool.query('UPDATE platform SET hp = GREATEST(0, hp - $1) WHERE id = 1', [hp]); }
+async function clearPlatformHp(hp) { await pool.query('UPDATE platform SET hp = GREATEST(0, hp - $1) WHERE id = 1', [hp]); updateCachedExcedente(); }
 
 // FUNCIONES PARA CONTENT MANAGER
 async function getAllAttacksDB() { const res = await pool.query('SELECT * FROM attacks'); return res.rows; }
 async function getAllVicamonsDB() { const res = await pool.query('SELECT * FROM vicamons'); return res.rows; }
-// FIX: Usar 'description' en lugar de 'desc'
 async function saveAttackDB(data) { 
   await pool.query(`INSERT INTO attacks (id, name, d, acc, fx, pp, description, type, cost) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (id) DO UPDATE SET name=$2, d=$3, acc=$4, fx=$5, pp=$6, description=$7, type=$8, cost=$9`, 
   [data.id, data.name, data.d, data.acc, data.fx, data.pp, data.desc, data.type, data.cost]); 
