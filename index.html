@@ -38,6 +38,8 @@
       <div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Tu nombre de combate</div>
       <input id="inp-name" placeholder="Nickname" maxlength="20" autocomplete="off" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:8px;padding:11px 14px;color:#fff;font-size:15px;outline:none;margin-bottom:12px">
       <button class="btn btn-blue" id="btn-continue" style="width:100%;padding:11px" onclick="goProfile()">Continuar →</button>
+      <!-- NUEVO: Botón a la Guía -->
+      <a href="/guia.html" class="btn" style="width:100%;padding:11px;display:block;text-align:center;margin-top:8px;background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1);color:#aaa;text-decoration:none;">📖 ¿Cómo jugar? (Guía)</a>
     </div>
     <div id="step-charge" style="display:none;margin-top:14px;background:rgba(74,158,255,.06);border:0.5px solid rgba(74,158,255,.2);border-radius:10px;padding:12px">
       <div style="font-size:11px;color:#85B7EB;margin-bottom:5px">💡 Deposita USDC para batallar por HP</div>
@@ -94,9 +96,9 @@
         <div style="font-size:18px;font-weight:700;color:#CFA9EC" id="profile-rank">Sin clasificado</div>
       </div>
     </div>
-      <div style="background:rgba(130,80,180,.1);border:0.5px solid rgba(130,80,180,.3);border-radius:8px;padding:10px;text-align:center;margin-bottom:16px">
+    <div style="background:rgba(130,80,180,.1);border:0.5px solid rgba(130,80,180,.3);border-radius:8px;padding:10px;text-align:center;margin-bottom:16px">
       <div style="font-size:11px;color:rgba(255,255,255,.4)">Rango</div>
-      <div style="font-size:14px;font-weight:600;color:#CFA9EC">🔒 Próximamente</div>
+      <div style="font-size:14px;font-weight:600;color:#CFA9EC" id="profile-tier">🥚 VicaNoob</div>
     </div>
   </div>
   
@@ -396,6 +398,7 @@
   </div>
 </div>
 
+<!-- NUEVO: MODAL CLASIFICACIÓN COMPLETA -->
 <div class="modal-bg hidden" id="modal-leaderboard">
   <div class="modal" style="max-width:450px; text-align:left;">
     <h3 style="text-align:center;">🏆 Clasificación Global</h3>
@@ -403,7 +406,7 @@
     <button class="btn btn-sm btn-red" style="margin-top: 15px; width:100%;" onclick="document.getElementById('modal-leaderboard').classList.add('hidden')">Cerrar</button>
   </div>
 </div>
-  
+
 <!-- SCRIPTS -->
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="beasts.js"></script>
