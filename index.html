@@ -38,8 +38,6 @@
       <div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Tu nombre de combate</div>
       <input id="inp-name" placeholder="Nickname" maxlength="20" autocomplete="off" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:8px;padding:11px 14px;color:#fff;font-size:15px;outline:none;margin-bottom:12px">
       <button class="btn btn-blue" id="btn-continue" style="width:100%;padding:11px" onclick="goProfile()">Continuar →</button>
-      <!-- NUEVO: Botón a la Guía -->
-      <a href="/guia.html" class="btn" style="width:100%;padding:11px;display:block;text-align:center;margin-top:8px;background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1);color:#aaa;text-decoration:none;">📖 ¿Cómo jugar? (Guía)</a>
     </div>
     <div id="step-charge" style="display:none;margin-top:14px;background:rgba(74,158,255,.06);border:0.5px solid rgba(74,158,255,.2);border-radius:10px;padding:12px">
       <div style="font-size:11px;color:#85B7EB;margin-bottom:5px">💡 Deposita USDC para batallar por HP</div>
@@ -51,6 +49,8 @@
       <button class="btn btn-sm" style="width:100%;font-size:11px" onclick="checkHPNow()">Ya deposité — verificar HP</button>
     </div>
   </div>
+  <!-- NUEVO: Botón a la Guía (Fuera del login-box para estar siempre activo) -->
+  <a href="/guia.html" class="btn" style="width:90%;max-width:340px;padding:11px;display:block;text-align:center;margin-top:15px;background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1);color:#aaa;text-decoration:none;">📖 ¿Cómo jugar? (Guía)</a>
 </div>
 
 <!-- PROFILE -->
