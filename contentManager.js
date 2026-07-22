@@ -81,23 +81,32 @@ async function loadOfficialCatalog() {
 
     // 3. Insertar los 12 Zodíacos con sus nuevos sets
     const zodiacs = [
-      { id: 'aries', name: 'Aries', sub: 'Carnero de Fuego', img: 'Aries.png', el: 'fuego', style: 'agresivo', stats: {atk:70, def:30, spd:90}, attacks: ['golpe_brutal', 'desarmar', 'robo_de_energia', 'rayo_devastador'] },
-      { id: 'tauro', name: 'Tauro', sub: 'Toro de Piedra', img: 'Tauro.png', el: 'tierra', style: 'defensivo', stats: {atk:55, def:90, spd:30}, attacks: ['mordisco', 'muro_de_energia', 'destello_cegador', 'golpe_demoledor'] },
-      { id: 'geminis', name: 'Géminis', sub: 'Gemelos del Viento', img: 'Geminis.png', el: 'aire', style: 'caos', stats: {atk:65, def:50, spd:80}, attacks: ['garra_rapida', 'drenaje_vital', 'niebla_densa', 'canon_de_plasma'] },
-      { id: 'cancer', name: 'Cáncer', sub: 'Cangrejo Abismal', img: 'Cancer.png', el: 'agua', style: 'defensivo', stats: {atk:45, def:95, spd:40}, attacks: ['azote', 'escudo_espejo', 'drenaje_vital', 'golpe_demoledor'] },
-      { id: 'leo', name: 'Leo', sub: 'León Estelar', img: 'Leo.png', el: 'fuego', style: 'equilibrado', stats: {atk:70, def:65, spd:70}, attacks: ['cabezazo', 'estudio', 'llama_abrasadora', 'disparo_certero'] },
-      { id: 'virgo', name: 'Virgo', sub: 'Doncella de Cristal', img: 'Virgo.png', el: 'tierra', style: 'tactico', stats: {atk:60, def:70, spd:65}, attacks: ['garra_rapida', 'sanacion_mayor', 'drenaje_vital', 'canon_de_plasma'] },
-      { id: 'libra', name: 'Libra', sub: 'Balanza de Acero', img: 'Libra.png', el: 'aire', style: 'tactico', stats: {atk:62, def:62, spd:62}, attacks: ['mordisco', 'reanimar', 'onda_de_choque', 'golpe_demoledor'] },
-      { id: 'escorpio', name: 'Escorpio', sub: 'Escorpión Abismal', img: 'Escorpio.png', el: 'agua', style: 'veneno', stats: {atk:65, def:55, spd:70}, attacks: ['choque', 'escudo_espejo', 'nube_toxica', 'golpe_demoledor'] },
-      { id: 'sagitario', name: 'Sagitario', sub: 'Centauro Cósmico', img: 'Sagitario.png', el: 'fuego', style: 'equilibrado', stats: {atk:68, def:55, spd:75}, attacks: ['mordisco', 'reanimar', 'niebla_densa', 'disparo_certero'] },
-      { id: 'capricornio', name: 'Capricornio', sub: 'Coba Titán', img: 'Capricornio.png', el: 'tierra', style: 'defensivo', stats: {atk:50, def:92, spd:35}, attacks: ['cabezazo', 'estudio', 'llama_abrasadora', 'disparo_certero'] },
-      { id: 'acuario', name: 'Acuario', sub: 'Portador del Rayo', img: 'Acuario.png', el: 'aire', style: 'caos', stats: {atk:72, def:45, spd:85}, attacks: ['choque', 'escudo_espejo', 'onda_de_choque', 'golpe_demoledor'] },
-      { id: 'piscis', name: 'Piscis', sub: 'Leviatán Dual', img: 'Piscis.png', el: 'agua', style: 'soporte', stats: {atk:58, def:68, spd:60}, attacks: ['azote', 'reanimar', 'nube_toxica', 'canon_de_plasma'] },
-      { id: 'irondog', name: 'Iron Dog', sub: 'Can Cyborg', img: 'IronDog.png', el: 'tierra', style: 'equilibrado', stats: {atk:65, def:85, spd:75}, attacks: ['mordida_de_titanio', 'muro_de_energia', 'destello_cegador', 'golpe_demoledor'] }
+      { id: 'aries', name: 'Aries', cat: 'Zodiaco', sub: 'Carnero de Fuego', img: 'Aries.png', el: 'fuego', style: 'agresivo', stats: {atk:70, def:30, spd:90}, attacks: ['golpe_brutal', 'desarmar', 'robo_de_energia', 'rayo_devastador'] },
+      { id: 'tauro', name: 'Tauro', cat: 'Zodiaco', sub: 'Toro de Piedra', img: 'Tauro.png', el: 'tierra', style: 'defensivo', stats: {atk:55, def:90, spd:30}, attacks: ['mordisco', 'muro_de_energia', 'destello_cegador', 'golpe_demoledor'] },
+      { id: 'geminis', name: 'Géminis', cat: 'Zodiaco', sub: 'Gemelos del Viento', img: 'Geminis.png', el: 'aire', style: 'caos', stats: {atk:65, def:50, spd:80}, attacks: ['garra_rapida', 'drenaje_vital', 'niebla_densa', 'canon_de_plasma'] },
+      { id: 'cancer', name: 'Cáncer', cat: 'Zodiaco', sub: 'Cangrejo Abismal', img: 'Cancer.png', el: 'agua', style: 'defensivo', stats: {atk:45, def:95, spd:40}, attacks: ['azote', 'escudo_espejo', 'drenaje_vital', 'golpe_demoledor'] },
+      { id: 'leo', name: 'Leo', cat: 'Zodiaco', sub: 'León Estelar', img: 'Leo.png', el: 'fuego', style: 'equilibrado', stats: {atk:70, def:65, spd:70}, attacks: ['cabezazo', 'estudio', 'llama_abrasadora', 'disparo_certero'] },
+      { id: 'virgo', name: 'Virgo', cat: 'Zodiaco', sub: 'Doncella de Cristal', img: 'Virgo.png', el: 'tierra', style: 'tactico', stats: {atk:60, def:70, spd:65}, attacks: ['garra_rapida', 'sanacion_mayor', 'drenaje_vital', 'canon_de_plasma'] },
+      { id: 'libra', name: 'Libra', cat: 'Zodiaco', sub: 'Balanza de Acero', img: 'Libra.png', el: 'aire', style: 'tactico', stats: {atk:62, def:62, spd:62}, attacks: ['mordisco', 'reanimar', 'onda_de_choque', 'golpe_demoledor'] },
+      { id: 'escorpio', name: 'Escorpio', cat: 'Zodiaco', sub: 'Escorpión Abismal', img: 'Escorpio.png', el: 'agua', style: 'veneno', stats: {atk:65, def:55, spd:70}, attacks: ['choque', 'escudo_espejo', 'nube_toxica', 'golpe_demoledor'] },
+      { id: 'sagitario', name: 'Sagitario', cat: 'Zodiaco', sub: 'Centauro Cósmico', img: 'Sagitario.png', el: 'fuego', style: 'equilibrado', stats: {atk:68, def:55, spd:75}, attacks: ['mordisco', 'reanimar', 'niebla_densa', 'disparo_certero'] },
+      { id: 'capricornio', name: 'Capricornio', cat: 'Zodiaco', sub: 'Coba Titán', img: 'Capricornio.png', el: 'tierra', style: 'defensivo', stats: {atk:50, def:92, spd:35}, attacks: ['cabezazo', 'estudio', 'llama_abrasadora', 'disparo_certero'] },
+      { id: 'acuario', name: 'Acuario', cat: 'Zodiaco', sub: 'Portador del Rayo', img: 'Acuario.png', el: 'aire', style: 'caos', stats: {atk:72, def:45, spd:85}, attacks: ['choque', 'escudo_espejo', 'onda_de_choque', 'golpe_demoledor'] },
+      { id: 'piscis', name: 'Piscis', cat: 'Zodiaco', sub: 'Leviatán Dual', img: 'Piscis.png', el: 'agua', style: 'soporte', stats: {atk:58, def:68, spd:60}, attacks: ['azote', 'reanimar', 'nube_toxica', 'canon_de_plasma'] }
     ];
 
     for (const z of zodiacs) {
       await saveVicamonDB(z);
+    }
+
+    // 4. Insertar los Físicos (Llaveros)
+    const physicals = [
+      { id: 'irondog', name: 'Iron Dog', cat: 'Físico', sub: 'Can Cyborg', img: 'IronDog.png', el: 'tierra', style: 'equilibrado', stats: {atk:65, def:85, spd:75}, attacks: ['mordida_de_titanio', 'muro_de_energia', 'destello_cegador', 'golpe_demoledor'] },
+      { id: 'tunqui', name: 'Tunqui', cat: 'Físico', sub: 'Guardián Amazónico', img: 'Tunqui.png', el: 'aire', style: 'equilibrado', stats: {atk:70, def:70, spd:70}, attacks: ['garra_rapida', 'escudo_espejo', 'llama_abrasadora', 'disparo_certero'] } // Añadido Tunqui para que los códigos QR funcionen
+    ];
+
+    for (const p of physicals) {
+      await saveVicamonDB(p);
     }
 
     console.log("[CONTENT] ¡Catálogo oficial balanceado V2 cargado con éxito!");
