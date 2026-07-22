@@ -163,4 +163,12 @@ function handleMsg(m){
   }
 }
 
-document.getElementById('inp-name').addEventListener('keydown',e=>{if(e.key==='Enter')goProfile();});
+// Asegurarnos de que BEASTS esté cargado antes de iniciar
+function checkBeastsAndInit() {
+  if (window.BEASTS) {
+    document.getElementById('inp-name').addEventListener('keydown',e=>{if(e.key==='Enter')goProfile();});
+  } else {
+    setTimeout(checkBeastsAndInit, 50);
+  }
+}
+checkBeastsAndInit();
