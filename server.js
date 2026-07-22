@@ -185,3 +185,11 @@ initializeContent().then(() => {
   const PORT = process.env.PORT || 3000;
   server.listen(PORT, () => console.log(`Zodiac Battle corriendo en http://localhost:${PORT}`));
 });
+
+// BLINDAJE DEL SERVIDOR: Capturar errores globales para que Render nunca se caiga
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('⚠️ Promesa no capturada (esto no tirará el servidor):', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('⚠️ Excepción no capturada (esto no tirará el servidor):', err);
+});
