@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>VICAMON (Dev)</title>
+<title>VICAMON</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -16,40 +16,23 @@
 <!-- LOGIN -->
 <div id="s-login" class="screen active">
   <div class="login-logo" style="padding:0;background:none;-webkit-text-fill-color:initial"><img src="vicamon-logo.png" alt="VICAMON" style="max-width:280px;width:90%"></div>
-  <div class="login-sub">The Vitality Cash Game · Dev</div>
+  <div class="login-sub">The Vitality Cash Game</div>
   <div class="login-box">
-    <div id="step-wallet" style="margin-bottom:16px">
-      <div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Conecta tu wallet o juega gratis</div>
-      <button class="btn" id="btn-phantom" style="width:100%;padding:11px;display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:8px" onclick="connectPhantom()">👻 Conectar Phantom</button>
-      <button class="btn" id="btn-guest" style="width:100%;padding:11px;display:flex;align-items:center;justify-content:center;gap:10px;background:rgba(93,202,165,.14);border-color:rgba(93,202,165,.35);color:#5DCAA5" onclick="playAsGuest()">🎮 Jugar sin Wallet (Solo XP)</button>
-      <div id="wallet-connected" style="display:none;background:rgba(93,202,165,.1);border:0.5px solid rgba(93,202,165,.3);border-radius:8px;padding:10px 12px;margin-top:8px">
-        <div style="font-size:10px;color:#5DCAA5;margin-bottom:2px">✓ Wallet conectada</div>
-        <div id="wallet-addr" style="font-size:11px;color:rgba(255,255,255,.6);font-family:monospace"></div>
-        <div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center">
-          <span style="font-size:11px;color:rgba(255,255,255,.4)">HP disponibles:</span>
-          <span id="wallet-hp" style="font-size:13px;font-weight:600;color:#5DCAA5">Verificando...</span>
-        </div>
-      </div>
-      <div id="no-phantom" style="display:none;background:rgba(240,153,122,.1);border:0.5px solid rgba(240,153,122,.3);border-radius:8px;padding:10px 12px;margin-top:8px;font-size:12px;color:#F0997B">
-        Phantom no detectado. <a href="https://phantom.app" target="_blank" style="color:#F0997B;text-decoration:underline">Instalalo aqui</a> y recarga la pagina.
-      </div>
+    <div id="auth-box">
+      <div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Inicia sesión o regístrate</div>
+      <input id="inp-email" type="email" placeholder="Correo electrónico" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:8px;padding:11px 14px;color:#fff;font-size:14px;outline:none;margin-bottom:8px">
+      <input id="inp-password" type="password" placeholder="Contraseña" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:8px;padding:11px 14px;color:#fff;font-size:14px;outline:none;margin-bottom:12px">
+      <button class="btn btn-blue" id="btn-login" style="width:100%;padding:11px;margin-bottom:8px" onclick="login()">🔑 Iniciar Sesión</button>
+      <button class="btn" id="btn-register" style="width:100%;padding:11px;background:rgba(93,202,165,.14);border-color:rgba(93,202,165,.35);color:#5DCAA5" onclick="register()">📝 Crear Cuenta</button>
     </div>
-    <div id="step-name" style="opacity:.4;pointer-events:none">
+    
+    <div id="step-name" style="display:none;margin-top:14px">
       <div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Tu nombre de combate</div>
       <input id="inp-name" placeholder="Nickname" maxlength="20" autocomplete="off" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:8px;padding:11px 14px;color:#fff;font-size:15px;outline:none;margin-bottom:12px">
       <button class="btn btn-blue" id="btn-continue" style="width:100%;padding:11px" onclick="goProfile()">Continuar →</button>
-    </div>
-    <div id="step-charge" style="display:none;margin-top:14px;background:rgba(74,158,255,.06);border:0.5px solid rgba(74,158,255,.2);border-radius:10px;padding:12px">
-      <div style="font-size:11px;color:#85B7EB;margin-bottom:5px">💡 Deposita USDC para batallar por HP</div>
-      <div style="font-size:11px;color:rgba(255,255,255,.45);margin-bottom:8px">0.10 USDC = 100 HP · cualquier monto funciona</div>
-      <div style="background:rgba(0,0,0,.35);border-radius:6px;padding:8px 10px;font-family:monospace;font-size:10px;color:#85B7EB;word-break:break-all;margin-bottom:6px;cursor:pointer;display:flex;justify-content:space-between;align-items:center" onclick="copyWallet()">
-        <span>DIRECCION_WALLET_A</span>
-        <span style="font-size:10px;margin-left:8px;white-space:nowrap">📋 copiar</span>
-      </div>
-      <button class="btn btn-sm" style="width:100%;font-size:11px" onclick="checkHPNow()">Ya deposité — verificar HP</button>
+      <button class="btn btn-sm btn-red" style="width:100%;margin-top:8px" onclick="logout()">🚪 Cerrar Sesión</button>
     </div>
   </div>
-  <!-- Botón a la Guía (Fuera del login-box para estar siempre activo) -->
   <a href="/guia.html" class="btn" style="width:90%;max-width:340px;padding:11px;display:block;text-align:center;margin-top:15px;background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1);color:#aaa;text-decoration:none;">📖 ¿Cómo jugar? (Guía)</a>
 </div>
 
@@ -57,16 +40,7 @@
 <div id="s-profile" class="screen">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
     <h1 style="margin:0">Perfil del Entrenador</h1>
-    <div style="display:flex;gap:8px">
-      <button class="btn btn-sm" id="btn-cashout" style="display:none;background:rgba(239,159,39,.15);border-color:rgba(239,159,39,.35);color:#EF9F27" onclick="doCashout()">💰 Cashout</button>
-      <button class="btn btn-sm btn-red" onclick="disconnectWallet()">🚪 Desconectar Wallet</button>
-    </div>
-  </div>
-  <div id="guest-upgrade-banner" style="display:none;background:linear-gradient(135deg,rgba(246,226,102,.15),rgba(245,166,35,.15));border:0.5px solid rgba(246,226,102,.4);border-radius:12px;padding:16px;margin-bottom:16px;text-align:center">
-    <div style="font-size:18px;margin-bottom:8px">🔥</div>
-    <div style="font-size:15px;font-weight:600;color:#F6E265;margin-bottom:4px">¡Conecta tu Wallet para ganar HP!</div>
-    <div style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:12px">Estás jugando como invitado. Conecta Phantom para guardar tus recompensas y batallar por HP.</div>
-    <button class="btn btn-blue" style="background:rgba(246,226,102,.2);border-color:rgba(246,226,102,.4);color:#F6E265" onclick="connectPhantom()">👻 Conectar Phantom</button>
+    <button class="btn btn-sm btn-red" onclick="logout()">🚪 Cerrar Sesión</button>
   </div>
   <div style="background:rgba(255,255,255,.04);border:0.5px solid rgba(255,255,255,.1);border-radius:12px;padding:16px;margin-bottom:16px">
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
@@ -77,23 +51,22 @@
       <input id="inp-edit-name" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:8px;padding:8px;color:#fff;font-size:14px;outline:none;margin-bottom:8px">
       <button class="btn btn-blue btn-sm" style="width:100%" onclick="saveNickname()">Guardar Nickname</button>
     </div>
-    <div id="profile-wallet-box" style="background:rgba(0,0,0,.3);padding:8px 10px;border-radius:6px;margin-bottom:12px">
-      <div style="font-size:10px;color:rgba(255,255,255,.3)">Tu Wallet</div>
-      <div style="font-size:11px;color:rgba(255,255,255,.6);font-family:monospace" id="profile-wallet">Conectando...</div>
+    <div style="background:rgba(0,0,0,.3);padding:8px 10px;border-radius:6px;margin-bottom:12px">
+      <div style="font-size:10px;color:rgba(255,255,255,.3)">Correo</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.6);font-family:monospace" id="profile-email">Conectando...</div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:12px">
       <div style="background:rgba(0,0,0,.3);padding:10px;border-radius:8px;text-align:center">
         <div style="font-size:11px;color:rgba(255,255,255,.4)">HP Disponibles</div>
         <div style="font-size:18px;font-weight:700;color:#5DCAA5" id="profile-hp">0 HP</div>
-        <div style="font-size:10px;color:rgba(255,255,255,.3)" id="profile-usdc">0.000 USDC</div>
+      </div>
+      <div style="background:rgba(0,0,0,.3);padding:10px;border-radius:8px;text-align:center">
+        <div style="font-size:11px;color:rgba(255,255,255,.4)">Vitality Cash (VC)</div>
+        <div style="font-size:18px;font-weight:700;color:#F6E265" id="profile-vc">0 VC</div>
       </div>
       <div style="background:rgba(0,0,0,.3);padding:10px;border-radius:8px;text-align:center">
         <div style="font-size:11px;color:rgba(255,255,255,.4)">Victorias / Derrotas</div>
         <div style="font-size:18px;font-weight:700;color:#fff"><span id="profile-wins" style="color:#5DCAA5">0</span> / <span id="profile-losses" style="color:#F0997B">0</span></div>
-      </div>
-      <div style="background:rgba(0,0,0,.3);padding:10px;border-radius:8px;text-align:center">
-        <div style="font-size:11px;color:rgba(255,255,255,.4)">Puesto en Ranking</div>
-        <div style="font-size:18px;font-weight:700;color:#CFA9EC" id="profile-rank">Sin clasificado</div>
       </div>
     </div>
     <div style="background:rgba(130,80,180,.1);border:0.5px solid rgba(130,80,180,.3);border-radius:8px;padding:10px;text-align:center;margin-bottom:16px">
@@ -101,8 +74,6 @@
       <div style="font-size:14px;font-weight:600;color:#CFA9EC" id="profile-tier">🥚 VicaNoob</div>
     </div>
   </div>
-  
-  <div id="profile-deposit-widget" style="margin-bottom:16px"></div>
   
   <div style="display:flex;gap:8px;margin-bottom:20px">
     <button class="btn btn-blue" style="flex:1" onclick="enterLobby()">⚔️ Ir al Lobby →</button>
@@ -136,9 +107,8 @@
   </div>
   <div style="background:rgba(216,90,48,.1);border:0.5px solid rgba(216,90,48,.3);border-radius:8px;padding:10px;margin-bottom:16px;font-size:12px;color:#F0997B;text-align:center">⚠️ ¡Atención! Las creaciones no se guardan en borrador.</div>
   <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,.3);padding:10px;border-radius:8px;margin-bottom:10px">
-    <div style="font-size:12px;color:rgba(255,255,255,.5)">HP Disponibles: <span id="lab-hp-val" style="color:#5DCAA5;font-weight:700">0 HP</span></div>
+    <div style="font-size:12px;color:rgba(255,255,255,.5)">Vitality Cash: <span id="lab-vc-val" style="color:#F6E265;font-weight:700">0 VC</span></div>
   </div>
-  <div id="lab-deposit-widget" style="margin-bottom:16px"></div>
   <div class="lab-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
     <div>
       <h3 style="margin-bottom:10px">1. Apariencia</h3>
@@ -172,7 +142,7 @@
   </div>
   <div style="margin-top:20px;text-align:center;display:flex;flex-direction:column;gap:10px">
     <button class="btn btn-lg" style="width:100%;background:rgba(93,202,165,.14);border-color:rgba(93,202,165,.35);color:#5DCAA5" onclick="simulateLabVicamon()">⚔️ Probar en Simulación (Gratis)</button>
-    <button class="btn btn-blue btn-lg" id="lab-submit-btn" onclick="submitLabVicamon()" style="width:100%;background:rgba(246,226,102,.15);border-color:rgba(246,226,102,.35);color:#F6E265">🔒 Enviar a Revisión (Costo: 3000 HP)</button>
+    <button class="btn btn-blue btn-lg" id="lab-submit-btn" onclick="submitLabVicamon()" style="width:100%;background:rgba(246,226,102,.15);border-color:rgba(246,226,102,.35);color:#F6E265">🔒 Enviar a Revisión (Costo: 3000 VC)</button>
   </div>
 </div>
 
@@ -184,7 +154,6 @@
       <p style="font-size:11px;color:rgba(255,255,255,.3);margin-top:2px"><span class="online-dot"></span><span id="lbl-online">0</span> jugadores en línea</p>
     </div>
     <div class="my-badge" style="display:flex;align-items:center;gap:8px">
-      <button class="btn btn-sm" id="btn-cashout-lobby" style="display:none;background:rgba(239,159,39,.15);border-color:rgba(239,159,39,.35);color:#EF9F27;white-space:nowrap" onclick="doCashout()">💰 Cashout</button>
       <img id="badge-img" src="" alt="" style="display:none">
       <div><div style="font-size:10px;color:rgba(255,255,255,.4)">Jugando como</div><span id="lbl-myname"></span> · <span id="lbl-myhp" style="color:#5DCAA5;font-weight:600;font-size:11px"></span></div>
     </div>
@@ -209,9 +178,6 @@
       </div>
     </div>
 
-    <div id="low-hp-warning" style="display:none;margin-bottom:12px">
-      <div id="lobby-deposit-widget"></div>
-    </div>
     <div style="background:linear-gradient(135deg,rgba(120,40,200,.18),rgba(60,20,120,.18));border:0.5px solid rgba(160,80,255,.3);border-radius:12px;padding:14px 16px;margin-bottom:0;">
       <div style="margin-bottom:10px">
         <div style="font-size:14px;font-weight:600;color:#CFA9EC">⚔ Zodiac Master</div>
@@ -228,17 +194,10 @@
   </div>
 
   <div style="font-size:11px;color:rgba(255,255,255,.3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Jugadores en sala</div>
-  <div id="guest-lobby-banner" style="display:none;background:linear-gradient(135deg,rgba(246,226,102,.15),rgba(245,166,35,.15));border:0.5px solid rgba(246,226,102,.4);border-radius:12px;padding:14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px">
-    <div>
-      <div style="font-size:14px;font-weight:600;color:#F6E265">🔥 ¡Conecta tu Wallet!</div>
-      <div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:2px">Los invitados solo pueden ganar XP. Conecta Phantom para batallar por HP.</div>
-    </div>
-    <button class="btn btn-sm" style="background:rgba(246,226,102,.2);border-color:rgba(246,226,102,.4);color:#F6E265;white-space:nowrap" onclick="connectPhantom()">👻 Conectar</button>
-  </div>
   <div class="lobby-list" id="players-list"></div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
     <button class="btn btn-sm" onclick="show('s-profile')">👤 Mi Perfil</button>
-    <button class="btn btn-sm btn-red" onclick="disconnectWallet()">🚪 Desconectar Wallet</button>
+    <button class="btn btn-sm btn-red" onclick="logout()">🚪 Cerrar Sesión</button>
   </div>
   <div class="chat-wrap">
     <h2 style="margin:0 0 10px 0;font-size:16px">Chat del Lobby</h2>
@@ -385,20 +344,6 @@
   </div>
 </div>
 
-<div class="modal-bg hidden" id="modal-mobile-connect">
-  <div class="modal" style="max-width:400px; text-align:left;">
-    <h3 style="color:#F0997B; margin-bottom:15px; text-align:center;">📱 Jugar con Wallet en Móvil</h3>
-    <p style="font-size:13px; color:rgba(255,255,255,.6); margin-bottom:10px;">Para conectar tu wallet desde el móvil, necesitas abrir este juego dentro de la app de Phantom.</p>
-    <p style="font-size:13px; color:rgba(255,255,255,.6); margin-bottom:15px;"><strong>Pasos:</strong><br>1. Copia el enlace de abajo.<br>2. Abre la app de <strong>Phantom</strong>.<br>3. Ve a <strong>"Descubrir" (🔍)</strong> y pega el enlace.</p>
-    <div style="background:rgba(0,0,0,.3); padding:10px; margin-bottom:20px; border-radius:8px; word-break:break-all; font-family:monospace; font-size:11px; color:#85B7EB; cursor:pointer; display:flex; justify-content:space-between; align-items:center" onclick="copyText(window.location.href)">
-      <span id="mobile-url-display"></span> <span style="margin-left:8px; white-space:nowrap; font-size:14px">📋</span>
-    </div>
-    <button class="btn btn-blue" style="width:100%; margin-bottom:10px; padding:12px" onclick="openPhantomApp()">🚀 Intentar abrir en Phantom automáticamente</button>
-    <button class="btn btn-sm btn-red" style="width:100%" onclick="closeMobileConnectModal()">Cancelar</button>
-  </div>
-</div>
-
-<!-- MODAL CLASIFICACIÓN COMPLETA -->
 <div class="modal-bg hidden" id="modal-leaderboard">
   <div class="modal" style="max-width:450px; text-align:left;">
     <h3 style="text-align:center;">🏆 Clasificación Global</h3>
@@ -410,21 +355,20 @@
 <!-- SCRIPTS -->
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
-  // NUEVO: Cargar bestiario dinámicamente desde la base de datos
   fetch('/api/beasts')
     .then(r => r.json())
     .then(data => {
-      window.BEASTS = data; // Inyectamos los datos de la BD en el navegador
-      // Ahora que tenemos los datos, cargamos el resto de los scripts
+      window.BEASTS = data;
       ['audio.js', 'wallet.js', 'ui.js', 'lab.js', 'tournament.js', 'app.js'].forEach(src => {
         const s = document.createElement('script');
         s.src = src;
         document.head.appendChild(s);
       });
+      // Verificar si hay sesión iniciada al cargar
+      setTimeout(checkSession, 500);
     })
     .catch(err => {
       console.error("Error cargando BD, usando fallback:", err);
-      // Si la BD falla, usamos el beasts.js local estático para que el juego no se rompa
       const s = document.createElement('script');
       s.src = 'beasts.js';
       s.onload = () => {
@@ -433,6 +377,7 @@
           sc.src = src;
           document.head.appendChild(sc);
         });
+        setTimeout(checkSession, 500);
       };
       document.head.appendChild(s);
     });
