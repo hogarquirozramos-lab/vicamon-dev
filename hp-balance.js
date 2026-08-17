@@ -5,8 +5,7 @@ const pool = new Pool({
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
 
-// LIMPIEZA Y NUEVA ESTRUCTURA DE BD (Fase 1 de Cuentas)
-pool.query(`DROP TABLE IF EXISTS players;`).catch(e=>{});
+// Estructura de Base de Datos (Sin DROP para no borrar cuentas existentes)
 pool.query(`CREATE TABLE IF NOT EXISTS players (
   id SERIAL PRIMARY KEY,
   email VARCHAR(255) UNIQUE,
@@ -43,7 +42,8 @@ updateCachedExcedente();
 
 // === FUNCIONES DE AUTENTICACIÓN Y USUARIOS ===
 async function createUser(email, hashedPassword, nick) {
-  await pool.query(`INSERT INTO players (email, password, last_name, hp, vc, wins, losses) VALUES ($1, $2, $3, 0, 0, 0, 0)`, [email, hashedPassword, nick]);
+  // El email se guarda también en la columna "wallet" para mantener la compatibilidad con el resto del juego
+  await pool.query(`INSERT INTO players (email, wallet, password, last_name, hp, vc, wins, losses) VALUES ($1, $1, $2, $3, 0, 0, 0, 0)`, [email, hashedPassword, nick]);
   const res = await pool.query('SELECT id, email, last_name FROM players WHERE email = $1', [email]);
   return res.rows[0];
 }
@@ -57,7 +57,7 @@ async function linkWalletToAccount(userId, wallet) {
   await pool.query('UPDATE players SET wallet = $1 WHERE id = $2', [wallet, userId]);
 }
 
-// === FUNCIONES DE ECONOMÍA (Mantienen compatibilidad temporal con la wallet) ===
+// === FUNCIONES DE ECONOMÍA ===
 async function getAllPlayersDebug() { const res = await pool.query('SELECT id, email, wallet, hp, locked_hp, vc, wins, losses, last_name FROM players'); return res.rows; }
 async function isTxProcessed(signature) { const res = await pool.query('SELECT 1 FROM processed_txs WHERE signature = $1', [signature]); return res.rows.length > 0; }
 async function markTxProcessed(signature) { await pool.query('INSERT INTO processed_txs (signature) VALUES ($1) ON CONFLICT DO NOTHING', [signature]); }
@@ -245,7 +245,7 @@ module.exports = {
   getTowerStatus, claimTowerGrandPrize, checkTowerTrainingWin, claimTowerTrainingWin,
   getExcedente, getTotalPlayersHP, checkOwnerWithdrawal,
   getAllAttacksDB, getAllVicamonsDB, saveAttackDB, saveVicamonDB,
-  // NUEVAS EXPORTACIONES FASE 1
+  // EXPORTACIONES FASE 1 y 2
   createUser, getUserByEmail, linkWalletToAccount,
   getVC, addVC, spendVC
 };
