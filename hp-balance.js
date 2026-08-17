@@ -5,14 +5,25 @@ const pool = new Pool({
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
 
-pool.query(`CREATE TABLE IF NOT EXISTS players (wallet VARCHAR(50) PRIMARY KEY, hp INTEGER DEFAULT 0, locked_hp INTEGER DEFAULT 0);`).catch(e => console.error("Error creando tabla players:", e));
-pool.query(`CREATE TABLE IF NOT EXISTS platform (id INTEGER PRIMARY KEY DEFAULT 1, hp INTEGER DEFAULT 0);`).catch(e => console.error("Error creando tabla platform:", e));
-pool.query(`CREATE TABLE IF NOT EXISTS processed_txs (signature VARCHAR(100) PRIMARY KEY);`).catch(e=>{});
+// LIMPIEZA Y NUEVA ESTRUCTURA DE BD (Fase 1 de Cuentas)
+pool.query(`DROP TABLE IF EXISTS players;`).catch(e=>{});
+pool.query(`CREATE TABLE IF NOT EXISTS players (
+  id SERIAL PRIMARY KEY,
+  email VARCHAR(255) UNIQUE,
+  password VARCHAR(255),
+  wallet VARCHAR(50) UNIQUE,
+  hp INTEGER DEFAULT 0,
+  locked_hp INTEGER DEFAULT 0,
+  vc INTEGER DEFAULT 0,
+  wins INTEGER DEFAULT 0,
+  losses INTEGER DEFAULT 0,
+  last_name VARCHAR(20),
+  tower_train_date VARCHAR(10)
+);`).catch(e => console.error("Error creando tabla players:", e));
+
+pool.query(`CREATE TABLE IF NOT EXISTS platform (id INTEGER PRIMARY KEY DEFAULT 1, hp INTEGER DEFAULT 0);`).catch(e=>{});
 pool.query(`INSERT INTO platform (id, hp) VALUES (1, 0) ON CONFLICT DO NOTHING;`).catch(e=>{});
-pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS wins INTEGER DEFAULT 0;`).catch(e=>{});
-pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS losses INTEGER DEFAULT 0;`).catch(e=>{});
-pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS last_name VARCHAR(20);`).catch(e=>{});
-pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS tower_train_date VARCHAR(10);`).catch(e=>{});
+pool.query(`CREATE TABLE IF NOT EXISTS processed_txs (signature VARCHAR(100) PRIMARY KEY);`).catch(e=>{});
 pool.query(`CREATE TABLE IF NOT EXISTS attacks (id VARCHAR(50) PRIMARY KEY, name VARCHAR(50), d INT, acc INT, fx VARCHAR(50), pp INT, description TEXT, type VARCHAR(20), cost INT);`).catch(e => console.error("Error creando tabla attacks:", e));
 pool.query(`CREATE TABLE IF NOT EXISTS vicamons (id VARCHAR(50) PRIMARY KEY, name VARCHAR(50), sub VARCHAR(50), img VARCHAR(100), el VARCHAR(20), style VARCHAR(20), cat VARCHAR(20), stats JSONB, attacks JSONB);`).catch(e => console.error("Error creando tabla vicamons:", e));
 
@@ -30,7 +41,24 @@ async function updateCachedExcedente() {
 setInterval(updateCachedExcedente, 10000);
 updateCachedExcedente(); 
 
-async function getAllPlayersDebug() { const res = await pool.query('SELECT wallet, hp, locked_hp, wins, losses, last_name FROM players'); return res.rows; }
+// === FUNCIONES DE AUTENTICACIÓN Y USUARIOS ===
+async function createUser(email, hashedPassword, nick) {
+  await pool.query(`INSERT INTO players (email, password, last_name, hp, vc, wins, losses) VALUES ($1, $2, $3, 0, 0, 0, 0)`, [email, hashedPassword, nick]);
+  const res = await pool.query('SELECT id, email, last_name FROM players WHERE email = $1', [email]);
+  return res.rows[0];
+}
+
+async function getUserByEmail(email) {
+  const res = await pool.query('SELECT * FROM players WHERE email = $1', [email]);
+  return res.rows[0];
+}
+
+async function linkWalletToAccount(userId, wallet) {
+  await pool.query('UPDATE players SET wallet = $1 WHERE id = $2', [wallet, userId]);
+}
+
+// === FUNCIONES DE ECONOMÍA (Mantienen compatibilidad temporal con la wallet) ===
+async function getAllPlayersDebug() { const res = await pool.query('SELECT id, email, wallet, hp, locked_hp, vc, wins, losses, last_name FROM players'); return res.rows; }
 async function isTxProcessed(signature) { const res = await pool.query('SELECT 1 FROM processed_txs WHERE signature = $1', [signature]); return res.rows.length > 0; }
 async function markTxProcessed(signature) { await pool.query('INSERT INTO processed_txs (signature) VALUES ($1) ON CONFLICT DO NOTHING', [signature]); }
 async function adminSetHP(wallet, hp) { await pool.query(`INSERT INTO players (wallet, hp) VALUES ($1, $2) ON CONFLICT (wallet) DO UPDATE SET hp = $2`, [wallet, hp]); return await getHP(wallet); }
@@ -40,14 +68,11 @@ async function updatePlayerName(wallet, name) { await pool.query(`INSERT INTO pl
 async function updatePlayerStats(winnerWallet, loserWallet) { await pool.query('UPDATE players SET wins = wins + 1 WHERE wallet = $1', [winnerWallet]); await pool.query('UPDATE players SET losses = losses + 1 WHERE wallet = $1', [loserWallet]); }
 async function getTopPlayers(limit = 3) { const res = await pool.query('SELECT last_name, wins, losses FROM players WHERE wins > 0 ORDER BY wins DESC, losses ASC LIMIT $1', [limit]); return res.rows; }
 
-// NUEVO: getLeaderboard ahora calcula el Tier y el Rank de cada jugador en la lista
 async function getLeaderboard(limit = 100) {
     const tRes = await pool.query('SELECT COUNT(*) as total FROM players WHERE wins > 0 OR losses > 0');
     const totalRanked = parseInt(tRes.rows[0].total, 10);
     if (totalRanked === 0) return [];
-    
     const res = await pool.query('SELECT last_name, wins, losses FROM players WHERE wins > 0 OR losses > 0 ORDER BY wins DESC, losses ASC LIMIT $1', [limit]);
-    
     return res.rows.map((p, index) => {
         const rank = index + 1;
         let tier = 5; 
@@ -66,18 +91,13 @@ async function getLeaderboard(limit = 100) {
 async function getPlayerStats(wallet) {
   const res = await pool.query('SELECT wins, losses FROM players WHERE wallet = $1', [wallet]);
   if (res.rows.length === 0) return { wins: 0, losses: 0, rank: null, tier: 0, totalRanked: 0 };
-  
   const { wins, losses } = res.rows[0];
-  let rank = null;
-  let tier = 0; 
-  let totalRanked = 0;
-
+  let rank = null, tier = 0, totalRanked = 0;
   if (wins > 0 || losses > 0) {
     const rRes = await pool.query('SELECT COUNT(*) + 1 as rank FROM players WHERE wins > $1 OR (wins = $1 AND losses < $2)', [wins, losses]);
     const tRes = await pool.query('SELECT COUNT(*) as total FROM players WHERE wins > 0 OR losses > 0');
     rank = parseInt(rRes.rows[0].rank, 10);
     totalRanked = parseInt(tRes.rows[0].total, 10);
-    
     if (totalRanked > 0) {
       const percentile = (rank / totalRanked) * 100;
       if (percentile <= 5) tier = 1;
@@ -85,19 +105,31 @@ async function getPlayerStats(wallet) {
       else if (percentile <= 30) tier = 3;
       else if (percentile <= 50) tier = 4;
       else tier = 5;
-    } else {
-      tier = 5;
-    }
-  } else {
-    tier = 0;
-  }
-  
+    } else { tier = 5; }
+  } else { tier = 0; }
   return { wins, losses, rank, tier, totalRanked };
 }
 
-async function getPlayerRank(wallet) { 
-  const stats = await getPlayerStats(wallet);
-  return stats.rank;
+async function getPlayerRank(wallet) { const stats = await getPlayerStats(wallet); return stats.rank; }
+
+// === NUEVAS FUNCIONES VC (Vitality Cash) ===
+async function getVC(wallet) { const res = await pool.query('SELECT vc FROM players WHERE wallet = $1', [wallet]); return res.rows.length > 0 ? res.rows[0].vc : 0; }
+async function addVC(wallet, amount) { await pool.query('UPDATE players SET vc = vc + $1 WHERE wallet = $2', [amount, wallet]); return await getVC(wallet); }
+async function spendVC(wallet, amount) { 
+  const client = await pool.connect(); 
+  try { 
+    await client.query('BEGIN'); 
+    const res = await client.query('SELECT vc FROM players WHERE wallet = $1 FOR UPDATE', [wallet]); 
+    const currentVc = res.rows.length > 0 ? res.rows[0].vc : 0; 
+    if (currentVc < amount) { await client.query('ROLLBACK'); return false; } 
+    await client.query('UPDATE players SET vc = vc - $1 WHERE wallet = $2', [amount, wallet]); 
+    await client.query('COMMIT'); 
+    return true; 
+  } catch(e) { 
+    await client.query('ROLLBACK'); return false; 
+  } finally { 
+    client.release(); 
+  } 
 }
 
 async function getHP(wallet) { const res = await pool.query('SELECT hp FROM players WHERE wallet = $1', [wallet]); return res.rows.length > 0 ? res.rows[0].hp : 0; }
@@ -127,11 +159,8 @@ async function settleGauntletTiered(wallet, defeatedCount) {
     const reward = calculateGauntletReward(defeatedCount);
     const platformProfit = 100 - reward;
     await client.query('UPDATE players SET locked_hp = GREATEST(0, locked_hp - 100), hp = hp + $1 WHERE wallet = $2', [reward, wallet]); 
-    if (platformProfit > 0) {
-      await client.query('UPDATE platform SET hp = hp + $1 WHERE id = 1', [platformProfit]);
-    } else if (platformProfit < 0) {
-      await client.query('UPDATE platform SET hp = GREATEST(0, hp + $1) WHERE id = 1', [platformProfit]);
-    }
+    if (platformProfit > 0) { await client.query('UPDATE platform SET hp = hp + $1 WHERE id = 1', [platformProfit]); }
+    else if (platformProfit < 0) { await client.query('UPDATE platform SET hp = GREATEST(0, hp + $1) WHERE id = 1', [platformProfit]); }
     await client.query('COMMIT'); 
     const newHp = await getHP(wallet);
     return { newHp, reward }; 
@@ -143,13 +172,7 @@ async function settleGauntletTiered(wallet, defeatedCount) {
   } 
 }
 
-async function getTotalPlayersHP() {
-  const res = await pool.query('SELECT COALESCE(SUM(hp), 0) as total_hp, COALESCE(SUM(locked_hp), 0) as total_locked FROM players');
-  const totalHp = res.rows.length > 0 ? parseInt(res.rows[0].total_hp, 10) : 0;
-  const totalLocked = res.rows.length > 0 ? parseInt(res.rows[0].total_locked, 10) : 0;
-  return totalHp + totalLocked;
-}
-
+async function getTotalPlayersHP() { const res = await pool.query('SELECT COALESCE(SUM(hp), 0) as total_hp, COALESCE(SUM(locked_hp), 0) as total_locked FROM players'); const totalHp = res.rows.length > 0 ? parseInt(res.rows[0].total_hp, 10) : 0; const totalLocked = res.rows.length > 0 ? parseInt(res.rows[0].total_locked, 10) : 0; return totalHp + totalLocked; }
 async function getExcedente() { return cachedExcedente; }
 async function getTowerStatus() { const excedente = cachedExcedente; return { grandAvailable: excedente >= 2000, trainAvailable: excedente >= 10, excedente: excedente }; }
 
@@ -221,5 +244,8 @@ module.exports = {
   calculateGauntletReward,
   getTowerStatus, claimTowerGrandPrize, checkTowerTrainingWin, claimTowerTrainingWin,
   getExcedente, getTotalPlayersHP, checkOwnerWithdrawal,
-  getAllAttacksDB, getAllVicamonsDB, saveAttackDB, saveVicamonDB
+  getAllAttacksDB, getAllVicamonsDB, saveAttackDB, saveVicamonDB,
+  // NUEVAS EXPORTACIONES FASE 1
+  createUser, getUserByEmail, linkWalletToAccount,
+  getVC, addVC, spendVC
 };
