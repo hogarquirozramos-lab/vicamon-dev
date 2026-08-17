@@ -16,6 +16,7 @@ const { sendUSDC } = require('./transfer');
 const { setupWebSocketServer } = require('./wsHandlers');
 const { initializeContent } = require('./contentManager');
 const { runMetaSimulation } = require('./simulatorManager');
+const { handleAuthRoutes } = require('./auth'); // NUEVO: Importar rutas de autenticación
 
 const ADMIN_PASS = process.env.ADMIN_PASSWORD || process.env.INTERNAL_SECRET || '';
 const OWNER_WALLET = process.env.OWNER_WALLET || ''; 
@@ -55,7 +56,12 @@ const MIME = { '.html':'text/html', '.js':'application/javascript', '.css':'text
 const server = http.createServer(async (req, res) => {
   const urlPath = req.url.split('?')[0];
   
-  // NUEVO: Endpoint para que el frontend lea de la base de datos
+  // NUEVO: Rutas de Registro y Login
+  if (urlPath === '/api/register' || urlPath === '/api/login') {
+    const handled = await handleAuthRoutes(req, res, urlPath);
+    if (handled) return;
+  }
+
   if (urlPath === '/api/beasts') {
     const BEASTS_DB = global.BEASTS_DB || require('./beasts.js');
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -84,17 +90,8 @@ const server = http.createServer(async (req, res) => {
       const platformHp = await getPlatformHp(); 
       const playersTotalHp = await getTotalPlayersHP(); 
       const excedente = platformHp - playersTotalHp; 
-      
       res.writeHead(200, { 'Content-Type': 'application/json' }); 
-      res.end(JSON.stringify({ 
-        players, 
-        platformHp, 
-        platformUsdc: platformHp * USDC_PER_HP, 
-        playersTotalHp, 
-        playersTotalUsdc: playersTotalHp * USDC_PER_HP, 
-        excedente, 
-        excedenteUsdc: excedente * USDC_PER_HP 
-      })); 
+      res.end(JSON.stringify({ players, platformHp, platformUsdc: platformHp * USDC_PER_HP, playersTotalHp, playersTotalUsdc: playersTotalHp * USDC_PER_HP, excedente, excedenteUsdc: excedente * USDC_PER_HP })); 
     } catch(e) { 
       console.error("Admin data error:", e);
       res.writeHead(500); res.end('Error'); 
@@ -107,7 +104,6 @@ const server = http.createServer(async (req, res) => {
   if (urlPath === '/admin-unlock-hp' && req.method === 'POST') { let body = ''; req.on('data', c => body += c); req.on('end', async () => { try { const { pass } = JSON.parse(body); if (pass !== ADMIN_PASS) { res.writeHead(403); res.end(JSON.stringify({ ok: false })); return; } await adminUnlockAllHP(); res.writeHead(200); res.end(JSON.stringify({ ok: true })); } catch(e) { res.writeHead(400); res.end(JSON.stringify({ ok: false })); } }); return; }
   if (urlPath === '/admin-withdraw' && req.method === 'POST') { let body = ''; req.on('data', c => body += c); req.on('end', async () => { try { const { pass } = JSON.parse(body); if (pass !== ADMIN_PASS) { res.writeHead(403); res.end(JSON.stringify({ ok: false, msg: 'Forbidden' })); return; } if (!OWNER_WALLET) { res.writeHead(400); res.end(JSON.stringify({ ok: false, msg: 'OWNER_WALLET no configurada en el servidor' })); return; } const balance = await getPlatformUSDCBalance(); if (balance <= 0.001) { res.writeHead(400); res.end(JSON.stringify({ ok: false, msg: 'No hay suficientes USDC para retirar' })); return; } const sig = await sendUSDC(OWNER_WALLET, balance); const hpToClear = Math.round(balance / USDC_PER_HP); await clearPlatformHp(hpToClear); res.writeHead(200); res.end(JSON.stringify({ ok: true, amount: balance, sig })); } catch(e) { res.writeHead(500); res.end(JSON.stringify({ ok: false, msg: e.message })); } }); return; }
 
-  // RUTAS ADMIN LAB
   if (urlPath === '/admin-get-content' && req.method === 'GET') {
     const pass = new URL(req.url, 'http://localhost').searchParams.get('pass') || '';
     if (pass !== ADMIN_PASS) { res.writeHead(403); res.end('Forbidden'); return; }
@@ -125,7 +121,7 @@ const server = http.createServer(async (req, res) => {
         const { pass, data } = JSON.parse(body);
         if (pass !== ADMIN_PASS) { res.writeHead(403); res.end(JSON.stringify({ ok: false })); return; }
         await saveAttackDB(data);
-        await initializeContent(); // Recargar memoria
+        await initializeContent(); 
         res.writeHead(200); res.end(JSON.stringify({ ok: true }));
       } catch(e) { res.writeHead(400); res.end(JSON.stringify({ ok: false, msg: e.message })); }
     });
@@ -137,14 +133,13 @@ const server = http.createServer(async (req, res) => {
         const { pass, data } = JSON.parse(body);
         if (pass !== ADMIN_PASS) { res.writeHead(403); res.end(JSON.stringify({ ok: false })); return; }
         await saveVicamonDB(data);
-        await initializeContent(); // Recargar memoria
+        await initializeContent(); 
         res.writeHead(200); res.end(JSON.stringify({ ok: true }));
       } catch(e) { res.writeHead(400); res.end(JSON.stringify({ ok: false, msg: e.message })); }
     });
     return;
   }
   
-  // RUTA SIMULADOR
   if (urlPath === '/admin-run-simulation' && req.method === 'POST') {
     let body = ''; req.on('data', c => body += c); req.on('end', async () => {
       try {
@@ -186,7 +181,7 @@ initializeContent().then(() => {
   server.listen(PORT, () => console.log(`Zodiac Battle corriendo en http://localhost:${PORT}`));
 });
 
-// BLINDAJE DEL SERVIDOR: Capturar errores globales para que Render nunca se caiga
+// BLINDAJE DEL SERVIDOR
 process.on('unhandledRejection', (reason, promise) => {
   console.error('⚠️ Promesa no capturada (esto no tirará el servidor):', reason);
 });
