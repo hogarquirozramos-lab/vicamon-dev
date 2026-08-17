@@ -4,8 +4,12 @@ const { CPU_ID, processCpuPlayerTurn, scheduleCpuTurn } = require('./cpuLogic');
 const { processGauntletPlayerTurn, endGauntlet, scheduleGauntletCpuTurn } = require('./gauntletManager');
 const { pushTeamBattle, processTeamTurn, processTeamSwitch, processTeamCpuPlayerTurn, endTeamBattle } = require('./teamEngine');
 const { joinTournament, leaveTournament, broadcastTournamentState, reportTournamentResult } = require('./tournamentManager');
-const { getHP, addHP, hasHP, lockHP, unlockHP, settleMatch, cashout, updatePlayerName, updatePlayerStats, getTopPlayers, getLeaderboard, getPlayerStats, getPlayerRank, PLATFORM_WALLET, USDC_PER_HP, settleGauntletTiered, getTowerStatus, checkTowerTrainingWin, checkOwnerWithdrawal, clearPlatformHp } = require('./hp-balance');
+const { getHP, getVC, addHP, hasHP, lockHP, unlockHP, settleMatch, cashout, updatePlayerName, updatePlayerStats, getTopPlayers, getLeaderboard, getPlayerStats, getPlayerRank, PLATFORM_WALLET, USDC_PER_HP, settleGauntletTiered, getTowerStatus, checkTowerTrainingWin, checkOwnerWithdrawal, clearPlatformHp } = require('./hp-balance');
 const { sendUSDC } = require('./transfer');
+
+// NUEVO: Importar librería de Tokens
+const jwt = require('jsonwebtoken');
+const JWT_SECRET = process.env.JWT_SECRET || process.env.INTERNAL_SECRET || 'super-secret-dev-key';
 
 const BEASTS = global.BEASTS_DB || require('./beasts.js');
 const BEAST_KEYS = Object.keys(BEASTS);
@@ -54,7 +58,69 @@ function setupWebSocketServer(wss, getPlatformUSDCBalance) {
     ws.on('message', async raw => {
       let msg; try { msg = JSON.parse(raw); } catch { return; }
       try {
-        if (msg.type === 'join') { const wallet = msg.wallet || ''; const isGuest = msg.isGuest || wallet.startsWith('guest_'); if (!isGuest && walletToBattle.has(wallet)) { const bId = walletToBattle.get(wallet); const b = battles.get(bId); if (b) { clearTimeout(b.dcTimer); clearTimeout(b.dcTurnTimer); b.dcPlayerId = null; b.dcWallet = null; for (const [oldId, p] of lobby) { if (p.wallet === wallet && oldId !== id) { lobby.delete(oldId); try { p.ws.close(); } catch(e) {} } } const isP1 = b.p1Wallet === wallet; const oldId = isP1 ? b.p1id : b.p2id; if (isP1) b.p1id = id; else b.p2id = id; if (b.turnId === oldId) b.turnId = id; lobby.set(id, { ws, name: msg.name, beast: isP1 ? b.p1Beast : b.p2Beast, wallet, inBattle: true, id, isGuest: false, physicalBeasts: p.physicalBeasts || [] }); const oppId = isP1 ? b.p2id : b.p1id; const opp = lobby.get(oppId); if (opp) send(opp.ws, { type: 'opponent_reconnected' }); if (b.isTeamBattle) { send(ws, { type: 'reconnect_battle', battleId: bId, role: isP1 ? 'p1' : 'p2', id: id, isTeamBattle: true, opponent: opp?.name || 'Rival', yourTurn: b.turnId === id, myBeast: isP1 ? b.p1Beast : b.p2Beast, oppBeast: isP1 ? b.p2Beast : b.p1Beast }); setTimeout(() => pushTeamBattle(bId), 200); } else { send(ws, { type: 'reconnect_battle', battleId: bId, role: isP1 ? 'p1' : 'p2', id: id, isTeamBattle: false, opponent: opp?.name || 'Rival', yourTurn: b.turnId === id, myBeast: isP1 ? b.p1Beast : b.p2Beast, oppBeast: isP1 ? b.p2Beast : b.p1Beast }); setTimeout(() => pushBattle(bId), 200); } await pushLobby(); return; } else { walletToBattle.delete(wallet); } } for (const [oldId, p] of lobby) { if (p.wallet === wallet && oldId !== id) { send(p.ws, { type: 'kicked', msg: 'Tu wallet se conectó en otra pestaña.' }); if (!p.inBattle) lobby.delete(oldId); try { p.ws.close(); } catch(e) {} } } lobby.set(id, { ws, name: msg.name, beast: msg.beast, wallet, inBattle: false, id, isGuest, physicalBeasts: [] }); if (isGuest) { send(ws, { type: 'joined', id, hp: 0, isGuest: true, stats: { wins: 0, losses: 0, rank: null }, physicalBeasts: [] }); } else { await updatePlayerName(wallet, msg.name); const hp = await getHP(wallet); const stats = await getPlayerStats(wallet); const rank = await getPlayerRank(wallet); send(ws, { type: 'joined', id, hp, isGuest: false, stats: { wins: stats.wins, losses: stats.losses, rank }, physicalBeasts: [] }); const top = await getTopPlayers(3); send(ws, { type: 'leaderboard_update', top }); } await pushLobby(); }
+        
+        // --- LÓGICA DE LOGIN CON TOKEN ---
+        if (msg.type === 'join') { 
+          if (!msg.token) return send(ws, { type: 'kicked', msg: 'Sesión inválida. Recarga e inicia sesión.' });
+          
+          let email;
+          try {
+            const decoded = jwt.verify(msg.token, JWT_SECRET);
+            email = decoded.email;
+          } catch(e) {
+            return send(ws, { type: 'kicked', msg: 'Sesión expirada. Recarga e inicia sesión.' });
+          }
+          
+          const wallet = email; // Usamos el email como identificador interno (wallet)
+          const isGuest = false; // El modo invitado queda desactivado
+
+          // Reconexión a batallas si el jugador se desconectó
+          if (walletToBattle.has(wallet)) { 
+            const bId = walletToBattle.get(wallet); const b = battles.get(bId); 
+            if (b) { 
+              clearTimeout(b.dcTimer); clearTimeout(b.dcTurnTimer); b.dcPlayerId = null; b.dcWallet = null; 
+              for (const [oldId, p] of lobby) { 
+                if (p.wallet === wallet && oldId !== id) { lobby.delete(oldId); try { p.ws.close(); } catch(e) {} } 
+              } 
+              const isP1 = b.p1Wallet === wallet; const oldId = isP1 ? b.p1id : b.p2id; 
+              if (isP1) b.p1id = id; else b.p2id = id; 
+              if (b.turnId === oldId) b.turnId = id; 
+              lobby.set(id, { ws, name: msg.name, beast: isP1 ? b.p1Beast : b.p2Beast, wallet, inBattle: true, id, isGuest: false, physicalBeasts: p.physicalBeasts || [] }); 
+              const oppId = isP1 ? b.p2id : b.p1id; const opp = lobby.get(oppId); 
+              if (opp) send(opp.ws, { type: 'opponent_reconnected' }); 
+              if (b.isTeamBattle) { 
+                send(ws, { type: 'reconnect_battle', battleId: bId, role: isP1 ? 'p1' : 'p2', id: id, isTeamBattle: true, opponent: opp?.name || 'Rival', yourTurn: b.turnId === id, myBeast: isP1 ? b.p1Beast : b.p2Beast, oppBeast: isP1 ? b.p2Beast : b.p1Beast }); 
+                setTimeout(() => pushTeamBattle(bId), 200); 
+              } else { 
+                send(ws, { type: 'reconnect_battle', battleId: bId, role: isP1 ? 'p1' : 'p2', id: id, isTeamBattle: false, opponent: opp?.name || 'Rival', yourTurn: b.turnId === id, myBeast: isP1 ? b.p1Beast : b.p2Beast, oppBeast: isP1 ? b.p2Beast : b.p1Beast }); 
+                setTimeout(() => pushBattle(bId), 200); 
+              } 
+              await pushLobby(); return; 
+            } else { walletToBattle.delete(wallet); } 
+          } 
+
+          // Login normal (sin batalla activa)
+          for (const [oldId, p] of lobby) { 
+            if (p.wallet === wallet && oldId !== id) { 
+              send(p.ws, { type: 'kicked', msg: 'Tu cuenta se conectó en otra pestaña.' }); 
+              if (!p.inBattle) lobby.delete(oldId); 
+              try { p.ws.close(); } catch(e) {} 
+            } 
+          } 
+          
+          lobby.set(id, { ws, name: msg.name, beast: msg.beast, wallet, inBattle: false, id, isGuest, physicalBeasts: [] }); 
+          
+          await updatePlayerName(wallet, msg.name); 
+          const hp = await getHP(wallet); 
+          const vc = await getVC(wallet); // NUEVO: Obtener VC
+          const stats = await getPlayerStats(wallet); 
+          const rank = await getPlayerRank(wallet); 
+          send(ws, { type: 'joined', id, hp, vc, wallet, isGuest: false, stats: { wins: stats.wins, losses: stats.losses, rank }, physicalBeasts: [] }); 
+          const top = await getTopPlayers(3); 
+          send(ws, { type: 'leaderboard_update', top }); 
+          await pushLobby(); 
+        }
+
         if (msg.type === 'change_beast') { const p = lobby.get(id); if (p && !p.inBattle) { p.beast = msg.beast; await pushLobby(); } }
         if (msg.type === 'update_nickname') { const p = lobby.get(id); if (p) { p.name = msg.name; if (!p.isGuest) await updatePlayerName(p.wallet, msg.name); await pushLobby(); send(ws, { type: 'nickname_updated', name: msg.name }); } }
         if (msg.type === 'redeem_physical_code') { const p = lobby.get(id); if (!p) return; if (p.isGuest) { send(ws, { type: 'error', msg: 'Conecta tu wallet para usar códigos físicos.' }); return; } const code = (msg.code || '').toUpperCase().trim(); if (!PHYSICAL_CODES[code]) { send(ws, { type: 'error', msg: 'Código inválido. Verifica tu llavero.' }); return; } if (activePhysicalCodes.has(code) && activePhysicalCodes.get(code) !== p.wallet) { send(ws, { type: 'error', msg: '¡Este Vicamon ya está en uso por otro entrenador!' }); return; } const beastKey = PHYSICAL_CODES[code]; if (p.physicalBeasts.includes(beastKey)) { send(ws, { type: 'error', msg: 'Ya tienes a este Vicamon invocado.' }); return; } p.physicalBeasts.push(beastKey); activePhysicalCodes.set(code, p.wallet); send(ws, { type: 'physical_code_success', beast: beastKey, code: code }); await pushLobby(); }
@@ -158,7 +224,6 @@ function setupWebSocketServer(wss, getPlatformUSDCBalance) {
           return;
         }
 
-        // NUEVO: Obtener lista de clasificación completa
         if (msg.type === 'get_full_leaderboard') {
             const list = await getLeaderboard(100);
             send(ws, { type: 'full_leaderboard', list });
@@ -171,11 +236,11 @@ function setupWebSocketServer(wss, getPlatformUSDCBalance) {
         if (msg.type === 'ping') { 
           const p = lobby.get(id); 
           if (p) { 
-            // BLINDAJE: Si la base de datos falla al leer el HP en el ping, no rompemos el servidor ni spameamos errores al usuario
             try {
               if (!p.isGuest) {
                 const hp = await getHP(p.wallet || '');
-                send(ws, { type: 'hp_updated', hp: hp });
+                const vc = await getVC(p.wallet || '');
+                send(ws, { type: 'hp_updated', hp: hp, vc: vc });
               }
               await pushLobby();
             } catch(dbErr) {
