@@ -28,13 +28,14 @@ function openChallengeMenu(targetId, name, isTrain) {
   isGauntletChallenge = false; 
   const title = isTrain ? `Entrenar con ${name}` : `Batalla por HP con ${name}`; 
   let buttonsHtml = ''; 
-  if (isGuest && !isTrain) { alert('Los invitados solo pueden entrenar. Conecta tu wallet para batallas por HP.'); return; } 
   if (isTrain) { 
     buttonsHtml += `<button class="btn btn-blue" style="width:100%;margin-bottom:10px" onclick="selectChallengeMode('train')">🤝 Entrenar 1 vs 1 (XP)</button>`; 
-    buttonsHtml += `<button class="btn btn-blue" style="width:100%" onclick="selectChallengeMode('train3v3')">🤝 Entrenar 3 vs 3 (XP)</button>`; 
+    buttonsHtml += `<button class="btn btn-blue" style="width:100%;margin-bottom:10px" onclick="selectChallengeMode('train3v3')">🤝 Entrenar 3 vs 3 (XP)</button>`; 
+    buttonsHtml += `<button class="btn btn-blue" style="width:100%" onclick="selectChallengeMode('train6v6')">🤝 Entrenar 6 vs 6 (XP)</button>`; 
   } else { 
     buttonsHtml += `<button class="btn btn-blue" style="width:100%;margin-bottom:10px" ${myCurrentHP < 100 ? 'disabled' : ''} onclick="selectChallengeMode('1v1')">⚔️ 1 vs 1 (Recompensa 100 HP)</button>`; 
-    buttonsHtml += `<button class="btn btn-blue" style="width:100%" ${myCurrentHP < 300 ? 'disabled' : ''} onclick="selectChallengeMode('3v3')">⚔️ 3 vs 3 (Recompensa 300 HP)</button>`; 
+    buttonsHtml += `<button class="btn btn-blue" style="width:100%;margin-bottom:10px" ${myCurrentHP < 300 ? 'disabled' : ''} onclick="selectChallengeMode('3v3')">⚔️ 3 vs 3 (Recompensa 300 HP)</button>`; 
+    buttonsHtml += `<button class="btn btn-blue" style="width:100%" ${myCurrentHP < 600 ? 'disabled' : ''} onclick="selectChallengeMode('6v6')">⚔️ 6 vs 6 (Recompensa 600 HP)</button>`; 
   } 
   const modal = document.getElementById('modal-challenge-mode'); 
   modal.innerHTML = `<div class="modal" style="max-width:350px"><h3 style="margin-bottom:20px">${title}</h3><div style="display:flex;flex-direction:column;gap:5px">${buttonsHtml}</div><button class="btn btn-sm btn-red" style="margin-top:20px;width:100%" onclick="document.getElementById('modal-challenge-mode').classList.add('hidden')">Cancelar</button></div>`; 
@@ -48,20 +49,25 @@ function openMasterMenu() {
 function selectChallengeMode(mode) { 
   document.getElementById('modal-challenge-mode').classList.add('hidden'); 
   document.getElementById('modal-master-menu').classList.add('hidden'); 
-  teamSelectionMode = (mode === '3v3' || mode === 'train3v3') ? '3v3' : '1v1'; 
-  pendingIsTraining = (mode === 'train' || mode === 'train3v3'); 
+  if(mode === '1v1' || mode === 'train') teamSelectionMode = '1v1'; 
+  else if(mode === '3v3' || mode === 'train3v3') teamSelectionMode = '3v3'; 
+  else if(mode === '6v6' || mode === 'train6v6') teamSelectionMode = '6v6'; 
+  
+  pendingIsTraining = (mode === 'train' || mode === 'train3v3' || mode === 'train6v6'); 
   selectedTeam = []; 
   const titleEl = document.getElementById('ts-mode-title'); 
   const isMaster = (pendingChallengeTargetId === null); 
+  const maxPicks = teamSelectionMode === '6v6' ? 6 : (teamSelectionMode === '3v3' ? 3 : 1);
   if(teamSelectionMode === '1v1') titleEl.textContent = (isMaster || pendingIsTraining) ? 'Entrenamiento: 1 vs 1 (Elige 1)' : 'Batalla por HP: 1 vs 1 (Elige 1)'; 
-  if(teamSelectionMode === '3v3') titleEl.textContent = (isMaster || pendingIsTraining) ? 'Entrenamiento: 3 vs 3 (Elige 3)' : 'Batalla por HP: 3 vs 3 (Elige 3)'; 
+  else if(teamSelectionMode === '3v3') titleEl.textContent = (isMaster || pendingIsTraining) ? 'Entrenamiento: 3 vs 3 (Elige 3)' : 'Batalla por HP: 3 vs 3 (Elige 3)'; 
+  else if(teamSelectionMode === '6v6') titleEl.textContent = (isMaster || pendingIsTraining) ? 'Entrenamiento: 6 vs 6 (Elige 6)' : 'Batalla por HP: 6 vs 6 (Elige 6)'; 
   buildTeamPickGrid(); 
   show('s-team-select'); 
 }
 
 function buildTeamPickGrid() { const allKeys=Object.entries(BEASTS); const keys=allKeys.filter(([k,b])=>b.cat!=='Físico'||myPhysicalBeasts.includes(k)); let html=''; keys.forEach(([k,b])=>{ html+=`<div class="bcard" id="tpc-${k}" onclick="toggleTeamBeast('${k}')"><img src="${b.img}" alt="${b.name}"><div class="bname">${b.name}</div><div class="bsub">${b.sub}</div><span class="bstyle" style="${STCSS[b.style]}">${b.style}</span><div class="elbar" style="background:${EL[b.el]}"></div></div>`; }); html+=`<div class="beast-detail" id="team-detail-panel"></div>`; document.getElementById('team-pick-grid').innerHTML=html; updateTeamSelectionUI(); }
-function toggleTeamBeast(k) { const maxPicks = teamSelectionMode === '3v3' ? 3 : 1; const idx = selectedTeam.indexOf(k); if(idx > -1) { selectedTeam.splice(idx, 1); } else { if(selectedTeam.length >= maxPicks) { alert(`Ya elegiste ${maxPicks} Vicamons.`); return; } selectedTeam.push(k); } updateTeamSelectionUI(); }
-function updateTeamSelectionUI() { const maxPicks = teamSelectionMode === '3v3' ? 3 : 1; document.querySelectorAll('#team-pick-grid .bcard').forEach(c => c.classList.remove('sel')); selectedTeam.forEach((k, i) => { const card = document.getElementById('tpc-'+k); if(card) { card.classList.add('sel'); let badge = card.querySelector('.team-badge'); if(!badge) { badge = document.createElement('div'); badge.className = 'team-badge'; badge.style.cssText = 'position:absolute;top:2px;right:2px;background:#4a9eff;color:#fff;width:16px;height:16px;border-radius:50%;font-size:10px;display:flex;align-items:center;justify-content:center;font-weight:bold'; card.appendChild(badge); } badge.textContent = i + 1; } }); document.querySelectorAll('#team-pick-grid .bcard').forEach(c => { if(!c.classList.contains('sel')) { const badge = c.querySelector('.team-badge'); if(badge) badge.remove(); } }); document.getElementById('btn-confirm-team').disabled = selectedTeam.length !== maxPicks; }
+function toggleTeamBeast(k) { const maxPicks = teamSelectionMode === '6v6' ? 6 : (teamSelectionMode === '3v3' ? 3 : 1); const idx = selectedTeam.indexOf(k); if(idx > -1) { selectedTeam.splice(idx, 1); } else { if(selectedTeam.length >= maxPicks) { alert(`Ya elegiste ${maxPicks} Vicamons.`); return; } selectedTeam.push(k); } updateTeamSelectionUI(); }
+function updateTeamSelectionUI() { const maxPicks = teamSelectionMode === '6v6' ? 6 : (teamSelectionMode === '3v3' ? 3 : 1); document.querySelectorAll('#team-pick-grid .bcard').forEach(c => c.classList.remove('sel')); selectedTeam.forEach((k, i) => { const card = document.getElementById('tpc-'+k); if(card) { card.classList.add('sel'); let badge = card.querySelector('.team-badge'); if(!badge) { badge = document.createElement('div'); badge.className = 'team-badge'; badge.style.cssText = 'position:absolute;top:2px;right:2px;background:#4a9eff;color:#fff;width:16px;height:16px;border-radius:50%;font-size:10px;display:flex;align-items:center;justify-content:center;font-weight:bold'; card.appendChild(badge); } badge.textContent = i + 1; } }); document.querySelectorAll('#team-pick-grid .bcard').forEach(c => { if(!c.classList.contains('sel')) { const badge = c.querySelector('.team-badge'); if(badge) badge.remove(); } }); document.getElementById('btn-confirm-team').disabled = selectedTeam.length !== maxPicks; }
 function cancelTeamSelection() { if(pendingFrom !== null) { ws.send(JSON.stringify({type:'reject_challenge', fromId: pendingFrom})); pendingFrom = null; } isGauntletChallenge = false; show('s-lobby'); }
 
 function confirmTeam() { 
@@ -75,12 +81,30 @@ function confirmTeam() {
   } 
   let isTraining; 
   if (pendingFrom !== null) { isTraining = pendingIsTraining; } else { isTraining = pendingIsTraining || pendingChallengeTargetId === null; } 
-  const mode3v3 = teamSelectionMode === '3v3'; 
-  if(mode3v3) { myTeam = selectedTeam.slice(); } else { myBeast = selectedTeam[0]; myTeam = [myBeast]; } 
-  if(ws && ws.readyState === 1) { if(!mode3v3) ws.send(JSON.stringify({type:'change_beast', beast: myBeast})); } 
-  if(pendingFrom !== null) { if(mode3v3) ws.send(JSON.stringify({type:'accept_3v3', fromId: pendingFrom, team: myTeam, isTraining: isTraining})); else ws.send(JSON.stringify({type:'accept', fromId: pendingFrom, isTraining: isTraining})); pendingFrom = null; pendingIs3v3 = false; pendingIsTraining = false; } 
-  else if(pendingChallengeTargetId !== null) { if(mode3v3 && isTraining) ws.send(JSON.stringify({type:'challenge_3v3_training', targetId: pendingChallengeTargetId, team: myTeam})); else if(mode3v3) ws.send(JSON.stringify({type:'challenge_3v3', targetId: pendingChallengeTargetId, team: myTeam})); else if(isTraining) ws.send(JSON.stringify({type:'challenge_training', targetId: pendingChallengeTargetId})); else ws.send(JSON.stringify({type:'challenge', targetId: pendingChallengeTargetId})); pendingChallengeTargetId = null; pendingIsTraining = false; } 
-  else if(isTraining) { if(mode3v3) ws.send(JSON.stringify({type:'challenge_3v3_cpu', team: myTeam})); else ws.send(JSON.stringify({type:'challenge_cpu'})); } 
+  const mode = teamSelectionMode; 
+  if(mode === '3v3' || mode === '6v6') { myTeam = selectedTeam.slice(); } else { myBeast = selectedTeam[0]; myTeam = [myBeast]; } 
+  if(ws && ws.readyState === 1) { if(mode === '1v1') ws.send(JSON.stringify({type:'change_beast', beast: myBeast})); } 
+  
+  if(pendingFrom !== null) { 
+    if(mode === '6v6') ws.send(JSON.stringify({type:'accept_6v6', fromId: pendingFrom, team: myTeam, isTraining: isTraining})); 
+    else if(mode === '3v3') ws.send(JSON.stringify({type:'accept_3v3', fromId: pendingFrom, team: myTeam, isTraining: isTraining})); 
+    else ws.send(JSON.stringify({type:'accept', fromId: pendingFrom, isTraining: isTraining})); 
+    pendingFrom = null; pendingIs3v3 = false; pendingIsTraining = false; 
+  } 
+  else if(pendingChallengeTargetId !== null) { 
+    if(mode === '6v6' && isTraining) ws.send(JSON.stringify({type:'challenge_6v6_training', targetId: pendingChallengeTargetId, team: myTeam})); 
+    else if(mode === '6v6') ws.send(JSON.stringify({type:'challenge_6v6', targetId: pendingChallengeTargetId, team: myTeam})); 
+    else if(mode === '3v3' && isTraining) ws.send(JSON.stringify({type:'challenge_3v3_training', targetId: pendingChallengeTargetId, team: myTeam})); 
+    else if(mode === '3v3') ws.send(JSON.stringify({type:'challenge_3v3', targetId: pendingChallengeTargetId, team: myTeam})); 
+    else if(isTraining) ws.send(JSON.stringify({type:'challenge_training', targetId: pendingChallengeTargetId})); 
+    else ws.send(JSON.stringify({type:'challenge', targetId: pendingChallengeTargetId})); 
+    pendingChallengeTargetId = null; pendingIsTraining = false; 
+  } 
+  else if(isTraining) { 
+    if(mode === '6v6') ws.send(JSON.stringify({type:'challenge_6v6_cpu', team: myTeam})); 
+    else if(mode === '3v3') ws.send(JSON.stringify({type:'challenge_3v3_cpu', team: myTeam})); 
+    else ws.send(JSON.stringify({type:'challenge_cpu'})); 
+  } 
   show('s-lobby'); 
 }
 
@@ -90,16 +114,12 @@ function openTowerMenu() {
   const trainBtn = document.getElementById('btn-tower-train');
   const guestBtn = document.getElementById('btn-tower-guest');
   
-  hpBtn.style.display = 'none';
-  trainBtn.style.display = 'none';
-  guestBtn.style.display = 'none';
+  if(hpBtn) hpBtn.style.display = 'none';
+  if(trainBtn) trainBtn.style.display = 'none';
+  if(guestBtn) guestBtn.style.display = 'none';
   
-  if (isGuest) {
-    guestBtn.style.display = 'flex';
-  } else {
-    hpBtn.style.display = 'flex';
-    trainBtn.style.display = 'flex';
-  }
+  if (hpBtn) hpBtn.style.display = 'flex';
+  if (trainBtn) trainBtn.style.display = 'flex';
   
   modal.classList.remove('hidden');
   
@@ -143,18 +163,16 @@ function animAttack(side){ const spr=document.getElementById('spr-'+side); if(!s
 function updateLobbyBadge(){ 
   document.getElementById('lbl-myname').textContent=myName; 
   const hpEl = document.getElementById('lbl-myhp'); 
-  if(hpEl) hpEl.textContent = isGuest ? 'Invitado' : (myCurrentHP + ' HP'); 
+  if(hpEl) hpEl.textContent = (myCurrentHP + ' HP'); 
   const b = BEASTS[myBeast] || BEASTS['aries']; 
   const badgeImg = document.getElementById('badge-img'); 
   if(badgeImg) { badgeImg.src=b.img; badgeImg.style.display='block'; } 
   const cashoutBtnLobby = document.getElementById('btn-cashout-lobby');
-  if(cashoutBtnLobby) {
-    cashoutBtnLobby.style.display = (myCurrentHP > 0 && !isGuest) ? 'inline-block' : 'none';
-  }
+  if(cashoutBtnLobby) cashoutBtnLobby.style.display = 'none'; 
 }
 
 var _lastLobbyPlayers=[]; function renderLobbyFromCache(){ renderLobby(_lastLobbyPlayers); }
-function renderLobby(others){ _lastLobbyPlayers=others; const list=document.getElementById('players-list'); const myHp=myCurrentHP; const hpWarnEl=document.getElementById('low-hp-warning'); if(hpWarnEl) { hpWarnEl.style.display = 'block'; const warnMsg = hpWarnEl.querySelector('div:first-child'); if (warnMsg) warnMsg.style.display = (!isGuest && myHp < 100) ? 'block' : 'none'; } document.getElementById('guest-lobby-banner').style.display = isGuest ? 'flex' : 'none'; if(!others.length){list.innerHTML='<p class="empty-lobby">No hay otros jugadores...</p>';return;} list.innerHTML=others.map(p=>{ const b=BEASTS[p.beast]||{name:p.beast,img:''}; const rivalHp=p.hp||0; const isTargetGuest = p.isGuest || false; const canChallengeHP = !isGuest && !isTargetGuest && myHp >= 100 && rivalHp >= 100; const hpColor=rivalHp>=100?'#5DCAA5':'#F0997B'; const hpText = isTargetGuest ? 'Invitado' : `${rivalHp} HP`; return `<div class="p-row"><div class="p-info"><img class="p-img" src="${b.img}"><div><div class="p-name">${p.name}</div><div class="p-beast">${b.name} · <span style="color:${hpColor};font-size:10px">${hpText}</span></div></div></div><div style="display:flex;gap:6px"><button class="btn btn-sm" style="background:rgba(130,80,180,.15);border:1px solid rgba(130,80,180,.35);color:#CFA9EC" onclick="openChallengeMenu(${p.id},'${p.name}', true)">🤝 Entrenar</button><button class="btn btn-blue btn-sm" ${canChallengeHP?'':'disabled'} onclick="openChallengeMenu(${p.id},'${p.name}', false)">⚔️ Batalla HP</button></div></div>`; }).join(''); }
+function renderLobby(others){ _lastLobbyPlayers=others; const list=document.getElementById('players-list'); const myHp=myCurrentHP; const hpWarnEl=document.getElementById('low-hp-warning'); if(hpWarnEl) { hpWarnEl.style.display = 'none'; } const guestBanner = document.getElementById('guest-lobby-banner'); if(guestBanner) guestBanner.style.display = 'none'; if(!others.length){list.innerHTML='<p class="empty-lobby">No hay otros jugadores...</p>';return;} list.innerHTML=others.map(p=>{ const b=BEASTS[p.beast]||{name:p.beast,img:''}; const rivalHp=p.hp||0; const isTargetGuest = p.isGuest || false; const canChallengeHP = !isTargetGuest && myHp >= 100 && rivalHp >= 100; const hpColor=rivalHp>=100?'#5DCAA5':'#F0997B'; const hpText = isTargetGuest ? 'Invitado' : `${rivalHp} HP`; return `<div class="p-row"><div class="p-info"><img class="p-img" src="${b.img}"><div><div class="p-name">${p.name}</div><div class="p-beast">${b.name} · <span style="color:${hpColor};font-size:10px">${hpText}</span></div></div></div><div style="display:flex;gap:6px"><button class="btn btn-sm" style="background:rgba(130,80,180,.15);border:1px solid rgba(130,80,180,.35);color:#CFA9EC" onclick="openChallengeMenu(${p.id},'${p.name}', true)">🤝 Entrenar</button><button class="btn btn-blue btn-sm" ${canChallengeHP?'':'disabled'} onclick="openChallengeMenu(${p.id},'${p.name}', false)">⚔️ Batalla HP</button></div></div>`; }).join(''); }
 
 function challengeMaster(){ if(!ws || ws.readyState !== 1) return; openChallengeMenu(null, 'Zodiac Master', true); }
 function acceptChallenge(){ document.getElementById('modal-challenged').classList.add('hidden'); stopChallengeBeep(); if(pendingFrom===null) return; if(isGuest && !pendingIsTraining) { alert('Los invitados solo pueden aceptar entrenamientos. Conecta tu wallet para batallas por HP.'); rejectChallenge(); return; } teamSelectionMode = pendingIs3v3 ? '3v3' : '1v1'; selectedTeam = []; const title = (pendingIs3v3 ? '3 vs 3' : '1 vs 1') + (pendingIsTraining ? ' (Entrenamiento)' : ' (Batalla por HP)'); document.getElementById('ts-mode-title').textContent = title; buildTeamPickGrid(); show('s-team-select'); }
@@ -175,7 +193,6 @@ function getFullLeaderboard() {
   }
 }
 
-// NUEVO: Renderizar la tabla de clasificación mostrando la Clase (Tier) de cada jugador
 function renderFullLeaderboard(list) {
   const listEl = document.getElementById('full-leaderboard-list');
   if (!list || list.length === 0) {
@@ -228,5 +245,5 @@ function renderBattle(yourTurn, logs){
     if(logs&&logs.length){ const lb=document.getElementById('log-box'); lb.innerHTML=logs.map(l=>`<div class="ll lc-${l.c||'normal'}">${l.t}</div>`).join(''); lb.scrollTop=lb.scrollHeight; } 
 }
 function doAttack(i){ animAttack('me'); try { const b = (myBeast === 'custom_lab_beast' && window._labBeastTemp) ? window._labBeastTemp : BEASTS[myBeast]; const atk = b.attacks[i]; if(atk.d === 0) playSfx('curacion'); else playSfx('ataque'); } catch(e) {} ws.send(JSON.stringify({type:'attack',battleId,index:i})); }
-function leaveLobby(){ if(ws) ws.send(JSON.stringify({type:'leave_lobby'})); isKicked = true; if(ws) { try { ws.close(); } catch(e){} } ws = null; isGuest = false; show('s-login'); }
+function leaveLobby(){ if(ws) ws.send(JSON.stringify({type:'leave_lobby'})); isKicked = true; if(ws) { try { ws.close(); } catch(e){} } ws = null; show('s-login'); }
 function backToLobby(){ updateLobbyBadge(); show('s-lobby'); }
