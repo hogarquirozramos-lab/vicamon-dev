@@ -42,16 +42,7 @@ function handleMsg(m){
   
   if(m.type === 'tower_status') {
     const hpBtn = document.getElementById('btn-tower-hp');
-    const trainBtn = document.getElementById('btn-tower-train');
-    const status = m.status;
-    if(hpBtn) {
-      if(status.grandAvailable) { hpBtn.disabled = myCurrentHP < 100; hpBtn.textContent = '🏆 Torre (Inversión: 100 HP // Premio: 1000 HP)'; hpBtn.style.opacity = myCurrentHP < 100 ? '0.5' : '1'; } 
-      else { hpBtn.disabled = true; hpBtn.textContent = '🔒 Torre (Premio no disponible)'; hpBtn.style.opacity = '0.5'; }
-    }
-    if(trainBtn) {
-      if(status.trainAvailable) { trainBtn.disabled = false; trainBtn.textContent = '🤝 Torre (Premio: 10 HP)'; trainBtn.style.opacity = '1'; } 
-      else { trainBtn.disabled = true; trainBtn.textContent = '🔒 Torre (Bono no disponible)'; trainBtn.style.opacity = '0.5'; }
-    }
+    if(hpBtn) { hpBtn.disabled = false; hpBtn.textContent = '⚔️ Entrar (Costo: 10 VC)'; }
   }
 
   if(m.type === 'tournament_state') { if (myTournamentMode === m.mode || (!myTournamentMode && document.getElementById('s-tournament').classList.contains('active'))) { handleTournamentState(m); } }
@@ -73,7 +64,6 @@ function handleMsg(m){
   if(m.type==='battle_state'){ const me=myRole==='p1'?m.p1:m.p2; const opp=myRole==='p1'?m.p2:m.p1; if (m.isTeamBattle) { mySt = me.activeState; oppSt = opp.activeState; myBeast = me.activeBeast; oppBeast = opp.activeBeast; window._myBench = me.bench; } else { myBeast = me.beast || myBeast; oppBeast = opp.beast || oppBeast; mySt=me.state; oppSt=opp.state; } const prevMyHp=mySt.hp, prevOppHp=oppSt.hp; if(mySt.hp<prevMyHp) animHit('me',prevMyHp-mySt.hp); if(oppSt.hp<prevOppHp) animHit('opp',prevOppHp-oppSt.hp); renderBattle(m.yourTurn,m.logs); }
   if(m.type === 'team_force_switch'){ openSwitchMenu(m.reason); }
   if(m.type==='hp_updated'){ updateHPDisplay(m.hp); myCurrentHP=m.hp||0; if(m.vc !== undefined) { myCurrentVC = m.vc; updateHPDisplay(myCurrentHP); } }
-  if(m.type==='cashout_result'){ const btn=document.getElementById('btn-cashout'); if(!m.ok){ if(btn){btn.disabled=false;btn.textContent='💰 Cashout';} alert('Error: '+m.reason); return; } if(m.status==='confirmed'){ if(btn){btn.disabled=false;btn.textContent='💰 Cashout';} updateHPDisplay(0); alert(`✓ Cashout: ${m.usdc} USDC`); } }
   if(m.type==='physical_code_success'){ if(!myPhysicalBeasts.includes(m.beast)) myPhysicalBeasts.push(m.beast); localStorage.setItem('vicamon_physical_codes', JSON.stringify((JSON.parse(localStorage.getItem('vicamon_physical_codes')||'[]')).concat(m.code).filter((v,i,a)=>a.indexOf(v)===i))); updatePhysicalUI(); buildBestiary(); playSfx('curacion'); }
   
   if(m.type === 'info'){ alert('ℹ️ ' + m.msg); }
@@ -85,38 +75,58 @@ function handleMsg(m){
   if(m.type === 'full_leaderboard') { renderFullLeaderboard(m.list); }
   
   if(m.type==='battle_end'){ 
-    const won=m.won; const isCpuResult = m.isCpu === true; const isTrainingResult = m.isTraining === true; const isGauntletResult = m.isGauntlet === true; const isTeamResult = m.isTeamBattle === true; const isTournamentResult = m.isTournament === true; const winnerHp=m.winnerHp||0; const newHp=m.newHp||0; 
-    if(m.stats) updateProfileUI(m.stats); show('s-result'); 
+    const won=m.won; 
+    const isTrainingResult = m.isTraining === true; 
+    const isCpuResult = m.isCpu === true; 
+    const isGauntletResult = m.isGauntlet === true; 
+    const isTeamResult = m.isTeamBattle === true; 
+    const isTournamentResult = m.isTournament === true; 
     
-    if(!isCpuResult && !isTrainingResult) updateHPDisplay(newHp); 
-    if(isGauntletResult) updateHPDisplay(newHp); 
+    const newHp = m.newHp || 0; 
+    const newVC = m.newVC || 0; 
+    const hypHp = m.hypotheticalHp || 0; 
+    const hypVC = m.hypotheticalVC || 0; 
+    
+    if(m.stats) updateProfileUI(m.stats); 
+    show('s-result'); 
+    
+    if(!isCpuResult && !isTrainingResult && !isGauntletResult) updateHPDisplay(newHp); 
+    if(isGauntletResult && won) updateHPDisplay(newHp); 
     if(isTeamResult && !isTrainingResult) updateHPDisplay(newHp); 
     
     let resultBody=''; 
+    
     if(isTournamentResult){
        let btnText = 'Volver al Lobby'; let btnAction = "show('s-lobby'); myTournamentMode = null;";
        if (won && m.waitForNext) { btnText = 'Ir a la Sala del Torneo'; btnAction = "show('s-tournament');"; }
        resultBody=`<div style="background:rgba(246,226,102,.1);border:0.5px solid rgba(246,226,102,.3);border-radius:10px;padding:14px;margin:14px 0;text-align:center"><div style="font-size:20px">${won ? '🏆' : '💀'}</div><div style="color:${won ? '#F6E265' : '#F0997B'};font-weight:700;margin-top:5px">${won ? '¡Victoria en el Torneo!' : 'Derrota en el Torneo'}</div><div style="color:rgba(255,255,255,.8);margin-top:8px;font-size:14px">${m.customMsg || ''}</div></div>`;
        document.getElementById('result-box').innerHTML=`<div class="r-icon">${won ? '🏆' : '💀'}</div><div class="r-title">${won ? '¡Victoria!' : 'Derrota'}</div>${resultBody}<button class="btn btn-blue" onclick="${btnAction}">${btnText}</button>`;
     }
-    else if(isTeamResult && isTrainingResult){ const myXp = won ? (m.winnerXp || 0) : (m.loserXp || 0); resultBody=`<div style="background:rgba(130,80,180,.08);border:0.5px solid rgba(130,80,180,.2);border-radius:10px;padding:14px;margin:14px 0;text-align:center"><div style="font-size:20px">&#127891;</div><div style="font-size:13px;color:#CFA9EC;font-weight:600">Entrenamiento 3v3</div><div style="font-size:14px;color:#5DCAA5;margin-top:8px">+${myXp} XP</div></div>`; } 
+    else if(isTrainingResult || isCpuResult){ 
+      if(won){ 
+        resultBody=`<div style="background:rgba(93,202,165,.08);border-radius:10px;padding:14px;margin:14px 0;text-align:center"><div style="font-size:20px">&#127891;</div><div style="color:#5DCAA5">Entrenamiento</div><div style="font-size:14px;color:#F6E265;margin-top:8px">Si fuera real habrías ganado:</div><div style="color:#5DCAA5;margin-top:4px">+${hypHp} HP</div><div style="color:#F6E265">+${hypVC} VC</div></div>`; 
+      } else { 
+        resultBody=`<div style="background:rgba(240,153,122,.08);border-radius:10px;padding:14px;margin:14px 0;text-align:center"><div style="font-size:20px">&#127891;</div><div style="color:#F0997B">Derrota en Entrenamiento</div><div style="font-size:14px;color:#aaa;margin-top:8px">Si fuera real habrías perdido HP, pero recibido:</div><div style="color:#F6E265;margin-top:4px">+${hypVC} VC de consuelo</div></div>`; 
+      } 
+    } 
     else if(isGauntletResult){ 
       let resultText = '';
       if (m.customMsg) { resultText = `<div style="font-size:14px;color:#F6E265;margin-top:8px;font-weight:700">${m.customMsg}</div>`; }
       if(won){ resultBody=`<div style="background:rgba(246, 226, 102, 0.1);border-radius:10px;padding:14px;margin:14px 0;text-align:center"><div style="color:#F6E265">¡Torre Completada!</div>${resultText}</div>`; } 
       else { 
-         if (m.customMsg) { resultBody=`<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:14px;margin:14px 0;text-align:center"><div style="color:#F0997B">Torre Fallida</div><div style="color:#CFA9EC;margin-top:8px">Derrotaste ${m.defeated || 0} Vicamons</div>${resultText}</div>`; } 
-         else { const netHp = m.reward; const hpText = netHp === 0 ? "0 HP (Neutro)" : (netHp > 0 ? `+${netHp} HP` : `${netHp} HP`); const colorText = netHp >= 0 ? '#5DCAA5' : '#F0997B'; resultBody=`<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:14px;margin:14px 0;text-align:center"><div style="color:#F0997B">Torre Fallida</div><div style="color:#CFA9EC;margin-top:8px">Derrotaste ${m.defeated || 0} Vicamons</div><div style="color:${colorText};margin-top:8px;font-size:16px;font-weight:700">Balance: ${hpText}</div></div>`; } 
+        resultBody=`<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:14px;margin:14px 0;text-align:center"><div style="color:#F0997B">Torre Fallida</div><div style="color:#CFA9EC;margin-top:8px">Derrotaste ${m.defeated || 0} Vicamons</div>${resultText}</div>`; 
       } 
     }
-    else if(isTrainingResult){ const myXp = won ? (m.winnerXp || 0) : (m.loserXp || 0); resultBody=`<div style="background:rgba(130,80,180,.08);border:0.5px solid rgba(130,80,180,.2);border-radius:10px;padding:14px;margin:14px 0;text-align:center"><div style="font-size:20px">&#127891;</div><div style="font-size:13px;color:#CFA9EC">Entrenamiento 1v1</div><div style="font-size:14px;color:#5DCAA5;margin-top:8px">+${myXp} XP</div></div>`; } 
     else if(isTeamResult){ 
-      if(won){ resultBody=`<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:14px;margin:14px 0"><div>Batalla 3v3 por HP</div><div style="color:#5DCAA5;margin-top:8px">+300 HP (Apuesta del rival)</div><div style="color:#5DCAA5;margin-top:2px">+${winnerHp} HP (Restante de tus Vicamons)</div><div style="color:#fff;margin-top:8px;font-weight:700">Total: ${newHp} HP</div></div>`; } 
-      else { resultBody=`<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:14px;margin:14px 0"><div>Batalla 3v3 por HP</div><div style="color:#F0997B;margin-top:8px">-300 HP (Apuesta perdida)</div><div style="color:#fff;margin-top:8px;font-weight:700">Total: ${newHp} HP</div></div>`; } 
+      if(won){ resultBody=`<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:14px;margin:14px 0"><div>Batalla por HP</div><div style="color:#5DCAA5;margin-top:8px">¡Victoria!</div><div style="color:#F6E265;margin-top:4px">+${newVC} VC (HP restante)</div><div style="color:#fff;margin-top:8px;font-weight:700">Total HP: ${newHp}</div></div>`; } 
+      else { resultBody=`<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:14px;margin:14px 0"><div>Batalla por HP</div><div style="color:#F0997B;margin-top:8px">Derrota</div><div style="color:#F6E265;margin-top:4px">+${newVC} VC (Consuelo)</div><div style="color:#fff;margin-top:8px;font-weight:700">Total HP: ${newHp}</div></div>`; } 
     } 
-    else if(isCpuResult){ const myXp = won ? (m.winnerXp || 0) : (m.loserXp || 0); resultBody=`<div style="background:rgba(93,202,165,.08);border-radius:10px;padding:14px;margin:14px 0;text-align:center"><div style="font-size:20px">&#127891;</div><div style="color:#5DCAA5">Entrenamiento vs Master</div><div style="font-size:14px;color:#5DCAA5;margin-top:8px">+${myXp} XP</div></div>`; } 
-    else if(won){ resultBody=`<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:14px;margin:14px 0"><div>¡Victoria!</div><div style="color:#5DCAA5;margin-top:8px">+100 HP (Apuesta del rival)</div><div style="color:#5DCAA5;margin-top:2px">+${winnerHp} HP (Restante de tu Vicamon)</div><div style="color:#fff;margin-top:8px;font-weight:700">Total: ${newHp} HP</div></div>`; } 
-    else { resultBody=`<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:14px;margin:14px 0"><div>Derrota</div><div style="color:#F0997B;margin-top:8px">-100 HP (Apuesta perdida)</div><div style="color:#fff;margin-top:8px;font-weight:700">Total: ${newHp} HP</div></div>`; } 
+    else if(won){ 
+      resultBody=`<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:14px;margin:14px 0"><div>¡Victoria!</div><div style="color:#5DCAA5;margin-top:8px">+100 HP (Apuesta del rival)</div><div style="color:#F6E265;margin-top:4px">+${newVC} VC (HP restante)</div><div style="color:#fff;margin-top:8px;font-weight:700">Total HP: ${newHp}</div></div>`; 
+    } 
+    else { 
+      resultBody=`<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:14px;margin:14px 0"><div>Derrota</div><div style="color:#F0997B;margin-top:8px">-100 HP (Apuesta perdida)</div><div style="color:#F6E265;margin-top:4px">+${newVC} VC (Consuelo)</div><div style="color:#fff;margin-top:8px;font-weight:700">Total HP: ${newHp}</div></div>`; 
+    } 
     
     if (!isTournamentResult) {
         const icon = won ? '🏆' : '💀'; const title = won ? '¡Victoria!' : 'Derrota'; 
