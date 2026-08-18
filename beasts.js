@@ -89,6 +89,14 @@ const BEASTS = {
       {n:'Muro de Energía',  d:0,  acc:100, self:0,  fx:'shield2',  pp:4,  desc:'Bloquea los próximos 2 ataques.'},
       {n:'Destello Cegador', d:15, acc:85,  self:0,  fx:'blind',    pp:4,  desc:'Daño + Ciega (-30% precisión).'},
       {n:'Golpe Demoledor',  d:29, acc:65,  self:0,  fx:null,       pp:5,  desc:'Brutal, pero impreciso.'},
+    ]},
+  // NUEVO: Tunqui añadido al respaldo
+  tunqui:     {name:'Tunqui',     cat:'Físico',  sub:'Guardián Amazónico',  img:'Tunqui.png',     el:'aire',   style:'equilibrado', stats: {atk:70, def:70, spd:70},
+    attacks:[
+      {n:'Garra Rápida',    d:18, acc:100, self:0,  fx:null,       pp:99, desc:'Tajo veloz y seguro.'},
+      {n:'Escudo Espejo',   d:0,  acc:100, self:0,  fx:'shield1r', pp:2,  desc:'Bloquea 1 ataque y refleja 15 HP.'},
+      {n:'Llama Abrasadora',d:18, acc:100, self:0,  fx:'burn',     pp:4,  desc:'Daño + Quema (6 HP/turno).'},
+      {n:'Disparo Certero', d:34, acc:80,  self:0,  fx:null,       pp:5,  desc:'Proyectil concentrado.'},
     ]}
 };
 
