@@ -4,7 +4,7 @@ const { CPU_ID, processCpuPlayerTurn, scheduleCpuTurn } = require('./cpuLogic');
 const { processGauntletPlayerTurn, endGauntlet, scheduleGauntletCpuTurn } = require('./gauntletManager');
 const { pushTeamBattle, processTeamTurn, processTeamSwitch, processTeamCpuPlayerTurn, endTeamBattle } = require('./teamEngine');
 const { joinTournament, leaveTournament, broadcastTournamentState, reportTournamentResult } = require('./tournamentManager');
-const { getHP, getVC, addHP, addVC, hasHP, hasVC, lockHP, unlockHP, spendVC, settleMatch, cashout, updatePlayerName, updatePlayerStats, getTopPlayers, getLeaderboard, getPlayerStats, getPlayerRank, PLATFORM_WALLET, USDC_PER_HP, settleGauntletTiered, getTowerStatus, checkTowerTrainingWin, checkOwnerWithdrawal, clearPlatformHp } = require('./hp-balance');
+const { getHP, getVC, addHP, addVC, hasHP, hasVC, lockHP, unlockHP, spendVC, settleMatch, cashout, updatePlayerName, updatePlayerStats, getTopPlayers, getLeaderboard, getPlayerStats, getPlayerRank, PLATFORM_WALLET, USDC_PER_HP, settleGauntletTiered, getTowerStatus, checkTowerTrainingWin, checkTowerDailyWin, checkOwnerWithdrawal, clearPlatformHp } = require('./hp-balance');
 const { sendUSDC } = require('./transfer');
 
 // Importar librería de Tokens
@@ -218,7 +218,7 @@ function setupWebSocketServer(wss, getPlatformUSDCBalance) {
             else if (b.p1id === id || b.p2id === id) { const otherId = b.p1id === id ? b.p2id : b.p1id; await endBattle(msg.battleId, otherId, id, 0, true); } 
         }
 
-        // --- LÓGICA DE TORRE (MODO VC) ---
+        // --- LÓGICA DE TORRE (MODO VC Y DIARIA) ---
         if (msg.type === 'challenge_gauntlet') { 
           const pl = lobby.get(id); if (!pl || pl.inBattle) return; 
           const towerMode = msg.towerMode || 'training';
