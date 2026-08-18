@@ -59,6 +59,7 @@
       <div style="background:rgba(0,0,0,.3);padding:10px;border-radius:8px;text-align:center">
         <div style="font-size:11px;color:rgba(255,255,255,.4)">HP Disponibles</div>
         <div style="font-size:18px;font-weight:700;color:#5DCAA5" id="profile-hp">0 HP</div>
+        <div id="hp-reset-timer" style="display:none;font-size:10px;color:#EF9F27;margin-top:4px">⏳ Cargando...</div>
       </div>
       <div style="background:rgba(0,0,0,.3);padding:10px;border-radius:8px;text-align:center">
         <div style="font-size:11px;color:rgba(255,255,255,.4)">Vitality Cash (VC)</div>
@@ -182,8 +183,8 @@
       <div style="margin-bottom:10px">
         <div style="font-size:14px;font-weight:600;color:#CFA9EC">⚔ Zodiac Master</div>
         <div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:4px;line-height:1.4">
-          🤝 <strong>Entrenar:</strong> Practica en 1v1, 3v3 o en la Torre sin arriesgar HP. Gana XP.<br>
-          🏰 <strong>Torre de Batalla:</strong> Invierte 100 HP para ganar 1000 HP (si eres el primero hoy), o intenta el Bono Diario gratis de 10 HP.
+          🤝 <strong>Entrenar:</strong> Practica en 1v1, 3v3, 6v6 o en la Torre sin arriesgar HP.<br>
+          🏰 <strong>Torre de Batalla:</strong> Paga 10 VC. Si ganas, te llevas 100 HP de premio.
         </div>
       </div>
       <div style="display:flex;flex-direction:column;gap:6px">
@@ -312,12 +313,13 @@
 
 <div class="modal-bg hidden" id="modal-master-menu">
   <div class="modal" style="max-width:350px">
-    <h3>🤝 Entrenamiento (XP)</h3>
+    <h3>🤝 Entrenamiento</h3>
     <p style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:20px">Practica contra la IA sin arriesgar HP.</p>
     <div style="display:flex;flex-direction:column;gap:10px">
       <button class="btn btn-blue" style="width:100%" onclick="selectChallengeMode('train')">⚔️ Entrenar 1 vs 1</button>
       <button class="btn btn-blue" style="width:100%" onclick="selectChallengeMode('train3v3')">⚔️ Entrenar 3 vs 3</button>
-      <button class="btn btn-blue" style="width:100%;background:rgba(130,80,180,.15);border-color:rgba(130,80,180,.35);color:#CFA9EC" onclick="challengeGauntlet('guest')">🏰 Torre (XP)</button>
+      <button class="btn btn-blue" style="width:100%" onclick="selectChallengeMode('train6v6')">⚔️ Entrenar 6 vs 6</button>
+      <button class="btn btn-blue" style="width:100%;background:rgba(130,80,180,.15);border-color:rgba(130,80,180,.35);color:#CFA9EC" onclick="challengeGauntlet('training')">🏰 Torre (Simulación)</button>
     </div>
     <button class="btn btn-sm btn-red" style="margin-top:20px;width:100%" onclick="document.getElementById('modal-master-menu').classList.add('hidden')">Cancelar</button>
   </div>
@@ -326,11 +328,10 @@
 <div class="modal-bg hidden" id="modal-tower-menu">
   <div class="modal" style="max-width:350px">
     <h3>🏰 Torre de Batalla</h3>
-    <p style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:20px">Enfréntate a 12 Jefes Zodiaco. Elige tu modo:</p>
+    <p style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:20px">Paga 10 VC. Si derrotas a los 12 jefes, ganas 100 HP.</p>
     <div style="display:flex;flex-direction:column;gap:10px">
-      <button class="btn btn-blue" id="btn-tower-hp" style="width:100%;display:none" onclick="challengeGauntlet('hp')"></button>
-      <button class="btn btn-sm" id="btn-tower-train" style="width:100%;background:rgba(93,202,165,.15);border-color:rgba(93,202,165,.35);color:#5DCAA5;display:none" onclick="challengeGauntlet('training')"></button>
-      <button class="btn btn-sm" id="btn-tower-guest" style="width:100%;background:rgba(246,226,102,.15);border-color:rgba(246,226,102,.35);color:#F6E265;display:none" onclick="challengeGauntlet('guest')">🎮 Torre Invitado (Gratis)</button>
+      <button class="btn btn-blue" id="btn-tower-hp" style="width:100%" onclick="challengeGauntlet('hp')">⚔️ Entrar (Costo: 10 VC)</button>
+      <button class="btn btn-sm" id="btn-tower-guest" style="width:100%;background:rgba(246,226,102,.15);border-color:rgba(246,226,102,.35);color:#F6E265;display:none" onclick="challengeGauntlet('training')">🎮 Torre (Simulación Gratis)</button>
     </div>
     <button class="btn btn-sm btn-red" style="margin-top:20px;width:100%" onclick="document.getElementById('modal-tower-menu').classList.add('hidden')">Cancelar</button>
   </div>
@@ -352,10 +353,10 @@
   </div>
 </div>
 
-<!-- MODAL DE REGISTRO (NUEVO) -->
+<!-- MODAL DE REGISTRO -->
 <div class="modal-bg hidden" id="modal-register">
   <div class="modal" style="max-width:400px; text-align:left;">
-    <h3 style="text-align:center; margin-bottom:15px;">📝 </h3>
+    <h3 style="text-align:center; margin-bottom:15px;">📝 Crear Cuenta</h3>
     <div style="margin-bottom: 15px;">
       <label style="font-size:12px; color:#aaa; display:block; margin-bottom:5px;">Correo electrónico</label>
       <input id="inp-reg-email" type="email" placeholder="tu@correo.com" style="width:100%; background:rgba(255,255,255,.07); border:0.5px solid rgba(255,255,255,.15); border-radius:8px; padding:10px; color:#fff; outline:none;">
