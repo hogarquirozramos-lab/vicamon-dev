@@ -5,26 +5,20 @@ const pool = new Pool({
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
 
-// Asegurar estructura de DB (Sin borrar datos existentes)
+// Asegurar estructura de DB
 pool.query(`CREATE TABLE IF NOT EXISTS players (
-  id SERIAL PRIMARY KEY,
-  email VARCHAR(255) UNIQUE,
-  password VARCHAR(255),
-  wallet VARCHAR(50) UNIQUE,
-  hp INTEGER DEFAULT 100,
-  locked_hp INTEGER DEFAULT 0,
-  vc INTEGER DEFAULT 0,
-  wins INTEGER DEFAULT 0,
-  losses INTEGER DEFAULT 0,
-  last_name VARCHAR(20),
-  tower_train_date VARCHAR(10),
-  last_hp_reset VARCHAR(10)
+  id SERIAL PRIMARY KEY, email VARCHAR(255) UNIQUE, password VARCHAR(255), wallet VARCHAR(50) UNIQUE,
+  hp INTEGER DEFAULT 100, locked_hp INTEGER DEFAULT 0, vc INTEGER DEFAULT 0,
+  wins INTEGER DEFAULT 0, losses INTEGER DEFAULT 0, last_name VARCHAR(20), tower_train_date VARCHAR(10), last_hp_reset VARCHAR(10)
 );`).catch(e => console.error("Error creando tabla players:", e));
+
+pool.query(`CREATE TABLE IF NOT EXISTS platform (id INTEGER PRIMARY KEY DEFAULT 1, hp INTEGER DEFAULT 0, tour_vc_prize INTEGER DEFAULT 100, tower_vc_prize INTEGER DEFAULT 100);`).catch(e=>{});
+pool.query(`INSERT INTO platform (id, hp, tour_vc_prize, tower_vc_prize) VALUES (1, 0, 100, 100) ON CONFLICT (id) DO NOTHING;`).catch(e=>{});
+pool.query(`ALTER TABLE platform ADD COLUMN IF NOT EXISTS tour_vc_prize INTEGER DEFAULT 100;`).catch(e=>{});
+pool.query(`ALTER TABLE platform ADD COLUMN IF NOT EXISTS tower_vc_prize INTEGER DEFAULT 100;`).catch(e=>{});
 
 pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS vc INTEGER DEFAULT 0;`).catch(e=>{});
 pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS last_hp_reset VARCHAR(10);`).catch(e=>{});
-pool.query(`CREATE TABLE IF NOT EXISTS platform (id INTEGER PRIMARY KEY DEFAULT 1, hp INTEGER DEFAULT 0);`).catch(e=>{});
-pool.query(`INSERT INTO platform (id, hp) VALUES (1, 0) ON CONFLICT DO NOTHING;`).catch(e=>{});
 pool.query(`CREATE TABLE IF NOT EXISTS processed_txs (signature VARCHAR(100) PRIMARY KEY);`).catch(e=>{});
 pool.query(`CREATE TABLE IF NOT EXISTS attacks (id VARCHAR(50) PRIMARY KEY, name VARCHAR(50), d INT, acc INT, fx VARCHAR(50), pp INT, description TEXT, type VARCHAR(20), cost INT);`).catch(e => console.error("Error creando tabla attacks:", e));
 pool.query(`CREATE TABLE IF NOT EXISTS vicamons (id VARCHAR(50) PRIMARY KEY, name VARCHAR(50), sub VARCHAR(50), img VARCHAR(100), el VARCHAR(20), style VARCHAR(20), cat VARCHAR(20), stats JSONB, attacks JSONB);`).catch(e => console.error("Error creando tabla vicamons:", e));
@@ -57,20 +51,19 @@ async function updateCachedExcedente() {
 setInterval(updateCachedExcedente, 10000);
 updateCachedExcedente(); 
 
-// === FUNCIONES DE AUTENTICACIÓN ===
+// === AUTENTICACIÓN ===
 async function createUser(email, hashedPassword, nick) {
   const today = new Date().toISOString().split('T')[0];
   await pool.query(`INSERT INTO players (email, wallet, password, last_name, hp, vc, wins, losses, last_hp_reset) VALUES ($1, $1, $2, $3, 100, 0, 0, 0, $4)`, [email, hashedPassword, nick, today]);
   const res = await pool.query('SELECT id, email, last_name FROM players WHERE email = $1', [email]);
   return res.rows[0];
 }
-
 async function getUserByEmail(email) {
   const res = await pool.query('SELECT * FROM players WHERE email = $1', [email]);
   return res.rows[0];
 }
 
-// === FUNCIONES DE ECONOMÍA ===
+// === ECONOMÍA ===
 async function getAllPlayersDebug() { const res = await pool.query('SELECT id, email, wallet, hp, locked_hp, vc, wins, losses, last_name FROM players'); return res.rows; }
 async function isTxProcessed(signature) { const res = await pool.query('SELECT 1 FROM processed_txs WHERE signature = $1', [signature]); return res.rows.length > 0; }
 async function markTxProcessed(signature) { await pool.query('INSERT INTO processed_txs (signature) VALUES ($1) ON CONFLICT DO NOTHING', [signature]); }
@@ -87,15 +80,10 @@ async function getLeaderboard(limit = 100) {
     if (totalRanked === 0) return [];
     const res = await pool.query('SELECT last_name, wins, losses FROM players WHERE wins > 0 OR losses > 0 ORDER BY wins DESC, losses ASC LIMIT $1', [limit]);
     return res.rows.map((p, index) => {
-        const rank = index + 1;
-        let tier = 5; 
+        const rank = index + 1; let tier = 5; 
         if (totalRanked > 0) {
             const percentile = (rank / totalRanked) * 100;
-            if (percentile <= 5) tier = 1;
-            else if (percentile <= 15) tier = 2;
-            else if (percentile <= 30) tier = 3;
-            else if (percentile <= 50) tier = 4;
-            else tier = 5;
+            if (percentile <= 5) tier = 1; else if (percentile <= 15) tier = 2; else if (percentile <= 30) tier = 3; else if (percentile <= 50) tier = 4; else tier = 5;
         }
         return { ...p, rank, tier };
     });
@@ -104,28 +92,21 @@ async function getLeaderboard(limit = 100) {
 async function getPlayerStats(wallet) {
   const res = await pool.query('SELECT wins, losses FROM players WHERE wallet = $1', [wallet]);
   if (res.rows.length === 0) return { wins: 0, losses: 0, rank: null, tier: 0, totalRanked: 0 };
-  const { wins, losses } = res.rows[0];
-  let rank = null, tier = 0, totalRanked = 0;
+  const { wins, losses } = res.rows[0]; let rank = null, tier = 0, totalRanked = 0;
   if (wins > 0 || losses > 0) {
     const rRes = await pool.query('SELECT COUNT(*) + 1 as rank FROM players WHERE wins > $1 OR (wins = $1 AND losses < $2)', [wins, losses]);
     const tRes = await pool.query('SELECT COUNT(*) as total FROM players WHERE wins > 0 OR losses > 0');
-    rank = parseInt(rRes.rows[0].rank, 10);
-    totalRanked = parseInt(tRes.rows[0].total, 10);
+    rank = parseInt(rRes.rows[0].rank, 10); totalRanked = parseInt(tRes.rows[0].total, 10);
     if (totalRanked > 0) {
       const percentile = (rank / totalRanked) * 100;
-      if (percentile <= 5) tier = 1;
-      else if (percentile <= 15) tier = 2;
-      else if (percentile <= 30) tier = 3;
-      else if (percentile <= 50) tier = 4;
-      else tier = 5;
+      if (percentile <= 5) tier = 1; else if (percentile <= 15) tier = 2; else if (percentile <= 30) tier = 3; else if (percentile <= 50) tier = 4; else tier = 5;
     } else { tier = 5; }
   } else { tier = 0; }
   return { wins, losses, rank, tier, totalRanked };
 }
-
 async function getPlayerRank(wallet) { const stats = await getPlayerStats(wallet); return stats.rank; }
 
-// === FUNCIONES VC (Vitality Cash) ===
+// === VC ===
 async function getVC(wallet) { const res = await pool.query('SELECT vc FROM players WHERE wallet = $1', [wallet]); return res.rows.length > 0 ? res.rows[0].vc : 0; }
 async function addVC(wallet, amount) { await pool.query('UPDATE players SET vc = vc + $1 WHERE wallet = $2', [amount, wallet]); return await getVC(wallet); }
 async function hasVC(wallet, amount) { return (await getVC(wallet)) >= amount; }
@@ -137,25 +118,19 @@ async function spendVC(wallet, amount) {
     const currentVc = res.rows.length > 0 ? res.rows[0].vc : 0; 
     if (currentVc < amount) { await client.query('ROLLBACK'); return false; } 
     await client.query('UPDATE players SET vc = vc - $1 WHERE wallet = $2', [amount, wallet]); 
-    await client.query('COMMIT'); 
-    return true; 
+    await client.query('COMMIT'); return true; 
   } catch(e) { 
     await client.query('ROLLBACK'); return false; 
-  } finally { 
-    client.release(); 
-  } 
+  } finally { client.release(); } 
 }
 
-async function getHP(wallet) { 
-  const hp = await checkDailyReset(wallet); 
-  return hp;
-}
+async function getHP(wallet) { const hp = await checkDailyReset(wallet); return hp; }
 async function addHP(wallet, hp) { await pool.query(`INSERT INTO players (wallet, hp, locked_hp) VALUES ($1, $2, 0) ON CONFLICT (wallet) DO UPDATE SET hp = players.hp + $2`, [wallet, hp]); return await getHP(wallet); }
 async function hasHP(wallet, amount = 100) { return (await getHP(wallet)) >= amount; }
 async function lockHP(wallet, amount = 100) { const client = await pool.connect(); try { await client.query('BEGIN'); const res = await client.query('SELECT hp FROM players WHERE wallet = $1 FOR UPDATE', [wallet]); const currentHp = res.rows.length > 0 ? res.rows[0].hp : 0; if (currentHp < amount) { await client.query('ROLLBACK'); return false; } await client.query('UPDATE players SET hp = hp - $1, locked_hp = locked_hp + $1 WHERE wallet = $2', [amount, wallet]); await client.query('COMMIT'); return true; } catch(e) { await client.query('ROLLBACK'); return false; } finally { client.release(); } }
 async function unlockHP(wallet, amount = 100) { await pool.query('UPDATE players SET hp = hp + $1, locked_hp = GREATEST(0, locked_hp - $1) WHERE wallet = $2', [amount, wallet]); }
 
-// === NUEVAS FUNCIONES DE RECOMPENSA (VC y HP) ===
+// === RECOMPENSAS BATALLAS NORMALES ===
 async function settleMatch(winnerWallet, loserWallet, winnerHp) { 
   const client = await pool.connect(); 
   try { 
@@ -163,24 +138,12 @@ async function settleMatch(winnerWallet, loserWallet, winnerHp) {
     const hp = Math.max(0, Math.min(100, winnerHp)); 
     const winnerVC = Math.floor(hp);
     const loserVC = Math.floor((100 - hp) * 0.10);
-    
     await client.query('UPDATE players SET locked_hp = GREATEST(0, locked_hp - 100), hp = hp + 100, vc = vc + $1 WHERE wallet = $2', [winnerVC, winnerWallet]);
     await client.query('UPDATE players SET locked_hp = GREATEST(0, locked_hp - 100), vc = vc + $1 WHERE wallet = $2', [loserVC, loserWallet]);
-    
     await client.query('COMMIT'); 
-    const winnerNewHp = await getHP(winnerWallet); 
-    const winnerNewVc = await getVC(winnerWallet);
-    const loserNewHp = await getHP(loserWallet);
-    const loserNewVc = await getVC(loserWallet);
-    return { winnerNewHp, winnerNewVc, loserNewHp, loserNewVc }; 
-  } catch(e) { 
-    await client.query('ROLLBACK'); 
-    throw e; 
-  } finally { 
-    client.release(); 
-  } 
+    return { winnerNewHp: await getHP(winnerWallet), winnerNewVc: await getVC(winnerWallet), loserNewHp: await getHP(loserWallet), loserNewVc: await getVC(loserWallet) }; 
+  } catch(e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); } 
 }
-
 async function settleTeamMatch(winnerWallet, loserWallet, winnerRemainingHp, teamSize) { 
   const client = await pool.connect(); 
   try { 
@@ -189,27 +152,21 @@ async function settleTeamMatch(winnerWallet, loserWallet, winnerRemainingHp, tea
     const hp = Math.max(0, Math.min(stake, winnerRemainingHp));
     const winnerVC = Math.floor(hp);
     const loserVC = Math.floor((stake - hp) * 0.10);
-    
     await client.query('UPDATE players SET locked_hp = GREATEST(0, locked_hp - $1), hp = hp + $1, vc = vc + $2 WHERE wallet = $3', [stake, winnerVC, winnerWallet]);
     await client.query('UPDATE players SET locked_hp = GREATEST(0, locked_hp - $1), vc = vc + $2 WHERE wallet = $3', [stake, loserVC, loserWallet]);
-    
     await client.query('COMMIT'); 
-    const winnerNewHp = await getHP(winnerWallet); 
-    const winnerNewVc = await getVC(winnerWallet);
-    const loserNewHp = await getHP(loserWallet);
-    const loserNewVc = await getVC(loserWallet);
-    return { winnerNewHp, winnerNewVc, loserNewHp, loserNewVc }; 
-  } catch(e) { 
-    await client.query('ROLLBACK'); 
-    throw e; 
-  } finally { 
-    client.release(); 
-  } 
+    return { winnerNewHp: await getHP(winnerWallet), winnerNewVc: await getVC(winnerWallet), loserNewHp: await getHP(loserWallet), loserNewVc: await getVC(loserWallet) }; 
+  } catch(e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); } 
 }
 
-// --- TORRE (SIMPLIFICADA PARA MODO VC) ---
+// === ADMIN PREMIOS VC ===
+async function getTourVCPrize() { const res = await pool.query('SELECT tour_vc_prize FROM platform WHERE id = 1'); return res.rows.length > 0 ? res.rows[0].tour_vc_prize : 100; }
+async function getTowerVCPrize() { const res = await pool.query('SELECT tower_vc_prize FROM platform WHERE id = 1'); return res.rows.length > 0 ? res.rows[0].tower_vc_prize : 100; }
+async function setTourVCPrize(val) { await pool.query('UPDATE platform SET tour_vc_prize = $1 WHERE id = 1', [val]); }
+async function setTowerVCPrize(val) { await pool.query('UPDATE platform SET tower_vc_prize = $1 WHERE id = 1', [val]); }
+
 async function getTowerStatus() { return { grandAvailable: true, trainAvailable: true, excedente: 1000 }; }
-async function claimTowerGrandPrize(wallet) { await addHP(wallet, 100); return true; }
+async function claimTowerGrandPrize(wallet) { return true; }
 async function checkTowerTrainingWin(wallet) { return false; }
 async function claimTowerTrainingWin(wallet) { return { ok: true, newHp: await getHP(wallet) }; }
 
@@ -218,7 +175,7 @@ async function getExcedente() { return cachedExcedente; }
 async function checkOwnerWithdrawal() { return { shouldWithdraw: false }; }
 async function setPlatformHp(hp) { await pool.query('UPDATE platform SET hp = $1 WHERE id = 1', [hp]); updateCachedExcedente(); }
 async function addPlatformHp(hp) { await pool.query('UPDATE platform SET hp = hp + $1 WHERE id = 1', [hp]); updateCachedExcedente(); }
-async function cashout(wallet) { return { ok: true, hp: 0, usdc: 0 }; } // Deshabilitado por nueva economía
+async function cashout(wallet) { return { ok: true, hp: 0, usdc: 0 }; }
 async function getPlatformHp() { const res = await pool.query('SELECT hp FROM platform WHERE id = 1'); return res.rows.length > 0 ? res.rows[0].hp : 0; }
 async function getPlatformUsdc() { return parseFloat(((await getPlatformHp()) * USDC_PER_HP).toFixed(6)); }
 async function clearPlatformHp(hp) { await pool.query('UPDATE platform SET hp = GREATEST(0, hp - $1) WHERE id = 1', [hp]); updateCachedExcedente(); }
@@ -239,5 +196,6 @@ module.exports = {
   getExcedente, getTotalPlayersHP, checkOwnerWithdrawal,
   getAllAttacksDB, getAllVicamonsDB, saveAttackDB, saveVicamonDB,
   createUser, getUserByEmail,
-  getVC, addVC, hasVC, spendVC
+  getVC, addVC, hasVC, spendVC,
+  getTourVCPrize, getTowerVCPrize, setTourVCPrize, setTowerVCPrize
 };
