@@ -223,11 +223,18 @@ function setupWebSocketServer(wss, getPlatformUSDCBalance) {
           const pl = lobby.get(id); if (!pl || pl.inBattle) return; 
           const towerMode = msg.towerMode || 'training';
           if (msg.beast) pl.beast = msg.beast; 
-          if (towerMode === 'hp') { // Modo VC
+          
+          if (towerMode === 'hp') { // Torre VC
             if (pl.isGuest) return send(ws, { type: 'error', msg: 'Los invitados no pueden jugar por HP.' });
-            if (!await hasVC(pl.wallet, 10)) return send(ws, { type: 'error', msg: 'Necesitas 10 VC para entrar a la Torre.' });
-            await spendVC(pl.wallet, 10); 
+            if (!await hasHP(pl.wallet, 100)) return send(ws, { type: 'error', msg: 'Necesitas 100 HP.' });
+            await lockHP(pl.wallet, 100); 
+          } else if (towerMode === 'daily') { // Torre Diaria
+            if (pl.isGuest) return send(ws, { type: 'error', msg: 'Los invitados no pueden jugar la Torre Diaria.' });
+            if (await checkTowerDailyWin(pl.wallet)) return send(ws, { type: 'error', msg: 'Ya ganaste la Torre Diaria hoy. Vuelve mañana.' });
+            if (!await hasHP(pl.wallet, 50)) return send(ws, { type: 'error', msg: 'Necesitas 50 HP.' });
+            await lockHP(pl.wallet, 50); 
           }
+          
           pl.inBattle = true; 
           const zodiacTeam = [...ZODIAC_KEYS].sort(() => Math.random() - 0.5);
           const cpuBeast = zodiacTeam[0];
