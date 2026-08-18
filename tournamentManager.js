@@ -1,11 +1,10 @@
-const { lobby, battles, send, broadcast, pushBattle } = require('./state');
+const { lobby, battles, send, broadcast, pushLobby } = require('./state');
 const { getStartState } = require('./battleEngine');
-const { lockHP, unlockHP, addHP, updatePlayerStats, getTopPlayers } = require('./hp-balance');
+const { lockHP, unlockHP, addVC, updatePlayerStats, getTopPlayers, getTourVCPrize } = require('./hp-balance');
 
-// Almacén de torneos activos
 const tournaments = {
-    HP: { players: [], status: 'waiting', pot: 0, bracket: { sf1: [], sf2: [], f: [], champ: null } },
-    XP: { players: [], status: 'waiting', pot: 0, bracket: { sf1: [], sf2: [], f: [], champ: null } }
+    VC: { players: [], status: 'waiting', pot: 0, bracket: { sf1: [], sf2: [], f: [], champ: null } },
+    Libre: { players: [], status: 'waiting', pot: 0, bracket: { sf1: [], sf2: [], f: [], champ: null } }
 };
 
 function getTournamentState(mode) {
@@ -23,7 +22,6 @@ function getTournamentState(mode) {
 function broadcastTournamentState(mode) {
     const state = getTournamentState(mode);
     if (!state) return;
-    
     const tour = tournaments[mode];
     if (!tour) return;
 
@@ -40,25 +38,14 @@ function broadcastTournamentState(mode) {
 async function joinTournament(playerId, mode) {
     const player = lobby.get(playerId);
     if (!player) return;
-
     if (!tournaments[mode]) return;
-
     const tour = tournaments[mode];
 
-    if (tour.status !== 'waiting') {
-        return send(player.ws, { type: 'error', msg: 'El torneo ya empezó o no está disponible.' });
-    }
+    if (tour.status !== 'waiting') return send(player.ws, { type: 'error', msg: 'El torneo ya empezó o no está disponible.' });
+    if (tour.players.find(p => p.id === playerId)) return send(player.ws, { type: 'error', msg: 'Ya estás en este torneo.' });
+    if (tour.players.length >= 4) return send(player.ws, { type: 'error', msg: 'El torneo está lleno.' });
 
-    if (tour.players.find(p => p.id === playerId)) {
-        return send(player.ws, { type: 'error', msg: 'Ya estás en este torneo.' });
-    }
-
-    if (tour.players.length >= 4) {
-        return send(player.ws, { type: 'error', msg: 'El torneo está lleno.' });
-    }
-
-    if (mode === 'HP') {
-        if (player.isGuest) return send(player.ws, { type: 'error', msg: 'Los invitados no pueden jugar por HP.' });
+    if (mode === 'VC') {
         const locked = await lockHP(player.wallet, 100);
         if (!locked) return send(player.ws, { type: 'error', msg: 'Necesitas 100 HP disponibles.' });
         tour.pot += 100;
@@ -87,7 +74,7 @@ async function leaveTournament(playerId, mode) {
     const p = lobby.get(playerId);
     if(p) p.inTournament = false;
 
-    if (mode === 'HP') {
+    if (mode === 'VC') {
         await unlockHP(player.wallet, 100);
         tour.pot -= 100;
     }
@@ -102,13 +89,7 @@ function startTournament(mode) {
     const shuffled = [...tour.players].sort(() => Math.random() - 0.5);
     const [p1, p2, p3, p4] = shuffled;
     
-    tour.bracket = {
-        sf1: [p1.id, p2.id],
-        sf2: [p3.id, p4.id],
-        f: [null, null],
-        champ: null
-    };
-
+    tour.bracket = { sf1: [p1.id, p2.id], sf2: [p3.id, p4.id], f: [null, null], champ: null };
     broadcastTournamentState(mode);
 
     startTournamentMatch(p1.id, p2.id, mode, 'sf1');
@@ -149,15 +130,11 @@ async function reportTournamentResult(bId, winnerId, loserId, mode, round) {
         mode = b.tourMode;
         round = b.tourRound;
         
-        if (mode === 'HP' && b.p1Wallet && b.p2Wallet) {
-            const winnerWallet = b.p1id === winnerId ? b.p1Wallet : b.p2Wallet;
-            const loserWallet = b.p1id === loserId ? b.p1Wallet : b.p2Wallet;
-            if (winnerWallet && loserWallet) {
-                await updatePlayerStats(winnerWallet, loserWallet);
-                const top = await getTopPlayers(3);
-                broadcast({ type: 'leaderboard_update', top });
-            }
-        }
+        const winnerWallet = b.p1id === winnerId ? b.p1Wallet : b.p2Wallet;
+        const loserWallet = b.p1id === loserId ? b.p1Wallet : b.p2Wallet;
+        await updatePlayerStats(winnerWallet, loserWallet);
+        const top = await getTopPlayers(3);
+        broadcast({ type: 'leaderboard_update', top });
     }
 
     const tour = tournaments[mode];
@@ -169,9 +146,8 @@ async function reportTournamentResult(bId, winnerId, loserId, mode, round) {
     if(loserPl) loserPl.inTournament = false;
 
     const winnerPl = lobby.get(winnerId);
-    const isTrainingMode = (mode === 'XP');
+    const isTrainingMode = (mode === 'Libre');
 
-    // --- LÓGICA DE LA FINAL ---
     if (round === 'final') {
         tour.bracket.champ = winnerId;
         tour.status = 'finished';
@@ -179,13 +155,12 @@ async function reportTournamentResult(bId, winnerId, loserId, mode, round) {
         let champMsg = '¡Eres el Campeón del Torneo! 🏆';
         let runnerMsg = 'Quedaste en 2do lugar.';
         
-        if (mode === 'HP') {
-            if (winnerPl) await addHP(winnerPl.wallet, 250);
-            if (loserPl) await addHP(loserPl.wallet, 125);
-            champMsg += ' Ganaste 250 HP.';
-            runnerMsg += ' Recuperas 125 HP.';
+        if (mode === 'VC') {
+            const prize = await getTourVCPrize();
+            if (winnerPl) await addVC(winnerPl.wallet, prize);
+            champMsg += ` Ganaste ${prize} VC.`;
         } else {
-            champMsg += ' Ganaste 500 XP.';
+            champMsg += ' Si fuera real, ganarías VC.';
         }
 
         if (winnerPl) {
@@ -213,7 +188,6 @@ async function reportTournamentResult(bId, winnerId, loserId, mode, round) {
         return;
     }
 
-    // --- LÓGICA DE SEMIFINALES ---
     if (round === 'sf1') tour.bracket.f[0] = winnerId;
     if (round === 'sf2') tour.bracket.f[1] = winnerId;
 
@@ -221,7 +195,6 @@ async function reportTournamentResult(bId, winnerId, loserId, mode, round) {
     const loserMsg = 'Has sido eliminado del torneo.';
 
     if (winnerPl) {
-        // FIX: Enviar battle_end con waitForNext para que el frontend lo lleve a la sala de espera
         send(winnerPl.ws, { type: 'battle_end', won: true, isTournament: true, isTraining: isTrainingMode, customMsg: winnerMsg, waitForNext: true });
     }
     if (loserPl) {
@@ -230,7 +203,6 @@ async function reportTournamentResult(bId, winnerId, loserId, mode, round) {
 
     if (tour.bracket.f[0] && tour.bracket.f[1]) {
         broadcastTournamentState(mode);
-        // Dar 5 segundos para que lean el resultado antes de iniciar la final
         setTimeout(() => startTournamentMatch(tour.bracket.f[0], tour.bracket.f[1], mode, 'final'), 5000);
     } else {
         broadcastTournamentState(mode);
