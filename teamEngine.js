@@ -1,8 +1,7 @@
-// FIX: Usar BD en memoria, con beasts.js como respaldo
 const BEASTS = global.BEASTS_DB || require('./beasts.js');
 const { lobby, battles, send, broadcast, pushLobby, walletToBattle } = require('./state');
 const { applyAtk, tickEffects, getStartState } = require('./battleEngine');
-const { settleTeamMatch, updatePlayerStats, getPlayerStats, getPlayerRank, getTopPlayers } = require('./hp-balance');
+const { settleTeamMatch, updatePlayerStats, getPlayerStats, getPlayerRank, getTopPlayers, getHP, getVC } = require('./hp-balance');
 const { cpuPickAttack } = require('./cpuAI');
 
 const CPU_ID = -1;
@@ -35,19 +34,14 @@ function autoResolveTeamIfBlocked(bId) {
   const b = battles.get(bId); if (!b) return;
   const currentId = b.turnId;
   if (currentId === CPU_ID || currentId === -4 || currentId === -2) return; 
-
   const isP1 = b.p1id === currentId;
   const currentSt = isP1 ? b.team1[b.active1] : b.team2[b.active2];
   const isCpu = b.isTeamCpu;
-
   if (currentSt.stun || currentSt.recharge > 0) {
     setTimeout(async () => {
       const bb = battles.get(bId); if (!bb || bb.turnId !== currentId) return;
-      if (isCpu) {
-        await processTeamCpuPlayerTurn(bId, currentId, -1);
-      } else {
-        await processTeamTurn(bId, currentId, -1);
-      }
+      if (isCpu) { await processTeamCpuPlayerTurn(bId, currentId, -1); } 
+      else { await processTeamTurn(bId, currentId, -1); }
     }, 900);
   }
 }
@@ -58,33 +52,32 @@ async function endTeamBattle(bId, winnerId, loserId, winnerRemainingHp) {
   const isCpu = b?.isTeamCpu || false;
   const winner = lobby.get(winnerId);
   const loser = lobby.get(loserId);
-  const hp = Math.max(0, Math.min(300, winnerRemainingHp));
+  const teamSize = b.p1Team.length;
+  const stake = teamSize * 100;
+  const hp = Math.max(0, Math.min(stake, winnerRemainingHp));
   
+  // NUEVA LÓGICA DE ENTRENAMIENTO 3v3/6v6
   if (isTraining || isCpu) {
-    let winnerXp = 300 + hp; 
-    let loserXp = 0;
-    if(winner) winner.ws.send(JSON.stringify({ type:'battle_end', won:true, isTeamBattle:true, isTraining:true, winnerXp, loserXp }));
-    if(loser) loser.ws.send(JSON.stringify({ type:'battle_end', won:false, isTeamBattle:true, isTraining:true, winnerXp, loserXp }));
+    const winnerVC = hp;
+    const loserVC = Math.floor((stake - hp) * 0.10);
+    if(winner) winner.ws.send(JSON.stringify({ type:'battle_end', won:true, isTeamBattle:true, isTraining:true, hypotheticalHp: stake, hypotheticalVC: winnerVC }));
+    if(loser) loser.ws.send(JSON.stringify({ type:'battle_end', won:false, isTeamBattle:true, isTraining:true, hypotheticalHp: 0, hypotheticalVC: loserVC }));
   } else {
+    // NUEVA LÓGICA REAL 3v3/6v6
     const winnerWallet = winner?.wallet || '';
     const loserWallet = loser?.wallet || '';
-    const result = await settleTeamMatch(winnerWallet, loserWallet, hp);
+    const result = await settleTeamMatch(winnerWallet, loserWallet, hp, teamSize);
     await updatePlayerStats(winnerWallet, loserWallet);
-    const wStats = await getPlayerStats(winnerWallet);
-    const lStats = await getPlayerStats(loserWallet);
-    const wRank = await getPlayerRank(winnerWallet);
-    const lRank = await getPlayerRank(loserWallet);
-    if(winner) winner.ws.send(JSON.stringify({ type:'battle_end', won:true, isTeamBattle:true, winnerHp:hp, newHp: result.winnerNewHp, stats: { wins: wStats.wins, losses: wStats.losses, rank: wRank } }));
-    if(loser) loser.ws.send(JSON.stringify({ type:'battle_end', won:false, isTeamBattle:true, winnerHp:hp, newHp: 0, stats: { wins: lStats.wins, losses: lStats.losses, rank: lRank } }));
+    if(winner) winner.ws.send(JSON.stringify({ type:'battle_end', won:true, isTeamBattle:true, winnerHp:hp, newHp: result.winnerNewHp, newVC: result.winnerNewVc }));
+    if(loser) loser.ws.send(JSON.stringify({ type:'battle_end', won:false, isTeamBattle:true, winnerHp:hp, newHp: result.loserNewHp, newVC: result.loserNewVc }));
     const top = await getTopPlayers(3);
     broadcast({ type: 'leaderboard_update', top });
   }
+  
   if (winner) winner.inBattle = false;
   if (loser) loser.inBattle = false;
-
   if (b && b.p1Wallet) walletToBattle.delete(b.p1Wallet);
   if (b && b.p2Wallet) walletToBattle.delete(b.p2Wallet);
-
   battles.delete(bId);
   await pushLobby();
 }
@@ -118,9 +111,7 @@ async function checkTeamDeath(bId, isP1Attacker, isCpu) {
         pushTeamCpuBattle(bId);
       } else {
         if(isCpu) pushTeamCpuBattle(bId); else pushTeamBattle(bId);
-        if (dPlayer && dPlayer.ws) {
-          send(dPlayer.ws, { type: 'team_force_switch', battleId: bId, reason: '¡Tu Vicamon fue derrotado! Elige el siguiente.' });
-        }
+        if (dPlayer && dPlayer.ws) { send(dPlayer.ws, { type: 'team_force_switch', battleId: bId, reason: '¡Tu Vicamon fue derrotado! Elige el siguiente.' }); }
       }
       return true;
     }
@@ -146,9 +137,7 @@ async function checkTeamDeath(bId, isP1Attacker, isCpu) {
         pushTeamCpuBattle(bId);
       } else {
         if(isCpu) pushTeamCpuBattle(bId); else pushTeamBattle(bId);
-        if (aPlayer && aPlayer.ws) {
-          send(aPlayer.ws, { type: 'team_force_switch', battleId: bId, reason: '¡Tu Vicamon fue derrotado! Elige el siguiente.' });
-        }
+        if (aPlayer && aPlayer.ws) { send(aPlayer.ws, { type: 'team_force_switch', battleId: bId, reason: '¡Tu Vicamon fue derrotado! Elige el siguiente.' }); }
       }
       return true;
     }
@@ -257,10 +246,7 @@ async function processTeamSwitch(bId, playerId, switchToIndex) {
   const player = lobby.get(playerId);
   const team = isP1 ? b.team1 : b.team2;
   if (switchToIndex < 0 || switchToIndex >= team.length) return;
-  if (team[switchToIndex].hp <= 0) {
-    send(player.ws, { type: 'error', msg: 'Ese Vicamon está debilitado.' });
-    return;
-  }
+  if (team[switchToIndex].hp <= 0) { send(player.ws, { type: 'error', msg: 'Ese Vicamon está debilitado.' }); return; }
   if (isP1) b.active1 = switchToIndex; else b.active2 = switchToIndex;
   const beastName = BEASTS[player.team[switchToIndex]].name;
   b.logs.push({t: `${player.name} cambia a ${beastName}`, c: 'special'});
