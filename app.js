@@ -43,8 +43,16 @@ function handleMsg(m){
   if(m.type === 'tower_status') {
     const hpBtn = document.getElementById('btn-tower-hp');
     const trainBtn = document.getElementById('btn-tower-train');
+    const guestBtn = document.getElementById('btn-tower-guest');
+    const status = m.status;
+    
     if(hpBtn) { hpBtn.disabled = myCurrentHP < 100; hpBtn.textContent = '⚔️ Torre VC (Costo: 100 HP)'; hpBtn.style.opacity = myCurrentHP < 100 ? '0.5' : '1'; }
-    if(trainBtn) { trainBtn.disabled = false; trainBtn.textContent = '🎮 Torre Libre (Gratis)'; trainBtn.style.opacity = '1'; }
+    if(trainBtn) { 
+        trainBtn.textContent = '📅 Torre Diaria (Costo: 50 HP)'; 
+        if (!status.trainAvailable) { trainBtn.disabled = true; trainBtn.textContent = '🔒 Torre Diaria (Completada)'; trainBtn.style.opacity = '0.5'; }
+        else { trainBtn.disabled = myCurrentHP < 50; trainBtn.style.opacity = myCurrentHP < 50 ? '0.5' : '1'; }
+    }
+    if(guestBtn) { guestBtn.disabled = false; guestBtn.textContent = '🎮 Torre Libre (Gratis)'; }
   }
 
   if(m.type === 'tournament_state') { if (myTournamentMode === m.mode || (!myTournamentMode && document.getElementById('s-tournament').classList.contains('active'))) { handleTournamentState(m); } }
