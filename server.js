@@ -156,24 +156,25 @@ const server = http.createServer(async (req, res) => {
   }
 
   // NUEVAS RUTAS ADMIN PREMIOS VC
+  // RUTAS ADMIN PREMIOS VC
   if (urlPath === '/admin-get-prizes' && req.method === 'GET') {
     const pass = new URL(req.url, 'http://localhost').searchParams.get('pass') || '';
     if (pass !== ADMIN_PASS) { res.writeHead(403); res.end('Forbidden'); return; }
     try {
-      const tour = await getTourVCPrize();
-      const tower = await getTowerVCPrize();
+      const { getPrizes } = require('./hp-balance');
+      const prizes = await getPrizes();
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ tour, tower }));
+      res.end(JSON.stringify(prizes));
     } catch(e) { res.writeHead(500); res.end('Error'); }
     return;
   }
   if (urlPath === '/admin-save-prizes' && req.method === 'POST') {
     let body = ''; req.on('data', c => body += c); req.on('end', async () => {
       try {
-        const { pass, tour, tower } = JSON.parse(body);
+        const { pass, data } = JSON.parse(body);
         if (pass !== ADMIN_PASS) { res.writeHead(403); res.end(JSON.stringify({ ok: false })); return; }
-        await setTourVCPrize(parseInt(tour));
-        await setTowerVCPrize(parseInt(tower));
+        const { savePrizes } = require('./hp-balance');
+        await savePrizes(data);
         res.writeHead(200); res.end(JSON.stringify({ ok: true }));
       } catch(e) { res.writeHead(400); res.end(JSON.stringify({ ok: false, msg: e.message })); }
     });
