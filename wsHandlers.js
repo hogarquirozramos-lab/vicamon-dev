@@ -248,8 +248,8 @@ function setupWebSocketServer(wss, getPlatformUSDCBalance) {
         
         if (msg.type === 'get_tower_status') {
           const pl = lobby.get(id); if (!pl) return;
-          const towerStatus = await getTowerStatus();
-          let status = { grandAvailable: true, trainAvailable: true }; // Simbólico, ya que el costo es VC ahora
+          const dailyAvailable = !await checkTowerDailyWin(pl.wallet);
+          let status = { grandAvailable: true, trainAvailable: dailyAvailable };
           send(ws, { type: 'tower_status', status: status });
           return;
         }
