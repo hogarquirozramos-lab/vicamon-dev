@@ -19,11 +19,11 @@
   <div class="login-sub">The Vitality Cash Game</div>
   <div class="login-box">
     <div id="auth-box">
-      <div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Inicia sesión o regístrate</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Inicia sesión para jugar</div>
       <input id="inp-email" type="email" placeholder="Correo electrónico" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:8px;padding:11px 14px;color:#fff;font-size:14px;outline:none;margin-bottom:8px">
       <input id="inp-password" type="password" placeholder="Contraseña" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:8px;padding:11px 14px;color:#fff;font-size:14px;outline:none;margin-bottom:12px">
       <button class="btn btn-blue" id="btn-login" style="width:100%;padding:11px;margin-bottom:8px" onclick="login()">🔑 Iniciar Sesión</button>
-      <button class="btn" id="btn-register" style="width:100%;padding:11px;background:rgba(93,202,165,.14);border-color:rgba(93,202,165,.35);color:#5DCAA5" onclick="register()">📝 Crear Cuenta</button>
+      <button class="btn" id="btn-register" style="width:100%;padding:11px;background:rgba(93,202,165,.14);border-color:rgba(93,202,165,.35);color:#5DCAA5" onclick="openRegisterModal()">📝 Crear Cuenta</button>
     </div>
     
     <div id="step-name" style="display:none;margin-top:14px">
@@ -352,6 +352,23 @@
   </div>
 </div>
 
+<!-- MODAL DE REGISTRO (NUEVO) -->
+<div class="modal-bg hidden" id="modal-register">
+  <div class="modal" style="max-width:400px; text-align:left;">
+    <h3 style="text-align:center; margin-bottom:15px;">📝 Crear Cuenta</h3>
+    <div style="margin-bottom: 15px;">
+      <label style="font-size:12px; color:#aaa; display:block; margin-bottom:5px;">Correo electrónico</label>
+      <input id="inp-reg-email" type="email" placeholder="tu@correo.com" style="width:100%; background:rgba(255,255,255,.07); border:0.5px solid rgba(255,255,255,.15); border-radius:8px; padding:10px; color:#fff; outline:none;">
+    </div>
+    <div style="margin-bottom: 20px;">
+      <label style="font-size:12px; color:#aaa; display:block; margin-bottom:5px;">Contraseña</label>
+      <input id="inp-reg-pass" type="password" placeholder="Mínimo 6 caracteres" style="width:100%; background:rgba(255,255,255,.07); border:0.5px solid rgba(255,255,255,.15); border-radius:8px; padding:10px; color:#fff; outline:none;">
+    </div>
+    <button class="btn btn-blue" style="width:100%; padding:12px;" onclick="register()">✅ Registrarme</button>
+    <button class="btn btn-sm btn-red" style="width:100%; margin-top:10px;" onclick="closeRegisterModal()">Cancelar</button>
+  </div>
+</div>
+
 <!-- SCRIPTS -->
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
@@ -364,7 +381,6 @@
         s.src = src;
         document.head.appendChild(s);
       });
-      // Verificar si hay sesión iniciada al cargar
       setTimeout(checkSession, 500);
     })
     .catch(err => {
