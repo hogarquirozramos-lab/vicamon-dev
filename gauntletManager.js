@@ -1,7 +1,7 @@
 const BEASTS = global.BEASTS_DB || require('./beasts.js');
 const { lobby, battles, pushCpuBattle, broadcast, send, pushLobby } = require('./state');
 const { applyAtk, tickEffects, getStartState } = require('./battleEngine');
-const { addHP, getHP, getVC, getPlayerStats, getPlayerRank, getTopPlayers } = require('./hp-balance');
+const { addVC, getTowerVCPrize, getPlayerStats, getPlayerRank, getTopPlayers } = require('./hp-balance');
 const { cpuPickAttack } = require('./cpuAI');
 
 const CPU_ID = -1;
@@ -13,24 +13,19 @@ async function endGauntlet(bId, playerId, won, defeatedCount = 0) {
   if (!pl) return;
   
   const towerMode = b?.towerMode || 'training';
-  let newHp = 0;
   let customMsg = '';
 
   try {
     if (won) {
-      if (towerMode === 'hp') { // Modo VC (cuesta 10 VC)
-        await addHP(pl.wallet, 100);
-        newHp = await getHP(pl.wallet);
-        customMsg = '¡Felicidades! Has ganado 100 HP de premio.';
-      } else {
-        customMsg = '¡Ganaste la torre! Si la jugaras por VC, ganarías 100 HP.';
+      if (towerMode === 'hp') { // Modo VC
+        const prize = await getTowerVCPrize();
+        await addVC(pl.wallet, prize);
+        customMsg = `¡Felicidades! Has ganado ${prize} VC.`;
+      } else { // Modo Libre
+        customMsg = '¡Ganaste la torre! Si la jugaras por VC, ganarías VC.';
       }
     } else {
-      if (towerMode === 'hp') {
-        customMsg = 'Has sido derrotado. ¡Vuelve a intentarlo!';
-      } else {
-        customMsg = 'Has sido derrotado en la Torre de Entrenamiento.';
-      }
+      customMsg = 'Has sido derrotado. ¡Vuelve a intentarlo!';
     }
   } catch (error) {
     console.error("Error en endGauntlet:", error);
@@ -41,8 +36,6 @@ async function endGauntlet(bId, playerId, won, defeatedCount = 0) {
       type:'battle_end', 
       won, 
       isGauntlet: true, 
-      newHp, 
-      reward: 0, 
       defeated: won ? 12 : defeatedCount, 
       towerMode,
       customMsg
