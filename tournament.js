@@ -11,7 +11,7 @@ function openTournamentMenu(mode) {
     }
     const joinBtn = document.querySelector('#s-tournament .btn-lg');
     if (joinBtn) {
-        joinBtn.textContent = mode === 'HP' ? '✅ Inscribirse (100 HP)' : '✅ Inscribirse (Gratis)';
+        joinBtn.textContent = mode === 'VC' ? '✅ Inscribirse (100 HP)' : '✅ Inscribirse (Gratis)';
     }
 }
 
@@ -23,17 +23,15 @@ function handleTournamentState(data) {
 function joinTournament() {
     if (!myTournamentMode) return;
     
-    // Abrir selección de Vicamon
     isGauntletChallenge = false; isBoardChallenge = false;
     teamSelectionMode = '1v1';
     pendingChallengeTargetId = null;
-    pendingIsTraining = (myTournamentMode === 'XP');
+    pendingIsTraining = (myTournamentMode === 'Libre');
     selectedTeam = [];
     document.getElementById('ts-mode-title').textContent = `Torneo ${myTournamentMode} (Elige 1)`;
     buildTeamPickGrid();
     show('s-team-select');
     
-    // Sobrescribir el botón de confirmar temporalmente
     const confirmBtn = document.getElementById('btn-confirm-team');
     confirmBtn.onclick = () => {
         if (selectedTeam.length !== 1) return alert('Elige 1 Vicamon.');
@@ -41,7 +39,6 @@ function joinTournament() {
         ws.send(JSON.stringify({type:'change_beast', beast: myBeast}));
         ws.send(JSON.stringify({ type: 'join_tournament', mode: myTournamentMode }));
         show('s-tournament');
-        // Restaurar función original
         confirmBtn.onclick = () => confirmTeam();
     };
 }
@@ -58,9 +55,9 @@ function leaveTournament() {
 function renderTournament() {
     if (!tournamentData) return;
     
-    const isHP = tournamentData.mode === 'HP';
-    document.getElementById('tour-mode').textContent = isHP ? 'Torneo HP (100 HP)' : 'Torneo XP (Gratis)';
-    document.getElementById('tour-pot').textContent = isHP ? `${tournamentData.pot} HP` : 'Gloria';
+    const isVC = tournamentData.mode === 'VC';
+    document.getElementById('tour-mode').textContent = isVC ? 'Torneo VC (100 HP)' : 'Torneo Libre (Gratis)';
+    document.getElementById('tour-pot').textContent = isVC ? `${tournamentData.pot} HP` : 'Gloria';
     
     let statusText = 'Esperando jugadores...';
     if (tournamentData.status === 'ongoing') statusText = '¡Torneo en curso!';
