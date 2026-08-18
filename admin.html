@@ -38,6 +38,7 @@
     .atk-card:hover{border-color:#4a9eff;background:#1a1a2e}
     .atk-cat-title{grid-column:1/-1;border-bottom:1px solid #333;padding-bottom:5px;margin-top:15px;color:#85B7EB;text-transform:uppercase;font-size:12px}
     .atk-detail-box{background:#111;padding:15px;border-radius:8px;margin-top:15px;border:1px solid #333;font-size:14px;line-height:1.5}
+    .prize-input{text-align:center; font-size:20px; color:#F6E265; background:#1a1a24; border:1px solid #333; padding:8px; border-radius:8px; outline:none; width:100%}
   </style>
 </head>
 <body>
@@ -50,7 +51,7 @@
   <div id="admin-content" style="display:none;">
     <div class="tabs">
       <div class="tab active" onclick="showTab('treasury', this)">💰 Tesorería</div>
-      <div class="tab" onclick="showTab('prizes', this)">🏆 Premios VC</div>
+      <div class="tab" onclick="showTab('prizes', this)">🏆 Premios</div>
       <div class="tab" onclick="showTab('attacks', this)">⚔️ Ataques</div>
       <div class="tab" onclick="showTab('vicamons', this)">🐉 Vicamons</div>
       <div class="tab" onclick="showTab('simulator', this)">🧪 Simulador</div>
@@ -86,21 +87,36 @@
       </table>
     </div>
 
-    <!-- PREMIOS VC (NUEVO) -->
+    <!-- PREMIOS -->
     <div id="tab-prizes" class="tab-content">
-      <h2>Configuración de Premios VC</h2>
-      <p>Aquí puedes editar cuánto VC ganan los jugadores al ganar un Torneo VC o la Torre VC.</p>
-      <div class="metrics-grid" style="grid-template-columns: 1fr 1fr;">
+      <h2>🏆 Premios de Torneo</h2>
+      <div class="metrics-grid" style="grid-template-columns: 1fr 1fr; margin-bottom: 30px;">
         <div class="metric-card">
-          <div class="metric-title">Premio Torneo VC</div>
-          <input type="number" id="inp-tour-prize" value="100" style="text-align:center; font-size:24px; color:#F6E265; background:#1a1a24; border:1px solid #333; padding:10px; border-radius:8px; outline:none;">
+          <div class="metric-title">Premio Torneo VC (HP)</div>
+          <input type="number" id="prize-tour-hp" value="200" class="prize-input">
         </div>
         <div class="metric-card">
-          <div class="metric-title">Premio Torre VC</div>
-          <input type="number" id="inp-tower-prize" value="100" style="text-align:center; font-size:24px; color:#F6E265; background:#1a1a24; border:1px solid #333; padding:10px; border-radius:8px; outline:none;">
+          <div class="metric-title">Premio Torneo VC (VC)</div>
+          <input type="number" id="prize-tour-vc" value="100" class="prize-input">
         </div>
       </div>
-      <button onclick="savePrizes()" style="margin-top: 15px; padding: 12px 20px;">💾 Guardar Premios VC</button>
+
+      <h2>🏰 Premios de Torre VC (Costo: 100 HP)</h2>
+      <div class="metrics-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 30px;">
+        <div class="metric-card"><div class="metric-title">Nivel 1 (6-8) HP</div><input type="number" id="prize-t1-hp" value="30" class="prize-input"></div>
+        <div class="metric-card"><div class="metric-title">Nivel 2 (9-11) HP</div><input type="number" id="prize-t2-hp" value="50" class="prize-input"></div>
+        <div class="metric-card"><div class="metric-title">Nivel 3 (12) HP</div><input type="number" id="prize-t3-hp" value="100" class="prize-input"></div>
+        <div class="metric-card"><div class="metric-title">Nivel 1 (6-8) VC</div><input type="number" id="prize-t1-vc" value="5" class="prize-input"></div>
+        <div class="metric-card"><div class="metric-title">Nivel 2 (9-11) VC</div><input type="number" id="prize-t2-vc" value="10" class="prize-input"></div>
+        <div class="metric-card"><div class="metric-title">Nivel 3 (12) VC</div><input type="number" id="prize-t3-vc" value="100" class="prize-input"></div>
+      </div>
+
+      <h2>📅 Premios de Torre Diaria (Costo: 50 HP)</h2>
+      <div class="metrics-grid" style="grid-template-columns: 1fr; margin-bottom: 20px;">
+        <div class="metric-card"><div class="metric-title">Premio Torre Diaria (VC)</div><input type="number" id="prize-daily-vc" value="15" class="prize-input"></div>
+      </div>
+
+      <button onclick="savePrizes()" style="margin-top: 15px; padding: 12px 20px;">💾 Guardar Todos los Premios</button>
     </div>
 
     <!-- ATAQUES -->
@@ -219,7 +235,7 @@
       document.getElementById('admin-content').style.display = 'block';
       loadData();
       loadContent();
-      loadPrizes(); // Cargar premios VC
+      loadPrizes(); 
     }
 
     async function loadData(){
@@ -365,17 +381,33 @@
       const res = await fetch('/admin-get-prizes?pass='+encodeURIComponent(globalPass));
       if(!res.ok) return;
       const data = await res.json();
-      document.getElementById('inp-tour-prize').value = data.tour;
-      document.getElementById('inp-tower-prize').value = data.tower;
+      document.getElementById('prize-tour-hp').value = data.tour_hp_prize;
+      document.getElementById('prize-tour-vc').value = data.tour_vc_prize;
+      document.getElementById('prize-t1-hp').value = data.tower_t1_hp;
+      document.getElementById('prize-t1-vc').value = data.tower_t1_vc;
+      document.getElementById('prize-t2-hp').value = data.tower_t2_hp;
+      document.getElementById('prize-t2-vc').value = data.tower_t2_vc;
+      document.getElementById('prize-t3-hp').value = data.tower_t3_hp;
+      document.getElementById('prize-t3-vc').value = data.tower_t3_vc;
+      document.getElementById('prize-daily-vc').value = data.tower_daily_vc;
     }
 
     async function savePrizes(){
-      const tour = document.getElementById('inp-tour-prize').value;
-      const tower = document.getElementById('inp-tower-prize').value;
-      const res = await fetch('/admin-save-prizes', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pass:globalPass, tour, tower})});
-      const data = await res.json();
-      if(data.ok) alert('✓ Premios VC actualizados!');
-      else alert('Error: ' + data.msg);
+      const data = {
+        tour_hp: parseInt(document.getElementById('prize-tour-hp').value),
+        tour_vc: parseInt(document.getElementById('prize-tour-vc').value),
+        tower_t1_hp: parseInt(document.getElementById('prize-t1-hp').value),
+        tower_t1_vc: parseInt(document.getElementById('prize-t1-vc').value),
+        tower_t2_hp: parseInt(document.getElementById('prize-t2-hp').value),
+        tower_t2_vc: parseInt(document.getElementById('prize-t2-vc').value),
+        tower_t3_hp: parseInt(document.getElementById('prize-t3-hp').value),
+        tower_t3_vc: parseInt(document.getElementById('prize-t3-vc').value),
+        tower_daily_vc: parseInt(document.getElementById('prize-daily-vc').value)
+      };
+      const res = await fetch('/admin-save-prizes', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pass:globalPass, data})});
+      const result = await res.json();
+      if(result.ok) alert('✓ Premios actualizados!');
+      else alert('Error: ' + result.msg);
     }
 
     async function saveHP(wallet){
