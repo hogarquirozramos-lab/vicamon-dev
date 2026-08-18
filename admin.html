@@ -50,6 +50,7 @@
   <div id="admin-content" style="display:none;">
     <div class="tabs">
       <div class="tab active" onclick="showTab('treasury', this)">💰 Tesorería</div>
+      <div class="tab" onclick="showTab('prizes', this)">🏆 Premios VC</div>
       <div class="tab" onclick="showTab('attacks', this)">⚔️ Ataques</div>
       <div class="tab" onclick="showTab('vicamons', this)">🐉 Vicamons</div>
       <div class="tab" onclick="showTab('simulator', this)">🧪 Simulador</div>
@@ -83,6 +84,23 @@
         <thead><tr><th>Wallet</th><th>Nickname</th><th>HP</th><th>HP Bloqueados</th><th>Acción</th></tr></thead>
         <tbody id="data"></tbody>
       </table>
+    </div>
+
+    <!-- PREMIOS VC (NUEVO) -->
+    <div id="tab-prizes" class="tab-content">
+      <h2>Configuración de Premios VC</h2>
+      <p>Aquí puedes editar cuánto VC ganan los jugadores al ganar un Torneo VC o la Torre VC.</p>
+      <div class="metrics-grid" style="grid-template-columns: 1fr 1fr;">
+        <div class="metric-card">
+          <div class="metric-title">Premio Torneo VC</div>
+          <input type="number" id="inp-tour-prize" value="100" style="text-align:center; font-size:24px; color:#F6E265; background:#1a1a24; border:1px solid #333; padding:10px; border-radius:8px; outline:none;">
+        </div>
+        <div class="metric-card">
+          <div class="metric-title">Premio Torre VC</div>
+          <input type="number" id="inp-tower-prize" value="100" style="text-align:center; font-size:24px; color:#F6E265; background:#1a1a24; border:1px solid #333; padding:10px; border-radius:8px; outline:none;">
+        </div>
+      </div>
+      <button onclick="savePrizes()" style="margin-top: 15px; padding: 12px 20px;">💾 Guardar Premios VC</button>
     </div>
 
     <!-- ATAQUES -->
@@ -201,6 +219,7 @@
       document.getElementById('admin-content').style.display = 'block';
       loadData();
       loadContent();
+      loadPrizes(); // Cargar premios VC
     }
 
     async function loadData(){
@@ -324,7 +343,6 @@
       else alert('Error: ' + result.msg);
     }
 
-    // NUEVO: Simulador
     async function runSimulation(){
       const btn = event.target;
       btn.disabled = true; btn.textContent = 'Simulando... Esto puede tardar unos segundos.';
@@ -341,6 +359,23 @@
       } else {
         alert('Error en simulación');
       }
+    }
+
+    async function loadPrizes(){
+      const res = await fetch('/admin-get-prizes?pass='+encodeURIComponent(globalPass));
+      if(!res.ok) return;
+      const data = await res.json();
+      document.getElementById('inp-tour-prize').value = data.tour;
+      document.getElementById('inp-tower-prize').value = data.tower;
+    }
+
+    async function savePrizes(){
+      const tour = document.getElementById('inp-tour-prize').value;
+      const tower = document.getElementById('inp-tower-prize').value;
+      const res = await fetch('/admin-save-prizes', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pass:globalPass, tour, tower})});
+      const data = await res.json();
+      if(data.ok) alert('✓ Premios VC actualizados!');
+      else alert('Error: ' + data.msg);
     }
 
     async function saveHP(wallet){
