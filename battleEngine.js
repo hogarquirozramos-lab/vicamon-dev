@@ -1,10 +1,5 @@
-// FIX: Usar BD en memoria, con beasts.js como respaldo de emergencia
 const BEASTS = global.BEASTS_DB || require('./beasts.js');
-const { 
-  settleMatch, getHP, updatePlayerStats, 
-  getPlayerStats, getPlayerRank, getTopPlayers, 
-  USDC_PER_HP 
-} = require('./hp-balance');
+const { settleMatch, updatePlayerStats, getPlayerStats, getPlayerRank, getTopPlayers, getHP, getVC } = require('./hp-balance');
 const { lobby, battles, pushBattle, pushLobby, broadcast, walletToBattle } = require('./state');
 
 function newState() {
@@ -17,11 +12,7 @@ function newState() {
 function getStartState(beastKey) { 
   const st = newState(); 
   const beast = BEASTS[beastKey]; 
-  if (beast) { 
-    st.pp = beast.attacks.map(a => a.pp === undefined ? 99 : a.pp); 
-  } else { 
-    st.pp = [99, 99, 99, 99]; 
-  } 
+  if (beast) { st.pp = beast.attacks.map(a => a.pp === undefined ? 99 : a.pp); } else { st.pp = [99, 99, 99, 99]; } 
   return st; 
 }
 
@@ -45,11 +36,7 @@ function applyAtk(aSt, dSt, atk, aName, dName) {
   
   if (fx==='swap') { 
     const propsToSwap = ['stun', 'poisonDmg', 'poisonTurns', 'burnDmg', 'burnTurns', 'blind', 'weakAtk', 'weaken', 'corrode'];
-    propsToSwap.forEach(prop => {
-      const temp = dSt[prop];
-      dSt[prop] = aSt[prop];
-      aSt[prop] = temp;
-    });
+    propsToSwap.forEach(prop => { const temp = dSt[prop]; dSt[prop] = aSt[prop]; aSt[prop] = temp; });
     logs.push({t:`${aName} usó ${atk.n}. ¡Intercambia estados con ${dName}!`,c:'special'}); 
     return logs; 
   }
@@ -134,7 +121,6 @@ function tickEffects(st, name) {
 async function endBattle(bId, winnerId, loserId, winnerHp, forfeit=false) {
   const b = battles.get(bId);
   
-  // Si es una batalla de torneo, redirigir a tournamentManager
   if (b && b.isTournament) {
     const { reportTournamentResult } = require('./tournamentManager');
     await reportTournamentResult(bId, winnerId, loserId);
@@ -150,7 +136,7 @@ async function endBattle(bId, winnerId, loserId, winnerHp, forfeit=false) {
   const isLabSimulation = b?.isLabSimulation || false; 
   const winner = lobby.get(winnerId);
   const loser = lobby.get(loserId);
-  const hp = forfeit ? 100 : Math.max(0, Math.min(100, winnerHp));
+  const hp = forfeit ? 0 : Math.max(0, Math.min(100, winnerHp));
 
   if (isLabSimulation) {
     if(winner) winner.ws.send(JSON.stringify({ type:'battle_end', won:true, isCpu:true, isTraining:true, isLabSimulation:true, winnerXp:0, loserXp:0 }));
@@ -162,31 +148,26 @@ async function endBattle(bId, winnerId, loserId, winnerHp, forfeit=false) {
     return;
   }
 
-  if (isTraining) {
-    const winnerXp = forfeit ? 0 : 100 + Math.max(0, Math.min(100, winnerHp));
-    const loserXp = 0;
-    if(winner) winner.ws.send(JSON.stringify({ type:'battle_end', won:true, isTraining:true, isCpu:false, winnerXp, loserXp, forfeit }));
-    if(loser) loser.ws.send(JSON.stringify({ type:'battle_end', won:false, isTraining:true, isCpu:false, winnerXp, loserXp }));
-  } else if (isCpu) {
-    const winnerXp = forfeit ? 0 : 100 + Math.max(0, Math.min(100, winnerHp));
-    if(winner) winner.ws.send(JSON.stringify({ type:'battle_end', won:true, isCpu:true, isTraining:false, winnerXp, loserXp:0, winnerHp:hp, forfeit }));
-    if(loser) loser.ws.send(JSON.stringify({ type:'battle_end', won:false, isCpu:true, isTraining:false, winnerXp, loserXp:0, winnerHp:hp }));
+  // NUEVA LÓGICA DE ENTRENAMIENTO (Mensajes hipotéticos)
+  if (isTraining || isCpu) {
+    const winnerVC = hp;
+    const loserVC = Math.floor((100 - hp) * 0.10);
+    if(winner) winner.ws.send(JSON.stringify({ type:'battle_end', won:true, isCpu:isCpu, isTraining:true, hypotheticalHp: 100, hypotheticalVC: winnerVC }));
+    if(loser) loser.ws.send(JSON.stringify({ type:'battle_end', won:false, isCpu:isCpu, isTraining:true, hypotheticalHp: 0, hypotheticalVC: loserVC }));
   } else {
+    // NUEVA LÓGICA DE BATALLA REAL
     const winnerWallet = winner?.wallet || '';
     const loserWallet = loser?.wallet || '';
     const result = await settleMatch(winnerWallet, loserWallet, hp);
     await updatePlayerStats(winnerWallet, loserWallet);
-    const wStats = await getPlayerStats(winnerWallet);
-    const lStats = await getPlayerStats(loserWallet);
-    const wRank = await getPlayerRank(winnerWallet);
-    const lRank = await getPlayerRank(loserWallet);
-    const winnerUsdc = parseFloat(((100 + hp) * USDC_PER_HP).toFixed(3));
-    const platformUsdc = parseFloat(((100 - hp) * USDC_PER_HP).toFixed(3));
-    if(winner) winner.ws.send(JSON.stringify({ type:'battle_end', won:true, isCpu:false, isTraining:false, winnerHp:hp, winnerUsdc, platformUsdc, newHp: result.winnerNewHp, forfeit, stats: { wins: wStats.wins, losses: wStats.losses, rank: wRank } }));
-    if(loser) loser.ws.send(JSON.stringify({ type:'battle_end', won:false, isCpu:false, isTraining:false, winnerHp:hp, winnerUsdc, platformUsdc, newHp: await getHP(loserWallet), stats: { wins: lStats.wins, losses: lStats.losses, rank: lRank } }));
+    
+    if(winner) winner.ws.send(JSON.stringify({ type:'battle_end', won:true, isCpu:false, isTraining:false, winnerHp:hp, newHp: result.winnerNewHp, newVC: result.winnerNewVc }));
+    if(loser) loser.ws.send(JSON.stringify({ type:'battle_end', won:false, isCpu:false, isTraining:false, winnerHp:hp, newHp: result.loserNewHp, newVC: result.loserNewVc }));
+    
     const top = await getTopPlayers(3);
     broadcast({ type: 'leaderboard_update', top });
   }
+  
   if (winner) winner.inBattle=false;
   if (loser) loser.inBattle=false;
 
