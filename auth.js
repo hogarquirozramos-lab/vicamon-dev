@@ -19,7 +19,7 @@ async function handleAuthRoutes(req, res, urlPath) {
         const existing = await getUserByEmail(email.toLowerCase());
         if (existing) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
-          return res.end(JSON.stringify({ ok: false, msg: 'El correo ya está registrado' }));
+          return res.end(JSON.stringify({ ok: false, msg: 'El correo ya tiene una cuenta creada' }));
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
