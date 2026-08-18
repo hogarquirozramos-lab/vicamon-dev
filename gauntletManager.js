@@ -1,7 +1,7 @@
 const BEASTS = global.BEASTS_DB || require('./beasts.js');
 const { lobby, battles, pushCpuBattle, broadcast, send, pushLobby } = require('./state');
 const { applyAtk, tickEffects, getStartState } = require('./battleEngine');
-const { addVC, getTowerVCPrize, getPlayerStats, getPlayerRank, getTopPlayers } = require('./hp-balance');
+const { addHP, addVC, getHP, getVC, getPrizes, claimTowerDailyWin } = require('./hp-balance');
 const { cpuPickAttack } = require('./cpuAI');
 
 const CPU_ID = -1;
@@ -17,12 +17,24 @@ async function endGauntlet(bId, playerId, won, defeatedCount = 0) {
 
   try {
     if (won) {
-      if (towerMode === 'hp') { // Modo VC
-        const prize = await getTowerVCPrize();
-        await addVC(pl.wallet, prize);
-        customMsg = `¡Felicidades! Has ganado ${prize} VC.`;
-      } else { // Modo Libre
-        customMsg = '¡Ganaste la torre! Si la jugaras por VC, ganarías VC.';
+      if (towerMode === 'hp') { // Torre VC
+        const prizes = await getPrizes();
+        let prizeHp = 0, prizeVc = 0;
+        if (defeatedCount >= 12) { prizeHp = prizes.tower_t3_hp; prizeVc = prizes.tower_t3_vc; }
+        else if (defeatedCount >= 9) { prizeHp = prizes.tower_t2_hp; prizeVc = prizes.tower_t2_vc; }
+        else if (defeatedCount >= 6) { prizeHp = prizes.tower_t1_hp; prizeVc = prizes.tower_t1_vc; }
+        
+        if (prizeHp > 0) await addHP(pl.wallet, prizeHp);
+        if (prizeVc > 0) await addVC(pl.wallet, prizeVc);
+        customMsg = `¡Felicidades! Has ganado ${prizeHp} HP y ${prizeVc} VC.`;
+      } else if (towerMode === 'daily') { // Torre Diaria
+        await claimTowerDailyWin(pl.wallet);
+        const prizes = await getPrizes();
+        const prizeVc = prizes.tower_daily_vc;
+        if (prizeVc > 0) await addVC(pl.wallet, prizeVc);
+        customMsg = `¡Felicidades! Has ganado ${prizeVc} VC. Vuelve mañana.`;
+      } else { // Libre
+        customMsg = '¡Ganaste la torre! Si la jugaras por VC, ganarías premios.';
       }
     } else {
       customMsg = 'Has sido derrotado. ¡Vuelve a intentarlo!';
