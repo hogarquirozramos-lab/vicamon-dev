@@ -106,7 +106,7 @@ function connectPhantom() { return; }
 
 window.addEventListener('load', async () => { 
   const btnG = document.getElementById('btn-gauntlet'); 
-  if (btnG) { btnG.style.display = GAUNTLET_HABILITADO ? 'inline-block' : 'none'; btnG.disabled = true; }
+  if (btnG) { btnG.style.display = 'inline-block'; btnG.disabled = false; }
 });
 
 async function checkHPNow(fromConnect=false) { 
@@ -152,6 +152,7 @@ function updateHPDisplay(hp){
   const hpEl=document.getElementById('profile-hp'); if(hpEl){ hpEl.textContent=hp+' HP'; hpEl.style.color=hp>=100?'#5DCAA5':'#EF9F27'; } 
   
   const vcEl=document.getElementById('profile-vc'); if(vcEl){ vcEl.textContent=myCurrentVC+' VC'; vcEl.style.color='#F6E265'; }
+  const labVcEl=document.getElementById('lab-vc-val'); if(labVcEl){ labVcEl.textContent=myCurrentVC+' VC'; }
   
   const lobbyHp = document.getElementById('lbl-myhp'); 
   if(lobbyHp) lobbyHp.textContent = myCurrentHP + ' HP'; 
@@ -165,6 +166,30 @@ function updateHPDisplay(hp){
   
   if(document.getElementById('s-lobby')?.classList.contains('active')){ renderLobbyFromCache(); updateLobbyBadge(); }
   if (typeof calculateLabBalance === 'function') calculateLabBalance();
+  
+  // LÓGICA DE CUENTA REGRESIVA A MEDIANOCHE
+  const timerEl = document.getElementById('hp-reset-timer');
+  if (timerEl) {
+    if (myCurrentHP < 100) {
+      timerEl.style.display = 'block';
+      const updateTimer = () => {
+        const now = new Date();
+        const midnight = new Date(now);
+        midnight.setHours(24, 0, 0, 0); 
+        const diff = midnight - now;
+        const h = Math.floor(diff / (1000 * 60 * 60));
+        const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const s = Math.floor((diff % (1000 * 60)) / 1000);
+        timerEl.textContent = `⏳ Recarga de HP en: ${h}h ${m}m ${s}s`;
+      };
+      updateTimer();
+      if (!window._midnightInterval) {
+        window._midnightInterval = setInterval(updateTimer, 1000);
+      }
+    } else {
+      timerEl.style.display = 'none';
+    }
+  }
 }
 
 function doCashout(){ return; } 
