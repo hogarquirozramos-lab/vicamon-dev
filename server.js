@@ -9,14 +9,15 @@ const {
   PLATFORM_WALLET, PLATFORM_THRESHOLD, USDC_PER_HP,
   getAllPlayersDebug, adminSetHP, adminResetPlatform, adminUnlockAllHP,
   getPlayerStats, getPlayerRank, getTotalPlayersHP, getExcedente,
-  getAllAttacksDB, getAllVicamonsDB, saveAttackDB, saveVicamonDB
+  getAllAttacksDB, getAllVicamonsDB, saveAttackDB, saveVicamonDB,
+  getTourVCPrize, getTowerVCPrize, setTourVCPrize, setTowerVCPrize // NUEVAS IMPORTACIONES
 } = require('./hp-balance');
 const { sendUSDC } = require('./transfer');
 
 const { setupWebSocketServer } = require('./wsHandlers');
 const { initializeContent } = require('./contentManager');
 const { runMetaSimulation } = require('./simulatorManager');
-const { handleAuthRoutes } = require('./auth'); // NUEVO: Importar rutas de autenticación
+const { handleAuthRoutes } = require('./auth'); // Importar rutas de autenticación
 
 const ADMIN_PASS = process.env.ADMIN_PASSWORD || process.env.INTERNAL_SECRET || '';
 const OWNER_WALLET = process.env.OWNER_WALLET || ''; 
@@ -56,7 +57,7 @@ const MIME = { '.html':'text/html', '.js':'application/javascript', '.css':'text
 const server = http.createServer(async (req, res) => {
   const urlPath = req.url.split('?')[0];
   
-  // NUEVO: Rutas de Registro y Login
+  // RUTAS DE AUTENTICACIÓN
   if (urlPath === '/api/register' || urlPath === '/api/login') {
     const handled = await handleAuthRoutes(req, res, urlPath);
     if (handled) return;
@@ -104,6 +105,7 @@ const server = http.createServer(async (req, res) => {
   if (urlPath === '/admin-unlock-hp' && req.method === 'POST') { let body = ''; req.on('data', c => body += c); req.on('end', async () => { try { const { pass } = JSON.parse(body); if (pass !== ADMIN_PASS) { res.writeHead(403); res.end(JSON.stringify({ ok: false })); return; } await adminUnlockAllHP(); res.writeHead(200); res.end(JSON.stringify({ ok: true })); } catch(e) { res.writeHead(400); res.end(JSON.stringify({ ok: false })); } }); return; }
   if (urlPath === '/admin-withdraw' && req.method === 'POST') { let body = ''; req.on('data', c => body += c); req.on('end', async () => { try { const { pass } = JSON.parse(body); if (pass !== ADMIN_PASS) { res.writeHead(403); res.end(JSON.stringify({ ok: false, msg: 'Forbidden' })); return; } if (!OWNER_WALLET) { res.writeHead(400); res.end(JSON.stringify({ ok: false, msg: 'OWNER_WALLET no configurada en el servidor' })); return; } const balance = await getPlatformUSDCBalance(); if (balance <= 0.001) { res.writeHead(400); res.end(JSON.stringify({ ok: false, msg: 'No hay suficientes USDC para retirar' })); return; } const sig = await sendUSDC(OWNER_WALLET, balance); const hpToClear = Math.round(balance / USDC_PER_HP); await clearPlatformHp(hpToClear); res.writeHead(200); res.end(JSON.stringify({ ok: true, amount: balance, sig })); } catch(e) { res.writeHead(500); res.end(JSON.stringify({ ok: false, msg: e.message })); } }); return; }
 
+  // RUTAS ADMIN LAB
   if (urlPath === '/admin-get-content' && req.method === 'GET') {
     const pass = new URL(req.url, 'http://localhost').searchParams.get('pass') || '';
     if (pass !== ADMIN_PASS) { res.writeHead(403); res.end('Forbidden'); return; }
@@ -140,6 +142,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   
+  // RUTA SIMULADOR
   if (urlPath === '/admin-run-simulation' && req.method === 'POST') {
     let body = ''; req.on('data', c => body += c); req.on('end', async () => {
       try {
@@ -147,6 +150,31 @@ const server = http.createServer(async (req, res) => {
         if (pass !== ADMIN_PASS) { res.writeHead(403); res.end(JSON.stringify({ ok: false })); return; }
         const results = await runMetaSimulation();
         res.writeHead(200); res.end(JSON.stringify({ ok: true, results }));
+      } catch(e) { res.writeHead(400); res.end(JSON.stringify({ ok: false, msg: e.message })); }
+    });
+    return;
+  }
+
+  // NUEVAS RUTAS ADMIN PREMIOS VC
+  if (urlPath === '/admin-get-prizes' && req.method === 'GET') {
+    const pass = new URL(req.url, 'http://localhost').searchParams.get('pass') || '';
+    if (pass !== ADMIN_PASS) { res.writeHead(403); res.end('Forbidden'); return; }
+    try {
+      const tour = await getTourVCPrize();
+      const tower = await getTowerVCPrize();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ tour, tower }));
+    } catch(e) { res.writeHead(500); res.end('Error'); }
+    return;
+  }
+  if (urlPath === '/admin-save-prizes' && req.method === 'POST') {
+    let body = ''; req.on('data', c => body += c); req.on('end', async () => {
+      try {
+        const { pass, tour, tower } = JSON.parse(body);
+        if (pass !== ADMIN_PASS) { res.writeHead(403); res.end(JSON.stringify({ ok: false })); return; }
+        await setTourVCPrize(parseInt(tour));
+        await setTowerVCPrize(parseInt(tower));
+        res.writeHead(200); res.end(JSON.stringify({ ok: true }));
       } catch(e) { res.writeHead(400); res.end(JSON.stringify({ ok: false, msg: e.message })); }
     });
     return;
