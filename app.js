@@ -42,7 +42,9 @@ function handleMsg(m){
   
   if(m.type === 'tower_status') {
     const hpBtn = document.getElementById('btn-tower-hp');
-    if(hpBtn) { hpBtn.disabled = false; hpBtn.textContent = '⚔️ Entrar (Costo: 10 VC)'; }
+    const trainBtn = document.getElementById('btn-tower-train');
+    if(hpBtn) { hpBtn.disabled = myCurrentHP < 100; hpBtn.textContent = '⚔️ Torre VC (Costo: 100 HP)'; hpBtn.style.opacity = myCurrentHP < 100 ? '0.5' : '1'; }
+    if(trainBtn) { trainBtn.disabled = false; trainBtn.textContent = '🎮 Torre Libre (Gratis)'; trainBtn.style.opacity = '1'; }
   }
 
   if(m.type === 'tournament_state') { if (myTournamentMode === m.mode || (!myTournamentMode && document.getElementById('s-tournament').classList.contains('active'))) { handleTournamentState(m); } }
