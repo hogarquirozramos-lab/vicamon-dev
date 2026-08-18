@@ -12,10 +12,26 @@ pool.query(`CREATE TABLE IF NOT EXISTS players (
   wins INTEGER DEFAULT 0, losses INTEGER DEFAULT 0, last_name VARCHAR(20), tower_train_date VARCHAR(10), last_hp_reset VARCHAR(10)
 );`).catch(e => console.error("Error creando tabla players:", e));
 
-pool.query(`CREATE TABLE IF NOT EXISTS platform (id INTEGER PRIMARY KEY DEFAULT 1, hp INTEGER DEFAULT 0, tour_vc_prize INTEGER DEFAULT 100, tower_vc_prize INTEGER DEFAULT 100);`).catch(e=>{});
-pool.query(`INSERT INTO platform (id, hp, tour_vc_prize, tower_vc_prize) VALUES (1, 0, 100, 100) ON CONFLICT (id) DO NOTHING;`).catch(e=>{});
+pool.query(`CREATE TABLE IF NOT EXISTS platform (
+  id INTEGER PRIMARY KEY DEFAULT 1, hp INTEGER DEFAULT 0, 
+  tour_hp_prize INTEGER DEFAULT 200, tour_vc_prize INTEGER DEFAULT 100,
+  tower_t1_hp INTEGER DEFAULT 30, tower_t1_vc INTEGER DEFAULT 5,
+  tower_t2_hp INTEGER DEFAULT 50, tower_t2_vc INTEGER DEFAULT 10,
+  tower_t3_hp INTEGER DEFAULT 100, tower_t3_vc INTEGER DEFAULT 100,
+  tower_daily_vc INTEGER DEFAULT 15
+);`).catch(e=>{});
+pool.query(`INSERT INTO platform (id, hp) VALUES (1, 0) ON CONFLICT (id) DO NOTHING;`).catch(e=>{});
+
+// Añadir columnas si la tabla ya existía
+pool.query(`ALTER TABLE platform ADD COLUMN IF NOT EXISTS tour_hp_prize INTEGER DEFAULT 200;`).catch(e=>{});
 pool.query(`ALTER TABLE platform ADD COLUMN IF NOT EXISTS tour_vc_prize INTEGER DEFAULT 100;`).catch(e=>{});
-pool.query(`ALTER TABLE platform ADD COLUMN IF NOT EXISTS tower_vc_prize INTEGER DEFAULT 100;`).catch(e=>{});
+pool.query(`ALTER TABLE platform ADD COLUMN IF NOT EXISTS tower_t1_hp INTEGER DEFAULT 30;`).catch(e=>{});
+pool.query(`ALTER TABLE platform ADD COLUMN IF NOT EXISTS tower_t1_vc INTEGER DEFAULT 5;`).catch(e=>{});
+pool.query(`ALTER TABLE platform ADD COLUMN IF NOT EXISTS tower_t2_hp INTEGER DEFAULT 50;`).catch(e=>{});
+pool.query(`ALTER TABLE platform ADD COLUMN IF NOT EXISTS tower_t2_vc INTEGER DEFAULT 10;`).catch(e=>{});
+pool.query(`ALTER TABLE platform ADD COLUMN IF NOT EXISTS tower_t3_hp INTEGER DEFAULT 100;`).catch(e=>{});
+pool.query(`ALTER TABLE platform ADD COLUMN IF NOT EXISTS tower_t3_vc INTEGER DEFAULT 100;`).catch(e=>{});
+pool.query(`ALTER TABLE platform ADD COLUMN IF NOT EXISTS tower_daily_vc INTEGER DEFAULT 15;`).catch(e=>{});
 
 pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS vc INTEGER DEFAULT 0;`).catch(e=>{});
 pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS last_hp_reset VARCHAR(10);`).catch(e=>{});
@@ -159,16 +175,42 @@ async function settleTeamMatch(winnerWallet, loserWallet, winnerRemainingHp, tea
   } catch(e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); } 
 }
 
-// === ADMIN PREMIOS VC ===
-async function getTourVCPrize() { const res = await pool.query('SELECT tour_vc_prize FROM platform WHERE id = 1'); return res.rows.length > 0 ? res.rows[0].tour_vc_prize : 100; }
-async function getTowerVCPrize() { const res = await pool.query('SELECT tower_vc_prize FROM platform WHERE id = 1'); return res.rows.length > 0 ? res.rows[0].tower_vc_prize : 100; }
-async function setTourVCPrize(val) { await pool.query('UPDATE platform SET tour_vc_prize = $1 WHERE id = 1', [val]); }
-async function setTowerVCPrize(val) { await pool.query('UPDATE platform SET tower_vc_prize = $1 WHERE id = 1', [val]); }
+// === ADMIN PREMIOS ===
+async function getPrizes() {
+  const res = await pool.query('SELECT * FROM platform WHERE id = 1');
+  if (res.rows.length === 0) return null;
+  return res.rows[0];
+}
+async function savePrizes(data) {
+  await pool.query(`UPDATE platform SET 
+    tour_hp_prize = $1, tour_vc_prize = $2,
+    tower_t1_hp = $3, tower_t1_vc = $4,
+    tower_t2_hp = $5, tower_t2_vc = $6,
+    tower_t3_hp = $7, tower_t3_vc = $8,
+    tower_daily_vc = $9
+  WHERE id = 1`, [
+    data.tour_hp, data.tour_vc,
+    data.tower_t1_hp, data.tower_t1_vc,
+    data.tower_t2_hp, data.tower_t2_vc,
+    data.tower_t3_hp, data.tower_t3_vc,
+    data.tower_daily_vc
+  ]);
+}
 
+// --- TORRE ---
 async function getTowerStatus() { return { grandAvailable: true, trainAvailable: true, excedente: 1000 }; }
-async function claimTowerGrandPrize(wallet) { return true; }
-async function checkTowerTrainingWin(wallet) { return false; }
-async function claimTowerTrainingWin(wallet) { return { ok: true, newHp: await getHP(wallet) }; }
+async function checkTowerDailyWin(wallet) {
+  const res = await pool.query('SELECT tower_train_date FROM players WHERE wallet = $1', [wallet]);
+  if (res.rows.length > 0) {
+    const today = new Date().toISOString().split('T')[0];
+    return res.rows[0].tower_train_date === today;
+  }
+  return false;
+}
+async function claimTowerDailyWin(wallet) {
+  const today = new Date().toISOString().split('T')[0];
+  await pool.query('UPDATE players SET tower_train_date = $1 WHERE wallet = $2', [today, wallet]);
+}
 
 async function getTotalPlayersHP() { const res = await pool.query('SELECT COALESCE(SUM(hp), 0) as total_hp, COALESCE(SUM(locked_hp), 0) as total_locked FROM players'); const totalHp = res.rows.length > 0 ? parseInt(res.rows[0].total_hp, 10) : 0; const totalLocked = res.rows.length > 0 ? parseInt(res.rows[0].total_locked, 10) : 0; return totalHp + totalLocked; }
 async function getExcedente() { return cachedExcedente; }
@@ -192,10 +234,10 @@ module.exports = {
   getPlayerStats, getPlayerRank,
   isTxProcessed, markTxProcessed,
   adminSetHP, adminResetPlatform, adminUnlockAllHP,
-  getTowerStatus, claimTowerGrandPrize, checkTowerTrainingWin, claimTowerTrainingWin,
+  getTowerStatus, checkTowerDailyWin, claimTowerDailyWin,
   getExcedente, getTotalPlayersHP, checkOwnerWithdrawal,
   getAllAttacksDB, getAllVicamonsDB, saveAttackDB, saveVicamonDB,
   createUser, getUserByEmail,
   getVC, addVC, hasVC, spendVC,
-  getTourVCPrize, getTowerVCPrize, setTourVCPrize, setTowerVCPrize
+  getPrizes, savePrizes
 };
