@@ -76,7 +76,7 @@ async function login() {
       location.reload();
     } else {
       if (data.msg === 'Usuario no encontrado') {
-        alert('Usuario no encontrado. Regístrate para empezar.');
+        alert('Usuario no encontrado. Crea una cuenta para empezar.');
       } else {
         alert('Error: ' + data.msg);
       }
