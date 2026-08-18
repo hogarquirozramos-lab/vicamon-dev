@@ -19,10 +19,20 @@ function checkSession() {
   }
 }
 
+function openRegisterModal() {
+  document.getElementById('modal-register').classList.remove('hidden');
+  document.getElementById('inp-reg-email').focus();
+}
+
+function closeRegisterModal() {
+  document.getElementById('modal-register').classList.add('hidden');
+}
+
 async function register() {
-  const email = document.getElementById('inp-email').value.trim();
-  const password = document.getElementById('inp-password').value;
+  const email = document.getElementById('inp-reg-email').value.trim();
+  const password = document.getElementById('inp-reg-pass').value;
   if(!email || !password) return alert('Debes poner un correo y contraseña');
+  if(password.length < 6) return alert('La contraseña debe tener al menos 6 caracteres');
   
   try {
     const res = await fetch('/api/register', {
@@ -36,7 +46,8 @@ async function register() {
       localStorage.setItem('vicamon_nick', data.user.nick);
       myToken = data.token;
       myName = data.user.nick;
-      location.reload(); // Recargar para aplicar sesión
+      closeRegisterModal();
+      location.reload(); 
     } else {
       alert('Error: ' + data.msg);
     }
@@ -48,7 +59,7 @@ async function register() {
 async function login() {
   const email = document.getElementById('inp-email').value.trim();
   const password = document.getElementById('inp-password').value;
-  if(!email || !password) return alert('Debes poner un correo y contraseña');
+  if(!email || !password) return alert('Debes poner tu correo y contraseña');
 
   try {
     const res = await fetch('/api/login', {
@@ -64,10 +75,14 @@ async function login() {
       myName = data.user.nick;
       location.reload();
     } else {
-      alert('Error: ' + data.msg);
+      if (data.msg === 'Usuario no encontrado') {
+        alert('Usuario no encontrado. Regístrate para empezar.');
+      } else {
+        alert('Error: ' + data.msg);
+      }
     }
   } catch(e) {
-    alert('Error de conexión');
+    alert('Error de conexión con el servidor');
   }
 }
 
@@ -80,15 +95,14 @@ function logout() {
   location.reload();
 }
 
-function depositWidgetHTML() { return ''; } // Mantenido vacío temporalmente, la compra será con VC luego
+function depositWidgetHTML() { return ''; } 
 
 function getPhantom() { return window.phantom?.solana || window.solana || null; }
-
 function copyWallet() { return; }
 function openPhantomApp() { return; }
 function closeMobileConnectModal() { return; }
 function copyText(t) { return; }
-function connectPhantom() { return; } // Desactivado temporalmente, se habilitará como opcional luego
+function connectPhantom() { return; } 
 
 window.addEventListener('load', async () => { 
   const btnG = document.getElementById('btn-gauntlet'); 
@@ -153,7 +167,7 @@ function updateHPDisplay(hp){
   if (typeof calculateLabBalance === 'function') calculateLabBalance();
 }
 
-function doCashout(){ return; } // Desactivado por ahora
+function doCashout(){ return; } 
 
 function redeemPhysicalCode() { const input = document.getElementById('inp-physical-code'); const code = input.value.trim(); if(!code) return; if(ws && ws.readyState === 1) ws.send(JSON.stringify({type:'redeem_physical_code', code: code})); input.value = ''; }
 function autoRedeemPhysicalCodes() { const codes = JSON.parse(localStorage.getItem('vicamon_physical_codes') || '[]'); codes.forEach(code => { if(ws && ws.readyState === 1) ws.send(JSON.stringify({type:'redeem_physical_code', code: code})); }); }
