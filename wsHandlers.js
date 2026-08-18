@@ -4,10 +4,10 @@ const { CPU_ID, processCpuPlayerTurn, scheduleCpuTurn } = require('./cpuLogic');
 const { processGauntletPlayerTurn, endGauntlet, scheduleGauntletCpuTurn } = require('./gauntletManager');
 const { pushTeamBattle, processTeamTurn, processTeamSwitch, processTeamCpuPlayerTurn, endTeamBattle } = require('./teamEngine');
 const { joinTournament, leaveTournament, broadcastTournamentState, reportTournamentResult } = require('./tournamentManager');
-const { getHP, getVC, addHP, hasHP, lockHP, unlockHP, settleMatch, cashout, updatePlayerName, updatePlayerStats, getTopPlayers, getLeaderboard, getPlayerStats, getPlayerRank, PLATFORM_WALLET, USDC_PER_HP, settleGauntletTiered, getTowerStatus, checkTowerTrainingWin, checkOwnerWithdrawal, clearPlatformHp } = require('./hp-balance');
+const { getHP, getVC, addHP, addVC, hasHP, hasVC, lockHP, unlockHP, spendVC, settleMatch, cashout, updatePlayerName, updatePlayerStats, getTopPlayers, getLeaderboard, getPlayerStats, getPlayerRank, PLATFORM_WALLET, USDC_PER_HP, settleGauntletTiered, getTowerStatus, checkTowerTrainingWin, checkOwnerWithdrawal, clearPlatformHp } = require('./hp-balance');
 const { sendUSDC } = require('./transfer');
 
-// NUEVO: Importar librería de Tokens
+// Importar librería de Tokens
 const jwt = require('jsonwebtoken');
 const JWT_SECRET = process.env.JWT_SECRET || process.env.INTERNAL_SECRET || 'super-secret-dev-key';
 
@@ -151,6 +151,8 @@ function setupWebSocketServer(wss, getPlatformUSDCBalance) {
                 await lockHP(p1.wallet, 100); await lockHP(p2.wallet, 100); p1.inBattle = true; p2.inBattle = true; const bId = `b${uid()}`; battles.set(bId, { p1id: msg.fromId, p2id: id, st1: getStartState(p1.beast), st2: getStartState(p2.beast), turnId: msg.fromId, logs: [], isCpu: false, isTraining: false, p1Wallet: p1.wallet, p2Wallet: p2.wallet, p1Beast: p1.beast, p2Beast: p2.beast }); battles.get(bId).logs.push({t: `¡Batalla por HP 1v1!`, c: 'hi'}); send(p1.ws, { type: 'battle_start', battleId: bId, role: 'p1', opponent: p2.name, opponentBeast: p2.beast, isCpu: false, isTraining: false }); send(p2.ws, { type: 'battle_start', battleId: bId, role: 'p2', opponent: p1.name, opponentBeast: p1.beast, isCpu: false, isTraining: false }); walletToBattle.set(p1.wallet, bId); walletToBattle.set(p2.wallet, bId); await pushLobby(); setTimeout(() => pushBattle(bId), 120); 
             } 
         }
+        
+        // --- LÓGICA 3V3 Y 6V6 ---
         if (msg.type === 'challenge_3v3') { 
             const challenger = lobby.get(id); const target = lobby.get(msg.targetId); 
             if (!challenger || !target || target.inBattle || challenger.inBattle) return; 
@@ -172,6 +174,34 @@ function setupWebSocketServer(wss, getPlatformUSDCBalance) {
         }
         if (msg.type === 'challenge_cpu') { const pl = lobby.get(id); if (!pl || pl.inBattle) return; pl.inBattle = true; const cpuBeast = ZODIAC_KEYS[Math.floor(Math.random() * ZODIAC_KEYS.length)]; const bId = `bcpu${uid()}`; battles.set(bId, { p1id: CPU_ID, p2id: id, st1: getStartState(cpuBeast), st2: getStartState(pl.beast), turnId: CPU_ID, logs: [{t: `¡Entrenamiento 1v1 vs Master!`, c: 'hi'}], isCpu: true, cpuIsP1: true, cpuBeast }); send(ws, { type: 'battle_start', battleId: bId, role: 'p2', opponent: 'Zodiac Master', opponentBeast: cpuBeast, isCpu: true }); await pushLobby(); setTimeout(() => { pushCpuBattle(bId); scheduleCpuTurn(bId); }, 200); }
         if (msg.type === 'challenge_3v3_cpu') { const pl = lobby.get(id); if (!pl || pl.inBattle) return; pl.inBattle = true; pl.team = msg.team; const cpuTeam = [ZODIAC_KEYS[Math.floor(Math.random()*ZODIAC_KEYS.length)], ZODIAC_KEYS[Math.floor(Math.random()*ZODIAC_KEYS.length)], ZODIAC_KEYS[Math.floor(Math.random()*ZODIAC_KEYS.length)]]; const bId = `bteamcpu${uid()}`; battles.set(bId, { p1id: CPU_ID, p2id: id, team1: cpuTeam.map(k => getStartState(k)), team2: pl.team.map(k => getStartState(k)), active1: 0, active2: 0, turnId: CPU_ID, logs: [{t: `¡Entrenamiento 3v3 vs Master!`, c: 'hi'}], isTeamBattle: true, isTeamCpu: true, cpuTeam: cpuTeam }); send(ws, { type: 'battle_start', battleId: bId, role: 'p2', opponent: 'Zodiac Master', opponentBeast: cpuTeam[0], isTeamBattle: true, isCpu: true }); await pushLobby(); const { pushTeamCpuBattle, doTeamCpuTurn } = require('./teamEngine'); setTimeout(() => { pushTeamCpuBattle(bId); setTimeout(() => doTeamCpuTurn(bId), 1000); }, 200); }
+
+        // NUEVO: LÓGICA 6V6
+        if (msg.type === 'challenge_6v6') { 
+            const challenger = lobby.get(id); const target = lobby.get(msg.targetId); 
+            if (!challenger || !target || target.inBattle || challenger.inBattle) return; 
+            if (challenger.isGuest || target.isGuest) { send(ws, { type: 'error', msg: 'Los invitados no pueden hacer batallas por HP.' }); return; } 
+            const challengerHP = await getHP(challenger.wallet); const targetHP = await getHP(target.wallet); 
+            if (challengerHP < 600) { send(ws, { type: 'error', msg: `Necesitas 600 HP.` }); return; } 
+            if (targetHP < 600) { send(ws, { type: 'error', msg: `Ese jugador no tiene 600 HP.` }); return; } 
+            challenger.team = msg.team; send(target.ws, { type: 'challenged_3v3', fromId: id, fromName: challenger.name, isTraining: false }); send(ws, { type: 'info', msg: `Reto 6v6 enviado a ${target.name}. Esperando respuesta...` }); 
+        }
+        if (msg.type === 'challenge_6v6_training') { 
+            const challenger = lobby.get(id); const target = lobby.get(msg.targetId); 
+            if (!challenger || !target || target.inBattle || challenger.inBattle) return; 
+            challenger.team = msg.team; send(target.ws, { type: 'challenged_3v3', fromId: id, fromName: challenger.name, isTraining: true }); send(ws, { type: 'info', msg: `Reto 6v6 de entrenamiento enviado a ${target.name}. Esperando respuesta...` }); 
+        }
+        if (msg.type === 'accept_6v6') { 
+            const p1 = lobby.get(msg.fromId), p2 = lobby.get(id); 
+            if (!p1 || !p2 || p1.inBattle || p2.inBattle) return; p2.team = msg.team; 
+            if (!msg.isTraining) { 
+                if (p1.isGuest || p2.isGuest) { send(ws, { type: 'error', msg: 'Los invitados no pueden hacer batallas por HP.' }); return; } 
+                if (!await hasHP(p1.wallet, 600) || !await hasHP(p2.wallet, 600)) { send(p1.ws, { type: 'error', msg: 'Fondos insuficientes para 6v6.' }); return; } 
+                await lockHP(p1.wallet, 600); await lockHP(p2.wallet, 600); 
+            } p1.inBattle = true; p2.inBattle = true; const bId = `bteam6${uid()}`; battles.set(bId, { p1id: msg.fromId, p2id: id, team1: p1.team.map(k => getStartState(k)), team2: p2.team.map(k => getStartState(k)), active1: 0, active2: 0, turnId: msg.fromId, logs: [{t: `¡Combate 6v6!`, c: 'hi'}], isTeamBattle: true, isTeamTraining: msg.isTraining, isCpu: false, p1Wallet: p1.wallet, p2Wallet: p2.wallet, p1Team: p1.team, p2Team: p2.team }); send(p1.ws, { type: 'battle_start', battleId: bId, role: 'p1', opponent: p2.name, opponentBeast: p2.team[0], isTeamBattle: true, isTraining: msg.isTraining, isCpu: false }); send(p2.ws, { type: 'battle_start', battleId: bId, role: 'p2', opponent: p1.name, opponentBeast: p1.team[0], isTeamBattle: true, isTraining: msg.isTraining, isCpu: false }); if (!msg.isTraining) { walletToBattle.set(p1.wallet, bId); walletToBattle.set(p2.wallet, bId); } await pushLobby(); setTimeout(() => pushTeamBattle(bId), 120); 
+        }
+        if (msg.type === 'challenge_6v6_cpu') { 
+            const pl = lobby.get(id); if (!pl || pl.inBattle) return; pl.inBattle = true; pl.team = msg.team; const cpuTeam = []; for(let i=0; i<6; i++) cpuTeam.push(ZODIAC_KEYS[Math.floor(Math.random()*ZODIAC_KEYS.length)]); const bId = `bteam6cpu${uid()}`; battles.set(bId, { p1id: CPU_ID, p2id: id, team1: cpuTeam.map(k => getStartState(k)), team2: pl.team.map(k => getStartState(k)), active1: 0, active2: 0, turnId: CPU_ID, logs: [{t: `¡Entrenamiento 6v6 vs Master!`, c: 'hi'}], isTeamBattle: true, isTeamCpu: true, cpuTeam: cpuTeam }); send(ws, { type: 'battle_start', battleId: bId, role: 'p2', opponent: 'Zodiac Master', opponentBeast: cpuTeam[0], isTeamBattle: true, isCpu: true }); await pushLobby(); const { pushTeamCpuBattle, doTeamCpuTurn } = require('./teamEngine'); setTimeout(() => { pushTeamCpuBattle(bId); setTimeout(() => doTeamCpuTurn(bId), 1000); }, 200); 
+        }
         
         if (msg.type === 'get_tournament_state') { broadcastTournamentState(msg.mode); }
         if (msg.type === 'join_tournament') { await joinTournament(id, msg.mode); }
@@ -188,21 +218,15 @@ function setupWebSocketServer(wss, getPlatformUSDCBalance) {
             else if (b.p1id === id || b.p2id === id) { const otherId = b.p1id === id ? b.p2id : b.p1id; await endBattle(msg.battleId, otherId, id, 0, true); } 
         }
 
+        // --- LÓGICA DE TORRE (MODO VC) ---
         if (msg.type === 'challenge_gauntlet') { 
           const pl = lobby.get(id); if (!pl || pl.inBattle) return; 
-          const towerMode = msg.towerMode || (pl.isGuest ? 'guest' : 'hp');
+          const towerMode = msg.towerMode || 'training';
           if (msg.beast) pl.beast = msg.beast; 
-          if (towerMode === 'hp') {
+          if (towerMode === 'hp') { // Modo VC
             if (pl.isGuest) return send(ws, { type: 'error', msg: 'Los invitados no pueden jugar por HP.' });
-            const status = await getTowerStatus();
-            if (!status.grandAvailable) return send(ws, { type: 'error', msg: 'El premio mayor no está disponible en este momento. ¡Intenta más tarde!' });
-            if (!await hasHP(pl.wallet, 100)) return send(ws, { type: 'error', msg: 'Necesitas 100 HP.' });
-            await lockHP(pl.wallet, 100); 
-          } else if (towerMode === 'training') {
-            if (pl.isGuest) return send(ws, { type: 'error', msg: 'Los invitados no pueden usar este modo.' });
-            const status = await getTowerStatus();
-            if (!status.trainAvailable) return send(ws, { type: 'error', msg: 'El modo entrenamiento no está disponible en este momento.' });
-            if (await checkTowerTrainingWin(pl.wallet)) return send(ws, { type: 'error', msg: 'Ya ganaste el bono de 10 HP hoy.' });
+            if (!await hasVC(pl.wallet, 10)) return send(ws, { type: 'error', msg: 'Necesitas 10 VC para entrar a la Torre.' });
+            await spendVC(pl.wallet, 10); 
           }
           pl.inBattle = true; 
           const zodiacTeam = [...ZODIAC_KEYS].sort(() => Math.random() - 0.5);
@@ -218,8 +242,7 @@ function setupWebSocketServer(wss, getPlatformUSDCBalance) {
         if (msg.type === 'get_tower_status') {
           const pl = lobby.get(id); if (!pl) return;
           const towerStatus = await getTowerStatus();
-          let status = { grandAvailable: towerStatus.grandAvailable, trainAvailable: towerStatus.trainAvailable };
-          if (pl.isGuest) { status.trainAvailable = false; } else { status.trainAvailable = towerStatus.trainAvailable && !await checkTowerTrainingWin(pl.wallet); }
+          let status = { grandAvailable: true, trainAvailable: true }; // Simbólico, ya que el costo es VC ahora
           send(ws, { type: 'tower_status', status: status });
           return;
         }
