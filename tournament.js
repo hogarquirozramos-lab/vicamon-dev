@@ -57,7 +57,7 @@ function renderTournament() {
     
     const isVC = tournamentData.mode === 'VC';
     document.getElementById('tour-mode').textContent = isVC ? 'Torneo VC (100 HP)' : 'Torneo Libre (Gratis)';
-    document.getElementById('tour-pot').textContent = isVC ? `${tournamentData.pot} HP` : 'Gloria';
+    document.getElementById('tour-pot').textContent = isVC ? 'Premios HP y VC al ganador' : 'Gloria';
     
     let statusText = 'Esperando jugadores...';
     if (tournamentData.status === 'ongoing') statusText = '¡Torneo en curso!';
