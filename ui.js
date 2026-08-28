@@ -16,6 +16,29 @@ function dmgClass(a){ if(a.d===0) return 'dmg-zero'; const eff=a.fx==='double'?a
 function dmgLabelPick(a){ if(a.fx==='chaos'||a.fx==='chaosHi') return '?? HP'; if(a.fx==='equalize') return 'ΔHP'; if(a.fx==='double') return `2×${a.d}`; if(a.fx==='triple') return `3×${a.d}`; if(a.d===0){ const m={heal20:'♥+20',heal30:'♥+30',fortress:'♥+Escudo',shield2:'Escudo×2',shield1r:'Escudo+↩',reflect50:'↩50%',weaken:'⬇Atk rival',analyze:'🔍+15%dmg',purify:'✨Limpiar',counter:'↩Daño recv',swap:'⇄Estados'}; return m[a.fx]||'Buff'; } if(a.fx==='drain10') return `15 HP (+10♥)`; return `${a.d} HP`; }
 function dmgClassPick(a){ if(a.d===0) return 'dmg-zero'; const e=a.fx==='double'?a.d*2:a.fx==='triple'?a.d*3:a.d; return e>=35?'dmg-high':e>=18?'dmg-mid':'dmg-low'; }
 
+// NUEVO: Pintar Mis Vicamons en el Perfil
+function buildMyVicamonsProfile() {
+  const grid = document.getElementById('my-vicamons-grid');
+  if (!grid) return;
+  if (!myOwnedVicamons || myOwnedVicamons.length === 0) {
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#aaa;font-size:13px;padding:20px">Aún no tienes Vicamons propios. Crea uno en el VicaLab o canjea un código físico.</div>';
+    return;
+  }
+  let html = '';
+  myOwnedVicamons.forEach(v => {
+    const b = BEASTS[v.beast_key];
+    if(!b) return;
+    html += `<div class="bcard" style="border-color:rgba(246,226,102,.3)">
+      <img src="${b.img}">
+      <div class="bname" style="color:#F6E265">${v.custom_name}</div>
+      <div class="bsub">${b.name} (Nivel ${v.level})</div>
+      <span class="bstyle" style="${STCSS[b.style]}">${b.style}</span>
+      <div class="elbar" style="background:${EL[b.el]}"></div>
+    </div>`;
+  });
+  grid.innerHTML = html;
+}
+
 function buildBestiary(){ const allKeys=Object.entries(BEASTS); const keys=allKeys.filter(([k,b])=>b.cat!=='Físico'||myPhysicalBeasts.includes(k)); let html=''; const cats = {}; keys.forEach(([k,b])=>{ if(!cats[b.cat]) cats[b.cat] = []; cats[b.cat].push({k,b}); }); for(const catName in cats){ html += `<div style="grid-column:1/-1; margin-top:15px; border-bottom:0.5px solid rgba(255,255,255,.2); padding-bottom:5px; color:#CFA9EC; font-weight:600; text-transform:uppercase; letter-spacing:.08em; font-size:13px">✦ ${catName} Series</div>`; cats[catName].forEach(({k,b})=>{ html+=`<div class="bcard" id="bc-${k}" onclick="showBestiaryDetail('${k}')"><img src="${b.img}" alt="${b.name}"><div class="bname">${b.name}</div><div class="bsub">${b.sub}</div><span class="bstyle" style="${STCSS[b.style]}">${b.style}</span><div class="elbar" style="background:${EL[b.el]}"></div></div>`; }); } html+=`<div class="beast-detail" id="bestiary-detail-panel"></div>`; document.getElementById('bestiary-grid').innerHTML=html; }
 function showBestiaryDetail(k){ const b=BEASTS[k]; const panel=document.getElementById('bestiary-detail-panel'); const statData={atk:{aries:70,tauro:55,geminis:65,cancer:45,leo:70,virgo:60,libra:62,escorpio:65,sagitario:68,capricornio:50,acuario:72,piscis:58},def:{aries:30,tauro:90,geminis:50,cancer:95,leo:65,virgo:70,libra:62,escorpio:55,sagitario:55,capricornio:92,acuario:45,piscis:68},spd:{aries:90,tauro:30,geminis:80,cancer:40,leo:70,virgo:65,libra:62,escorpio:70,sagitario:75,capricornio:35,acuario:85,piscis:60}}; const atksHtml=b.attacks.map(a=>{ const tags=[]; if(a.pierce) tags.push('<span class="atk-tag tag-pierce">Ignora escudo</span>'); if(a.fx==='double') tags.push('<span class="atk-tag tag-nobreak">Doble golpe</span>'); if(a.fx==='triple') tags.push('<span class="atk-tag tag-nobreak">Triple golpe</span>'); if(a.risk||a.self>0) tags.push(`<span class="atk-tag tag-risk">Riesgo${a.self>0?' -'+a.self+' HP':''}</span>`); if(a.buff) tags.push('<span class="atk-tag tag-buff">Buff</span>'); if(a.dot) tags.push('<span class="atk-tag tag-dot">Daño/turno</span>'); if(a.debuff) tags.push('<span class="atk-tag tag-debuff">Debuff</span>'); const ppText = a.pp === 99 || a.pp === undefined ? 'PP: ∞' : `PP: ${a.pp}`; return `<div class="bd-atk"><div class="bd-atk-top"><span class="bd-atk-name">${a.n}</span><span class="bd-atk-dmg ${dmgClassPick(a)}">${dmgLabelPick(a)}</span></div>${tags.length?`<div class="bd-atk-tags">${tags.join('')}</div>`:''}<div class="bd-atk-desc">${a.desc}</div><div style="display:flex;justify-content:space-between;align-items:center"><div class="bd-atk-acc">${a.acc}% precisión</div><div class="bd-atk-pp">${ppText}</div></div></div>`; }).join(''); panel.innerHTML=`<div class="bd-left"><img src="${b.img}" alt="${b.name}"><div class="bd-name">${b.name}</div><div class="bd-sub">${b.sub}</div><div class="bd-stats"><div class="bd-stat"><div class="bd-stat-val">${b.stats?b.stats.atk:(statData.atk[k]||'—')}</div><div class="bd-stat-lbl">ATK</div></div><div class="bd-stat"><div class="bd-stat-val">${b.stats?b.stats.def:(statData.def[k]||'—')}</div><div class="bd-stat-lbl">DEF</div></div><div class="bd-stat"><div class="bd-stat-val">${b.stats?b.stats.spd:(statData.spd[k]||'—')}</div><div class="bd-stat-lbl">VEL</div></div></div></div><div class="bd-attacks">${atksHtml}</div>`; panel.classList.add('open'); panel.scrollIntoView({behavior:'smooth',block:'nearest'}); }
 
@@ -66,24 +89,20 @@ function selectChallengeMode(mode) {
 }
 
 function buildTeamPickGrid() { 
-  // Combinar Bestiario General con Vicamons Poseídos
-  const allKeys = Object.entries(BEASTS).filter(([k,b]) => b.cat !== 'Físico' || (myPhysicalBeasts || []).includes(k));
-  let html = '<div style="grid-column:1/-1; margin-bottom:5px; border-bottom:0.5px solid rgba(255,255,255,.2); padding-bottom:5px; color:#5DCAA5; font-weight:600; text-transform:uppercase; letter-spacing:.08em; font-size:12px">Bestiario General</div>';
-  allKeys.forEach(([k,b]) => {
-    html += `<div class="bcard" id="tpc-${k}" onclick="toggleTeamBeast('${k}')"><img src="${b.img}"><div class="bname">${b.name}</div><div class="bsub">${b.sub}</div><span class="bstyle" style="${STCSS[b.style]}">${b.style}</span><div class="elbar" style="background:${EL[b.el]}"></div></div>`;
-  });
-  
-  // NUEVO: Sección de Mis Vicamons
+  const allKeys=Object.entries(BEASTS); 
+  const keys=allKeys.filter(([k,b])=>b.cat!=='Físico'||myPhysicalBeasts.includes(k)); 
+  let html=''; 
+  keys.forEach(([k,b])=>{ 
+    html+=`<div class="bcard" id="tpc-${k}" onclick="toggleTeamBeast('${k}')"><img src="${b.img}" alt="${b.name}"><div class="bname">${b.name}</div><div class="bsub">${b.sub}</div><span class="bstyle" style="${STCSS[b.style]}">${b.style}</span><div class="elbar" style="background:${EL[b.el]}"></div></div>`; 
+  }); 
   if (myOwnedVicamons && myOwnedVicamons.length > 0) {
     html += '<div style="grid-column:1/-1; margin-top:15px; margin-bottom:5px; border-bottom:0.5px solid rgba(246,226,102,.2); padding-bottom:5px; color:#F6E265; font-weight:600; text-transform:uppercase; letter-spacing:.08em; font-size:12px">Mis Vicamons (Entrenados)</div>';
     myOwnedVicamons.forEach(v => {
       const b = BEASTS[v.beast_key];
       if(!b) return;
-      const k = `own_${v.id}`; // ID único temporal para el frontend
-      // NUEVO: Guardamos una referencia global temporal para el combate
+      const k = `own_${v.id}`; 
       window._tempOwnedBeasts = window._tempOwnedBeasts || {};
       window._tempOwnedBeasts[k] = { ...b, name: v.custom_name, stats: { atk: b.stats.atk + v.atk, def: b.stats.def + v.def, spd: b.stats.spd + v.spd } };
-      
       html += `<div class="bcard" id="tpc-${k}" onclick="toggleTeamBeast('${k}')" style="border-color:rgba(246,226,102,.3)">
         <img src="${b.img}">
         <div class="bname" style="color:#F6E265">${v.custom_name}</div>
@@ -93,10 +112,9 @@ function buildTeamPickGrid() {
       </div>`;
     });
   }
-  
-  html += `<div class="beast-detail" id="team-detail-panel"></div>`;
-  document.getElementById('team-pick-grid').innerHTML = html;
-  updateTeamSelectionUI();
+  html+=`<div class="beast-detail" id="team-detail-panel"></div>`; 
+  document.getElementById('team-pick-grid').innerHTML=html; 
+  updateTeamSelectionUI(); 
 }
 
 function toggleTeamBeast(k) { const maxPicks = teamSelectionMode === '6v6' ? 6 : (teamSelectionMode === '3v3' ? 3 : 1); const idx = selectedTeam.indexOf(k); if(idx > -1) { selectedTeam.splice(idx, 1); } else { if(selectedTeam.length >= maxPicks) { alert(`Ya elegiste ${maxPicks} Vicamons.`); return; } selectedTeam.push(k); } updateTeamSelectionUI(); }
@@ -146,19 +164,13 @@ function openTowerMenu() {
   const hpBtn = document.getElementById('btn-tower-hp');
   const trainBtn = document.getElementById('btn-tower-train');
   const guestBtn = document.getElementById('btn-tower-guest');
-  
   if(hpBtn) hpBtn.style.display = 'none';
   if(trainBtn) trainBtn.style.display = 'none';
   if(guestBtn) guestBtn.style.display = 'none';
-  
   if (hpBtn) hpBtn.style.display = 'flex';
   if (trainBtn) trainBtn.style.display = 'flex';
-  
   modal.classList.remove('hidden');
-  
-  if (ws && ws.readyState === 1) {
-    ws.send(JSON.stringify({type:'get_tower_status'}));
-  }
+  if (ws && ws.readyState === 1) { ws.send(JSON.stringify({type:'get_tower_status'})); }
 }
 
 function challengeGauntlet(towerMode) { 
@@ -166,12 +178,10 @@ function challengeGauntlet(towerMode) {
   document.getElementById('modal-master-menu').classList.add('hidden');
   if(!ws || ws.readyState !== 1) return alert('Conectando...'); 
   if(towerMode === 'hp' && myCurrentHP < 100) return alert('Necesitas al menos 100 HP.');
-  
   let msgText = '';
   if(towerMode === 'hp') msgText = '¿Iniciar Torre por HP? (Inviertes 100 HP)';
   else if(towerMode === 'training') msgText = '¿Iniciar Torre de Entrenamiento?';
   else msgText = '¿Iniciar Torre (Invitado)?';
-  
   if(!confirm(msgText)) return; 
   isGauntletChallenge = true; 
   teamSelectionMode = '1v1'; 
@@ -179,7 +189,6 @@ function challengeGauntlet(towerMode) {
   selectedTeam = []; 
   buildTeamPickGrid(); 
   show('s-team-select'); 
-  
   window._pendingTowerMode = towerMode;
 }
 
