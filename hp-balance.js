@@ -177,6 +177,10 @@ async function getOwnedVicamons(wallet) {
 }
 
 async function createInitialVicamon(wallet, beastKey, customName) {
+  // Verificar si ya tiene un Vicamon inicial para evitar duplicados
+  const existing = await pool.query('SELECT id FROM owned_vicamons WHERE owner_wallet = $1', [wallet]);
+  if (existing.rows.length > 0) return; // Si ya tiene uno, no hace nada
+  
   const cleanName = (customName || 'Vicamon').substring(0, 20);
   await pool.query('INSERT INTO owned_vicamons (owner_wallet, beast_key, custom_name) VALUES ($1, $2, $3)', [wallet, beastKey, cleanName]);
 }
