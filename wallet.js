@@ -23,7 +23,7 @@ function checkSession() {
             show('s-starter');
             buildStarterPicker();
           } else {
-            enterGame(); // Llama a la nueva función directa
+            enterGame(); 
           }
         } else {
           throw new Error('Sesión inválida');
@@ -36,7 +36,6 @@ function checkSession() {
   }
 }
 
-// NUEVO: Función directa para entrar al juego sin pasar por el login
 function enterGame() {
   if (!ws || ws.readyState !== 1) { 
     if(!myBeast) myBeast = 'aries'; 
@@ -44,7 +43,7 @@ function enterGame() {
   }
   show('s-profile');
   updateProfileUI();
-  buildBestiary();
+  if (typeof buildMyVicamonsProfile === 'function') buildMyVicamonsProfile(); // NUEVO
   autoRedeemPhysicalCodes();
   updateHPDisplay(myCurrentHP);
   if (!isGuest) checkHPNow(false);
@@ -73,11 +72,8 @@ async function confirmStarter() {
   const key = window._selectedStarter;
   if(!key) return alert('Selecciona un Vicamon');
   const customName = document.getElementById('inp-starter-name').value.trim() || BEASTS[key].name;
-  
-  // Bloquear botón inmediatamente para evitar clics múltiples
   const btn = document.getElementById('btn-confirm-starter');
   if(btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
-  
   try {
     const res = await fetch('/api/choose-starter', {
       method: 'POST',
