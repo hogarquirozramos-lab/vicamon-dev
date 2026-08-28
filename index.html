@@ -45,7 +45,6 @@
     <div style="font-size:12px;color:rgba(255,255,255,.4);margin-top:4px">Este será tu primer compañero. Podrás entrenarlo y cuidarlo.</div>
   </div>
   <div class="beast-grid" id="starter-grid"></div>
-  
   <div style="margin-top:20px;background:rgba(255,255,255,.04);border:0.5px solid rgba(255,255,255,.1);border-radius:12px;padding:16px;margin-bottom:16px">
     <h3 style="margin:0 0 10px 0;font-size:16px">Paso 2: Ponle un Nombre</h3>
     <input id="inp-starter-name" type="text" placeholder="Nombre de tu Vicamon" maxlength="20" style="width:100%;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:8px;padding:11px 14px;color:#fff;font-size:15px;outline:none;margin-bottom:12px">
@@ -92,12 +91,10 @@
       <div style="font-size:14px;font-weight:600;color:#CFA9EC" id="profile-tier">🥚 VicaNoob</div>
     </div>
   </div>
-  
   <div style="display:flex;gap:8px;margin-bottom:20px">
     <button class="btn btn-blue" style="flex:1" onclick="enterLobby()">⚔️ Ir al Lobby →</button>
     <button class="btn btn-blue" style="flex:1;background:rgba(216,90,48,.14);border-color:rgba(216,90,48,.35);color:#F0997B" onclick="show('s-lab')">🧪 VicaLab →</button>
   </div>
-
   <div style="background:rgba(255,255,255,.04);border:0.5px solid rgba(255,255,255,.1);border-radius:12px;padding:16px;margin-bottom:16px">
     <h2 style="margin:0 0 10px 0;font-size:16px">🔗 Invocaciones Físicas</h2>
     <p style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:12px">Escanea el QR o ingresa el código de tu llavero para invocar a tu Vicamon real durante esta sesión.</p>
@@ -108,7 +105,6 @@
     </div>
     <div id="physical-beasts-list" style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"></div>
   </div>
-
   <div class="chat-wrap" style="border-top:0.5px solid rgba(255,255,255,.1);padding-top:16px">
     <h2 style="margin:0 0 10px 0;font-size:16px">📖 Bestiario Vicamon</h2>
     <p style="font-size:11px;color:rgba(255,255,255,.3);margin-bottom:10px">Estudia los ataques de cada Vicamon para armar tu estrategia.</p>
@@ -183,7 +179,6 @@
     </div>
     <button class="btn btn-sm" style="width:100%; margin-top:10px;" onclick="getFullLeaderboard()">📜 Ver Clasificación Completa</button>
   </div>
-  
   <div class="lobby-zone">
     <div style="background:linear-gradient(135deg,rgba(246,226,102,.18),rgba(245,166,35,.18));border:0.5px solid rgba(246,226,102,.4);border-radius:12px;padding:14px 16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px">
       <div>
@@ -195,7 +190,6 @@
         <button class="btn btn-sm" style="background:rgba(130,80,180,.15);border-color:rgba(130,80,180,.35);color:#CFA9EC;white-space:nowrap" onclick="openTournamentMenu('Libre')">🤝 Torneo Libre</button>
       </div>
     </div>
-
     <div style="background:linear-gradient(135deg,rgba(120,40,200,.18),rgba(60,20,120,.18));border:0.5px solid rgba(160,80,255,.3);border-radius:12px;padding:14px 16px;margin-bottom:0;">
       <div style="margin-bottom:10px">
         <div style="font-size:14px;font-weight:600;color:#CFA9EC">⚔ Zodiac Master</div>
@@ -210,7 +204,6 @@
       </div>
     </div>
   </div>
-
   <div style="font-size:11px;color:rgba(255,255,255,.3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Jugadores en sala</div>
   <div class="lobby-list" id="players-list"></div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
@@ -268,12 +261,10 @@
     <h1 style="margin:0">🏆 Modo Torneo (4 Jugadores)</h1>
     <button class="btn btn-sm btn-red" onclick="leaveTournament()">🚪 Salir</button>
   </div>
-  
   <div style="background:rgba(246,226,102,.1);border:0.5px solid rgba(246,226,102,.3);border-radius:12px;padding:16px;margin-bottom:20px;text-align:center">
     <div id="tour-mode" style="font-size:16px;font-weight:700;color:#F6E265">Torneo VC (100 HP)</div>
     <div style="font-size:14px;color:rgba(255,255,255,.6);margin-top:4px">Pozo Acumulado: <span id="tour-pot" style="color:#5DCAA5;font-weight:700">0 HP</span> / 400 HP</div>
   </div>
-
   <div class="bracket-container" style="display:flex;justify-content:space-around;align-items:center;gap:10px;padding:20px 10px;background:rgba(0,0,0,.2);border-radius:12px">
     <div style="display:flex;flex-direction:column;justify-content:space-around;height:350px;width:30%">
       <div id="tour-slot-1" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:12px;text-align:center;min-height:50px;display:flex;align-items:center;justify-content:center;margin-bottom:20px"><span style="color:rgba(255,255,255,.3)">Esperando J1...</span></div>
@@ -289,7 +280,6 @@
       <div id="tour-slot-champ" style="background:rgba(246,226,102,.1);border:2px solid rgba(246,226,102,.5);border-radius:8px;padding:12px;text-align:center;min-height:80px;display:flex;align-items:center;justify-content:center;flex-direction:column"><span style="color:rgba(246,226,102,.5);font-weight:700;font-size:24px">🏆</span><span style="color:rgba(246,226,102,.5);font-size:11px;margin-top:5px">Esperando Campeón</span></div>
     </div>
   </div>
-
   <div id="tour-status" style="text-align:center;margin-top:20px;font-size:14px;color:#5DCAA5;font-weight:600">Esperando a que los jugadores se inscriban...</div>
   <div style="text-align:center;margin-top:20px">
     <button class="btn btn-blue btn-lg" onclick="joinTournament()" style="width:100%;background:rgba(246,226,102,.15);border-color:rgba(246,226,102,.35);color:#F6E265">✅ Inscribirse</button>
@@ -387,33 +377,32 @@
   </div>
 </div>
 
-<!-- SCRIPTS -->
+<!-- SCRIPTS (CARGA ESTÁTICA Y ORDENADA) -->
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="beasts.js"></script>
+<script src="audio.js"></script>
+<script src="wallet.js"></script>
+<script src="ui.js"></script>
+<script src="lab.js"></script>
+<script src="tournament.js"></script>
+<script src="app.js"></script>
 <script>
+  // Intentamos cargar el bestiario actualizado desde la base de datos
   fetch('/api/beasts')
     .then(r => r.json())
     .then(data => {
-      window.BEASTS = data;
-      ['audio.js', 'wallet.js', 'ui.js', 'lab.js', 'tournament.js', 'app.js'].forEach(src => {
-        const s = document.createElement('script');
-        s.src = src;
-        document.head.appendChild(s);
-      });
-      setTimeout(checkSession, 500);
+      if (data && Object.keys(data).length > 0) {
+        window.BEASTS = data;
+        // Reconstruir la UI si ya está visible
+        if (typeof buildBestiary === 'function') buildBestiary();
+      }
     })
-    .catch(err => {
-      console.error("Error cargando BD, usando fallback:", err);
-      const s = document.createElement('script');
-      s.src = 'beasts.js';
-      s.onload = () => {
-        ['audio.js', 'wallet.js', 'ui.js', 'lab.js', 'tournament.js', 'app.js'].forEach(src => {
-          const sc = document.createElement('script');
-          sc.src = src;
-          document.head.appendChild(sc);
-        });
-        setTimeout(checkSession, 500);
-      };
-      document.head.appendChild(s);
+    .catch(err => console.log("Usando bestiario local por defecto"))
+    .finally(() => {
+      // Ejecutamos la sesión al final de todo
+      if (typeof checkSession === 'function') {
+        checkSession();
+      }
     });
 </script>
 </body>
