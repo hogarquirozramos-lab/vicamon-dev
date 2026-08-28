@@ -3,7 +3,7 @@ var myToken = null;
 var myCurrentHP = 0;
 var myCurrentVC = 0;
 var myPhysicalBeasts = [];
-var myOwnedVicamons = []; // NUEVO: Vicamons poseídos
+var myOwnedVicamons = []; // Vicamons poseídos
 var myStats = { wins: 0, losses: 0, rank: null, tier: 0 };
 var platformWalletAddress = ''; 
 
@@ -16,9 +16,13 @@ function checkSession() {
     document.getElementById('auth-box').style.display = 'none';
     document.getElementById('step-name').style.display = 'block';
     document.getElementById('inp-name').value = savedName;
+    
     // NUEVO: Revisar si ya tiene Vicamons poseídos
     fetch('/api/get-owned-vicamons', { headers: { 'Authorization': `Bearer ${token}` }})
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) return r.json().then(err => { throw new Error(err.msg || 'Error del servidor'); });
+        return r.json();
+      })
       .then(data => {
         if(data.ok) {
           myOwnedVicamons = data.vicamons;
@@ -30,8 +34,13 @@ function checkSession() {
             goProfile();
           }
         } else {
-          logout(); // Token inválido
+          throw new Error('Sesión inválida');
         }
+      })
+      .catch(err => {
+        console.error("Session check failed:", err);
+        alert("Error al cargar sesión: " + err.message + "\n\nSi el error es 'relation owned_vicamons does not exist', debes crear la tabla en NeonDB.");
+        logout();
       });
   }
 }
@@ -39,6 +48,7 @@ function checkSession() {
 // NUEVO: Construir el selector de Starter Inicial
 function buildStarterPicker() {
   const grid = document.getElementById('starter-grid');
+  if (!grid) return;
   const zodiacKeys = Object.entries(BEASTS).filter(([k,b]) => b.cat === 'Zodiaco');
   let html = '';
   zodiacKeys.forEach(([k,b]) => {
