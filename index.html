@@ -377,7 +377,7 @@
   </div>
 </div>
 
-<!-- SCRIPTS (CARGA ESTÁTICA Y ORDENADA) -->
+<!-- SCRIPTS (CARGA ESTÁTICA Y ORDENADA AL FINAL) -->
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="beasts.js"></script>
 <script src="audio.js"></script>
@@ -387,22 +387,17 @@
 <script src="tournament.js"></script>
 <script src="app.js"></script>
 <script>
-  // Intentamos cargar el bestiario actualizado desde la base de datos
+  // Cargar bestiario desde backend y luego iniciar sesión
   fetch('/api/beasts')
     .then(r => r.json())
     .then(data => {
       if (data && Object.keys(data).length > 0) {
         window.BEASTS = data;
-        // Reconstruir la UI si ya está visible
-        if (typeof buildBestiary === 'function') buildBestiary();
       }
     })
     .catch(err => console.log("Usando bestiario local por defecto"))
     .finally(() => {
-      // Ejecutamos la sesión al final de todo
-      if (typeof checkSession === 'function') {
-        checkSession();
-      }
+      checkSession();
     });
 </script>
 </body>
