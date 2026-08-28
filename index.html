@@ -95,6 +95,14 @@
     <button class="btn btn-blue" style="flex:1" onclick="enterLobby()">⚔️ Ir al Lobby →</button>
     <button class="btn btn-blue" style="flex:1;background:rgba(216,90,48,.14);border-color:rgba(216,90,48,.35);color:#F0997B" onclick="show('s-lab')">🧪 VicaLab →</button>
   </div>
+
+  <!-- NUEVO: MIS VICAMONS -->
+  <div style="background:rgba(255,255,255,.04);border:0.5px solid rgba(255,255,255,.1);border-radius:12px;padding:16px;margin-bottom:16px">
+    <h2 style="margin:0 0 10px 0;font-size:16px">🐉 Mis Vicamons</h2>
+    <p style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:12px">Tus compañeros. Entrénalos y cuídalos para que sean más fuertes.</p>
+    <div class="beast-grid" id="my-vicamons-grid"></div>
+  </div>
+
   <div style="background:rgba(255,255,255,.04);border:0.5px solid rgba(255,255,255,.1);border-radius:12px;padding:16px;margin-bottom:16px">
     <h2 style="margin:0 0 10px 0;font-size:16px">🔗 Invocaciones Físicas</h2>
     <p style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:12px">Escanea el QR o ingresa el código de tu llavero para invocar a tu Vicamon real durante esta sesión.</p>
@@ -104,12 +112,6 @@
       <button class="btn btn-sm" style="background:rgba(246,226,102,.2);border-color:rgba(246,226,102,.4);color:#F6E265;min-width:45px" onclick="openQRScanner()">📷</button>
     </div>
     <div id="physical-beasts-list" style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"></div>
-  </div>
-  <div class="chat-wrap" style="border-top:0.5px solid rgba(255,255,255,.1);padding-top:16px">
-    <h2 style="margin:0 0 10px 0;font-size:16px">📖 Bestiario Vicamon</h2>
-    <p style="font-size:11px;color:rgba(255,255,255,.3);margin-bottom:10px">Estudia los ataques de cada Vicamon para armar tu estrategia.</p>
-    <div class="beast-grid" id="bestiary-grid"></div>
-    <div class="beast-detail" id="bestiary-detail-panel"></div>
   </div>
 </div>
 
@@ -210,7 +212,16 @@
     <button class="btn btn-sm" onclick="show('s-profile')">👤 Mi Perfil</button>
     <button class="btn btn-sm btn-red" onclick="logout()">🚪 Cerrar Sesión</button>
   </div>
-  <div class="chat-wrap">
+  
+  <!-- BESTIARIO MOVIDO AL LOBBY -->
+  <div class="chat-wrap" style="border-top:0.5px solid rgba(255,255,255,.1);padding-top:16px;margin-top:16px">
+    <h2 style="margin:0 0 10px 0;font-size:16px">📖 Bestiario Vicamon</h2>
+    <p style="font-size:11px;color:rgba(255,255,255,.3);margin-bottom:10px">Estudia los ataques de los Vicamons generales disponibles.</p>
+    <div class="beast-grid" id="bestiary-grid"></div>
+    <div class="beast-detail" id="bestiary-detail-panel"></div>
+  </div>
+
+  <div class="chat-wrap" style="margin-top:20px">
     <h2 style="margin:0 0 10px 0;font-size:16px">Chat del Lobby</h2>
     <div class="chat-box" id="chat-box"><div class="chat-empty">Sé el primero en escribir un mensaje...</div></div>
     <div style="display:flex;gap:8px">
@@ -377,7 +388,7 @@
   </div>
 </div>
 
-<!-- SCRIPTS (CARGA ESTÁTICA Y ORDENADA) -->
+<!-- SCRIPTS -->
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="beasts.js"></script>
 <script src="ui.js"></script>
@@ -387,7 +398,6 @@
 <script src="tournament.js"></script>
 <script src="app.js"></script>
 <script>
-  // Cargar bestiario desde backend y luego iniciar sesión
   fetch('/api/beasts')
     .then(r => r.json())
     .then(data => {
