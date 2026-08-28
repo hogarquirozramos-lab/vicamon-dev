@@ -3,13 +3,15 @@ var myToken = null;
 var myCurrentHP = 0;
 var myCurrentVC = 0;
 var myPhysicalBeasts = [];
-var myOwnedVicamons = []; // Vicamons poseídos
+var myOwnedVicamons = [];
 var myStats = { wins: 0, losses: 0, rank: null, tier: 0 };
 var platformWalletAddress = ''; 
 
 function checkSession() {
+  console.log("Ejecutando checkSession...");
   const token = localStorage.getItem('vicamon_token');
   if (token) {
+    console.log("Token encontrado, validando sesión...");
     myToken = token;
     const savedName = localStorage.getItem('vicamon_nick') || 'Entrenador';
     myName = savedName;
@@ -17,20 +19,22 @@ function checkSession() {
     document.getElementById('step-name').style.display = 'block';
     document.getElementById('inp-name').value = savedName;
     
-    // NUEVO: Revisar si ya tiene Vicamons poseídos
     fetch('/api/get-owned-vicamons', { headers: { 'Authorization': `Bearer ${token}` }})
       .then(r => {
+        console.log("Respuesta HTTP de get-owned-vicamons:", r.status);
         if (!r.ok) return r.json().then(err => { throw new Error(err.msg || 'Error del servidor'); });
         return r.json();
       })
       .then(data => {
+        console.log("Datos recibidos:", data);
         if(data.ok) {
           myOwnedVicamons = data.vicamons;
           if(myOwnedVicamons.length === 0) {
-            // No tiene starter, mostrar pantalla de elección
+            console.log("No tiene starter, mostrando pantalla de elección.");
             show('s-starter');
             buildStarterPicker();
           } else {
+            console.log("Tiene starter, yendo al perfil.");
             goProfile();
           }
         } else {
@@ -39,13 +43,14 @@ function checkSession() {
       })
       .catch(err => {
         console.error("Session check failed:", err);
-        alert("Error al cargar sesión: " + err.message + "\n\nSi el error es 'relation owned_vicamons does not exist', debes crear la tabla en NeonDB.");
+        alert("Error al cargar sesión: " + err.message);
         logout();
       });
+  } else {
+    console.log("No hay token guardado, quedándose en login.");
   }
 }
 
-// NUEVO: Construir el selector de Starter Inicial
 function buildStarterPicker() {
   const grid = document.getElementById('starter-grid');
   if (!grid) return;
@@ -57,7 +62,6 @@ function buildStarterPicker() {
   grid.innerHTML = html;
 }
 
-// NUEVO: Seleccionar Starter
 function selectStarter(key) {
   document.querySelectorAll('#starter-grid .bcard').forEach(c => c.classList.remove('sel'));
   document.getElementById('st-'+key)?.classList.add('sel');
@@ -65,7 +69,6 @@ function selectStarter(key) {
   document.getElementById('btn-confirm-starter').disabled = false;
 }
 
-// NUEVO: Confirmar Starter
 async function confirmStarter() {
   const key = window._selectedStarter;
   if(!key) return alert('Selecciona un Vicamon');
@@ -98,8 +101,10 @@ async function register() {
   if(!email || !password) return alert('Debes poner un correo y contraseña');
   if(password.length < 6) return alert('La contraseña debe tener al menos 6 caracteres');
   try {
+    console.log("Intentando registrar:", email);
     const res = await fetch('/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password, nick: email.split('@')[0] }) });
     const data = await res.json();
+    console.log("Respuesta de registro:", data);
     if(data.ok) {
       localStorage.setItem('vicamon_token', data.token);
       localStorage.setItem('vicamon_nick', data.user.nick);
@@ -116,13 +121,16 @@ async function login() {
   const password = document.getElementById('inp-password').value;
   if(!email || !password) return alert('Debes poner tu correo y contraseña');
   try {
+    console.log("Intentando login con:", email);
     const res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
     const data = await res.json();
+    console.log("Respuesta de login:", data);
     if(data.ok) {
       localStorage.setItem('vicamon_token', data.token);
       localStorage.setItem('vicamon_nick', data.user.nick);
       myToken = data.token;
       myName = data.user.nick;
+      alert("Login exitoso, recargando página...");
       location.reload();
     } else {
       if (data.msg === 'Usuario no encontrado') { alert('Usuario no encontrado. Crea una cuenta para empezar.'); } else { alert('Error: ' + data.msg); }
