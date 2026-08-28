@@ -3,7 +3,7 @@ var myToken = null;
 var myCurrentHP = 0;
 var myCurrentVC = 0;
 var myPhysicalBeasts = [];
-var myOwnedVicamons = [];
+var myOwnedVicamons = []; 
 var myStats = { wins: 0, losses: 0, rank: null, tier: 0 };
 var platformWalletAddress = ''; 
 
@@ -23,7 +23,7 @@ function checkSession() {
             show('s-starter');
             buildStarterPicker();
           } else {
-            goProfile();
+            enterGame(); // Llama a la nueva función directa
           }
         } else {
           throw new Error('Sesión inválida');
@@ -31,11 +31,24 @@ function checkSession() {
       })
       .catch(err => {
         console.error("Session check failed:", err);
-        // Si hay error, mostramos el login de nuevo
-        document.getElementById('auth-box').style.display = 'block';
-        document.getElementById('step-name').style.display = 'none';
+        show('s-login');
       });
   }
+}
+
+// NUEVO: Función directa para entrar al juego sin pasar por el login
+function enterGame() {
+  if (!ws || ws.readyState !== 1) { 
+    if(!myBeast) myBeast = 'aries'; 
+    connectWS(); 
+  }
+  show('s-profile');
+  updateProfileUI();
+  buildBestiary();
+  autoRedeemPhysicalCodes();
+  updateHPDisplay(myCurrentHP);
+  if (!isGuest) checkHPNow(false);
+  updatePhysicalUI();
 }
 
 function buildStarterPicker() {
@@ -70,7 +83,7 @@ async function confirmStarter() {
     const data = await res.json();
     if(data.ok) {
       alert('¡Has elegido a tu primer Vicamon!');
-      checkSession(); // Llama a checkSession en lugar de recargar
+      checkSession(); 
     } else {
       alert('Error al guardar tu Vicamon.');
     }
@@ -96,10 +109,7 @@ async function register() {
       myToken = data.token;
       myName = data.user.nick;
       closeRegisterModal();
-      document.getElementById('auth-box').style.display = 'none';
-      document.getElementById('step-name').style.display = 'block';
-      document.getElementById('inp-name').value = myName;
-      checkSession(); // Llama a checkSession en lugar de recargar
+      checkSession(); 
     } else { alert('Error: ' + data.msg); }
   } catch(e) { alert('Error de conexión'); }
 }
@@ -116,10 +126,7 @@ async function login() {
       localStorage.setItem('vicamon_nick', data.user.nick);
       myToken = data.token;
       myName = data.user.nick;
-      document.getElementById('auth-box').style.display = 'none';
-      document.getElementById('step-name').style.display = 'block';
-      document.getElementById('inp-name').value = myName;
-      checkSession(); // Llama a checkSession en lugar de recargar
+      checkSession(); 
     } else {
       if (data.msg === 'Usuario no encontrado') { alert('Usuario no encontrado. Crea una cuenta para empezar.'); } else { alert('Error: ' + data.msg); }
     }
@@ -132,8 +139,6 @@ function logout() {
   myToken = null; 
   myName = ''; 
   if(ws) { try { ws.close(); } catch(e){} } 
-  document.getElementById('auth-box').style.display = 'block';
-  document.getElementById('step-name').style.display = 'none';
   show('s-login'); 
 }
 
