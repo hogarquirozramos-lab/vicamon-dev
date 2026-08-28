@@ -27,9 +27,9 @@ window._boardRole = 'p1';
 
 setInterval(() => { if (ws && ws.readyState === 1) { if (Date.now() - lastMsgTime > 25000) { console.log("WS timeout, forzando reconexión..."); try { ws.close(); } catch(e) {} return; } ws.send(JSON.stringify({type:'ping'})); } }, 10000);
 
-function goProfile(){ if(!window.myToken){alert('Inicia sesión primero');return;} myName=document.getElementById('inp-name').value.trim(); if(!myName){alert('Escribe tu nombre de combate');return;} localStorage.setItem('vicamon_nick', myName); updateProfileUI(); buildBestiary(); autoRedeemPhysicalCodes(); show('s-profile'); updateHPDisplay(myCurrentHP); checkHPNow(false); if (!ws || ws.readyState !== 1) { connectWS(); } }
+function goProfile(){ if(!window.myToken){alert('Inicia sesión primero');return;} myName=document.getElementById('inp-name').value.trim(); if(!myName){alert('Escribe tu nombre de combate');return;} localStorage.setItem('vicamon_nick', myName); updateProfileUI(); if (typeof buildMyVicamonsProfile === 'function') buildMyVicamonsProfile(); autoRedeemPhysicalCodes(); show('s-profile'); updateHPDisplay(myCurrentHP); checkHPNow(false); if (!ws || ws.readyState !== 1) { connectWS(); } }
 
-function enterLobby(){ if(ws && ws.readyState === 1) { show('s-lobby'); ws.send(JSON.stringify({type:'ping'})); } else { if(!myBeast) myBeast = 'aries'; connectWS(); } }
+function enterLobby(){ if(ws && ws.readyState === 1) { show('s-lobby'); if (typeof buildBestiary === 'function') buildBestiary(); ws.send(JSON.stringify({type:'ping'})); } else { if(!myBeast) myBeast = 'aries'; connectWS(); } }
 function connectWS(){ clearTimeout(reconnectTimer); isKicked=false; const proto=location.protocol==='https:'?'wss':'ws'; const localWs = new WebSocket(`${proto}://${location.host}`); localWs.onopen=()=>{ clearTimeout(reconnectTimer); lastMsgTime = Date.now(); localWs.send(JSON.stringify({type:'join', token: window.myToken, name:myName, beast:myBeast||'aries'})); }; localWs.onmessage=e=>{ lastMsgTime = Date.now(); try{handleMsg(JSON.parse(e.data));}catch(err){console.error(err);} }; localWs.onerror=()=>{}; localWs.onclose=()=>{ if(ws !== localWs) return; const inBattle=document.getElementById('s-battle').classList.contains('active'); if(!inBattle && !isKicked) reconnectTimer=setTimeout(()=>{ if(myName&&myBeast) connectWS(); },2000); }; ws = localWs; }
 
 function handleMsg(m){
@@ -43,16 +43,12 @@ function handleMsg(m){
   if(m.type === 'tower_status') {
     const hpBtn = document.getElementById('btn-tower-hp');
     const trainBtn = document.getElementById('btn-tower-train');
-    const guestBtn = document.getElementById('btn-tower-guest');
-    const status = m.status;
-    
     if(hpBtn) { hpBtn.disabled = myCurrentHP < 100; hpBtn.textContent = '⚔️ Torre VC (Costo: 100 HP)'; hpBtn.style.opacity = myCurrentHP < 100 ? '0.5' : '1'; }
     if(trainBtn) { 
         trainBtn.textContent = '📅 Torre Diaria (Costo: 50 HP)'; 
         if (!status.trainAvailable) { trainBtn.disabled = true; trainBtn.textContent = '🔒 Torre Diaria (Completada)'; trainBtn.style.opacity = '0.5'; }
         else { trainBtn.disabled = myCurrentHP < 50; trainBtn.style.opacity = myCurrentHP < 50 ? '0.5' : '1'; }
     }
-    if(guestBtn) { guestBtn.disabled = false; guestBtn.textContent = '🎮 Torre Libre (Gratis)'; }
   }
 
   if(m.type === 'tournament_state') { if (myTournamentMode === m.mode || (!myTournamentMode && document.getElementById('s-tournament').classList.contains('active'))) { handleTournamentState(m); } }
@@ -85,27 +81,14 @@ function handleMsg(m){
   if(m.type === 'full_leaderboard') { renderFullLeaderboard(m.list); }
   
   if(m.type==='battle_end'){ 
-    const won=m.won; 
-    const isTrainingResult = m.isTraining === true; 
-    const isCpuResult = m.isCpu === true; 
-    const isGauntletResult = m.isGauntlet === true; 
-    const isTeamResult = m.isTeamBattle === true; 
-    const isTournamentResult = m.isTournament === true; 
-    
-    const newHp = m.newHp || 0; 
-    const newVC = m.newVC || 0; 
-    const hypHp = m.hypotheticalHp || 0; 
-    const hypVC = m.hypotheticalVC || 0; 
-    
-    if(m.stats) updateProfileUI(m.stats); 
-    show('s-result'); 
-    
+    const won=m.won; const isTrainingResult = m.isTraining === true; const isCpuResult = m.isCpu === true; const isGauntletResult = m.isGauntlet === true; const isTeamResult = m.isTeamBattle === true; const isTournamentResult = m.isTournament === true; 
+    const newHp = m.newHp || 0; const newVC = m.newVC || 0; const hypHp = m.hypotheticalHp || 0; const hypVC = m.hypotheticalVC || 0; 
+    if(m.stats) updateProfileUI(m.stats); show('s-result'); 
     if(!isCpuResult && !isTrainingResult && !isGauntletResult) updateHPDisplay(newHp); 
     if(isGauntletResult && won) updateHPDisplay(newHp); 
     if(isTeamResult && !isTrainingResult) updateHPDisplay(newHp); 
     
     let resultBody=''; 
-    
     if(isTournamentResult){
        let btnText = 'Volver al Lobby'; let btnAction = "show('s-lobby'); myTournamentMode = null;";
        if (won && m.waitForNext) { btnText = 'Ir a la Sala del Torneo'; btnAction = "show('s-tournament');"; }
@@ -113,30 +96,21 @@ function handleMsg(m){
        document.getElementById('result-box').innerHTML=`<div class="r-icon">${won ? '🏆' : '💀'}</div><div class="r-title">${won ? '¡Victoria!' : 'Derrota'}</div>${resultBody}<button class="btn btn-blue" onclick="${btnAction}">${btnText}</button>`;
     }
     else if(isTrainingResult || isCpuResult){ 
-      if(won){ 
-        resultBody=`<div style="background:rgba(93,202,165,.08);border-radius:10px;padding:14px;margin:14px 0;text-align:center"><div style="font-size:20px">&#127891;</div><div style="color:#5DCAA5">Entrenamiento</div><div style="font-size:14px;color:#F6E265;margin-top:8px">Si fuera real habrías ganado:</div><div style="color:#5DCAA5;margin-top:4px">+${hypHp} HP</div><div style="color:#F6E265">+${hypVC} VC</div></div>`; 
-      } else { 
-        resultBody=`<div style="background:rgba(240,153,122,.08);border-radius:10px;padding:14px;margin:14px 0;text-align:center"><div style="font-size:20px">&#127891;</div><div style="color:#F0997B">Derrota en Entrenamiento</div><div style="font-size:14px;color:#aaa;margin-top:8px">Si fuera real habrías perdido HP, pero recibido:</div><div style="color:#F6E265;margin-top:4px">+${hypVC} VC de consuelo</div></div>`; 
-      } 
+      if(won){ resultBody=`<div style="background:rgba(93,202,165,.08);border-radius:10px;padding:14px;margin:14px 0;text-align:center"><div style="font-size:20px">&#127891;</div><div style="color:#5DCAA5">Entrenamiento</div><div style="font-size:14px;color:#F6E265;margin-top:8px">Si fuera real habrías ganado:</div><div style="color:#5DCAA5;margin-top:4px">+${hypHp} HP</div><div style="color:#F6E265">+${hypVC} VC</div></div>`; } 
+      else { resultBody=`<div style="background:rgba(240,153,122,.08);border-radius:10px;padding:14px;margin:14px 0;text-align:center"><div style="font-size:20px">&#127891;</div><div style="color:#F0997B">Derrota en Entrenamiento</div><div style="font-size:14px;color:#aaa;margin-top:8px">Si fuera real habrías perdido HP, pero recibido:</div><div style="color:#F6E265;margin-top:4px">+${hypVC} VC de consuelo</div></div>`; } 
     } 
     else if(isGauntletResult){ 
       let resultText = '';
       if (m.customMsg) { resultText = `<div style="font-size:14px;color:#F6E265;margin-top:8px;font-weight:700">${m.customMsg}</div>`; }
       if(won){ resultBody=`<div style="background:rgba(246, 226, 102, 0.1);border-radius:10px;padding:14px;margin:14px 0;text-align:center"><div style="color:#F6E265">¡Torre Completada!</div>${resultText}</div>`; } 
-      else { 
-        resultBody=`<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:14px;margin:14px 0;text-align:center"><div style="color:#F0997B">Torre Fallida</div><div style="color:#CFA9EC;margin-top:8px">Derrotaste ${m.defeated || 0} Vicamons</div>${resultText}</div>`; 
-      } 
+      else { resultBody=`<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:14px;margin:14px 0;text-align:center"><div style="color:#F0997B">Torre Fallida</div><div style="color:#CFA9EC;margin-top:8px">Derrotaste ${m.defeated || 0} Vicamons</div>${resultText}</div>`; } 
     }
     else if(isTeamResult){ 
       if(won){ resultBody=`<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:14px;margin:14px 0"><div>Batalla por HP</div><div style="color:#5DCAA5;margin-top:8px">¡Victoria!</div><div style="color:#F6E265;margin-top:4px">+${newVC} VC (HP restante)</div><div style="color:#fff;margin-top:8px;font-weight:700">Total HP: ${newHp}</div></div>`; } 
       else { resultBody=`<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:14px;margin:14px 0"><div>Batalla por HP</div><div style="color:#F0997B;margin-top:8px">Derrota</div><div style="color:#F6E265;margin-top:4px">+${newVC} VC (Consuelo)</div><div style="color:#fff;margin-top:8px;font-weight:700">Total HP: ${newHp}</div></div>`; } 
     } 
-    else if(won){ 
-      resultBody=`<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:14px;margin:14px 0"><div>¡Victoria!</div><div style="color:#5DCAA5;margin-top:8px">+100 HP (Apuesta del rival)</div><div style="color:#F6E265;margin-top:4px">+${newVC} VC (HP restante)</div><div style="color:#fff;margin-top:8px;font-weight:700">Total HP: ${newHp}</div></div>`; 
-    } 
-    else { 
-      resultBody=`<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:14px;margin:14px 0"><div>Derrota</div><div style="color:#F0997B;margin-top:8px">-100 HP (Apuesta perdida)</div><div style="color:#F6E265;margin-top:4px">+${newVC} VC (Consuelo)</div><div style="color:#fff;margin-top:8px;font-weight:700">Total HP: ${newHp}</div></div>`; 
-    } 
+    else if(won){ resultBody=`<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:14px;margin:14px 0"><div>¡Victoria!</div><div style="color:#5DCAA5;margin-top:8px">+100 HP (Apuesta del rival)</div><div style="color:#F6E265;margin-top:4px">+${newVC} VC (HP restante)</div><div style="color:#fff;margin-top:8px;font-weight:700">Total HP: ${newHp}</div></div>`; } 
+    else { resultBody=`<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:14px;margin:14px 0"><div>Derrota</div><div style="color:#F0997B;margin-top:8px">-100 HP (Apuesta perdida)</div><div style="color:#F6E265;margin-top:4px">+${newVC} VC (Consuelo)</div><div style="color:#fff;margin-top:8px;font-weight:700">Total HP: ${newHp}</div></div>`; } 
     
     if (!isTournamentResult) {
         const icon = won ? '🏆' : '💀'; const title = won ? '¡Victoria!' : 'Derrota'; 
