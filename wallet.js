@@ -8,33 +8,21 @@ var myStats = { wins: 0, losses: 0, rank: null, tier: 0 };
 var platformWalletAddress = ''; 
 
 function checkSession() {
-  console.log("Ejecutando checkSession...");
   const token = localStorage.getItem('vicamon_token');
   if (token) {
-    console.log("Token encontrado, validando sesión...");
     myToken = token;
     const savedName = localStorage.getItem('vicamon_nick') || 'Entrenador';
     myName = savedName;
-    document.getElementById('auth-box').style.display = 'none';
-    document.getElementById('step-name').style.display = 'block';
-    document.getElementById('inp-name').value = savedName;
     
     fetch('/api/get-owned-vicamons', { headers: { 'Authorization': `Bearer ${token}` }})
-      .then(r => {
-        console.log("Respuesta HTTP de get-owned-vicamons:", r.status);
-        if (!r.ok) return r.json().then(err => { throw new Error(err.msg || 'Error del servidor'); });
-        return r.json();
-      })
+      .then(r => { if (!r.ok) return r.json().then(err => { throw new Error(err.msg || 'Error del servidor'); }); return r.json(); })
       .then(data => {
-        console.log("Datos recibidos:", data);
         if(data.ok) {
           myOwnedVicamons = data.vicamons;
           if(myOwnedVicamons.length === 0) {
-            console.log("No tiene starter, mostrando pantalla de elección.");
             show('s-starter');
             buildStarterPicker();
           } else {
-            console.log("Tiene starter, yendo al perfil.");
             goProfile();
           }
         } else {
@@ -43,11 +31,10 @@ function checkSession() {
       })
       .catch(err => {
         console.error("Session check failed:", err);
-        alert("Error al cargar sesión: " + err.message);
-        logout();
+        // Si hay error, mostramos el login de nuevo
+        document.getElementById('auth-box').style.display = 'block';
+        document.getElementById('step-name').style.display = 'none';
       });
-  } else {
-    console.log("No hay token guardado, quedándose en login.");
   }
 }
 
@@ -83,7 +70,7 @@ async function confirmStarter() {
     const data = await res.json();
     if(data.ok) {
       alert('¡Has elegido a tu primer Vicamon!');
-      location.reload();
+      checkSession(); // Llama a checkSession en lugar de recargar
     } else {
       alert('Error al guardar tu Vicamon.');
     }
@@ -101,17 +88,18 @@ async function register() {
   if(!email || !password) return alert('Debes poner un correo y contraseña');
   if(password.length < 6) return alert('La contraseña debe tener al menos 6 caracteres');
   try {
-    console.log("Intentando registrar:", email);
     const res = await fetch('/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password, nick: email.split('@')[0] }) });
     const data = await res.json();
-    console.log("Respuesta de registro:", data);
     if(data.ok) {
       localStorage.setItem('vicamon_token', data.token);
       localStorage.setItem('vicamon_nick', data.user.nick);
       myToken = data.token;
       myName = data.user.nick;
       closeRegisterModal();
-      location.reload(); 
+      document.getElementById('auth-box').style.display = 'none';
+      document.getElementById('step-name').style.display = 'block';
+      document.getElementById('inp-name').value = myName;
+      checkSession(); // Llama a checkSession en lugar de recargar
     } else { alert('Error: ' + data.msg); }
   } catch(e) { alert('Error de conexión'); }
 }
@@ -121,24 +109,34 @@ async function login() {
   const password = document.getElementById('inp-password').value;
   if(!email || !password) return alert('Debes poner tu correo y contraseña');
   try {
-    console.log("Intentando login con:", email);
     const res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
     const data = await res.json();
-    console.log("Respuesta de login:", data);
     if(data.ok) {
       localStorage.setItem('vicamon_token', data.token);
       localStorage.setItem('vicamon_nick', data.user.nick);
       myToken = data.token;
       myName = data.user.nick;
-      alert("Login exitoso, recargando página...");
-      location.reload();
+      document.getElementById('auth-box').style.display = 'none';
+      document.getElementById('step-name').style.display = 'block';
+      document.getElementById('inp-name').value = myName;
+      checkSession(); // Llama a checkSession en lugar de recargar
     } else {
       if (data.msg === 'Usuario no encontrado') { alert('Usuario no encontrado. Crea una cuenta para empezar.'); } else { alert('Error: ' + data.msg); }
     }
   } catch(e) { alert('Error de conexión con el servidor'); }
 }
 
-function logout() { localStorage.removeItem('vicamon_token'); localStorage.removeItem('vicamon_nick'); myToken = null; myName = ''; if(ws) { try { ws.close(); } catch(e){} } location.reload(); }
+function logout() { 
+  localStorage.removeItem('vicamon_token'); 
+  localStorage.removeItem('vicamon_nick'); 
+  myToken = null; 
+  myName = ''; 
+  if(ws) { try { ws.close(); } catch(e){} } 
+  document.getElementById('auth-box').style.display = 'block';
+  document.getElementById('step-name').style.display = 'none';
+  show('s-login'); 
+}
+
 function depositWidgetHTML() { return ''; } 
 function getPhantom() { return window.phantom?.solana || window.solana || null; }
 function copyWallet() { return; }
