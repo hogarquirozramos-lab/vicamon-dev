@@ -74,6 +74,10 @@ async function confirmStarter() {
   if(!key) return alert('Selecciona un Vicamon');
   const customName = document.getElementById('inp-starter-name').value.trim() || BEASTS[key].name;
   
+  // Bloquear botón inmediatamente para evitar clics múltiples
+  const btn = document.getElementById('btn-confirm-starter');
+  if(btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+  
   try {
     const res = await fetch('/api/choose-starter', {
       method: 'POST',
@@ -86,9 +90,11 @@ async function confirmStarter() {
       checkSession(); 
     } else {
       alert('Error al guardar tu Vicamon.');
+      if(btn) { btn.disabled = false; btn.textContent = '¡Adoptar y Comenzar! 🤝'; }
     }
   } catch(e) {
     alert('Error de conexión');
+    if(btn) { btn.disabled = false; btn.textContent = '¡Adoptar y Comenzar! 🤝'; }
   }
 }
 
